@@ -25,6 +25,14 @@ permission_query_conditions = {
 	"VerityAI Integration Status": "verityai_saas.services.permissions.workspace_child_query_condition",
 }
 
+role_home_page = {
+	"VerityAI Customer Owner": "verityai",
+	"VerityAI Customer Admin": "verityai",
+	"VerityAI Sales User": "verityai",
+	"VerityAI Support User": "verityai",
+	"VerityAI Billing User": "verityai",
+	"VerityAI Viewer": "verityai",
+}
 scheduler_events = {
 	"hourly": ["verityai_saas.services.usage.sync_all_usage", "verityai_saas.services.billing.check_subscription_expiry"],
 	"daily": ["verityai_saas.services.notifications.send_daily_summaries", "verityai_saas.services.billing.check_trial_expiry", "verityai_saas.services.notifications.send_usage_warnings"],

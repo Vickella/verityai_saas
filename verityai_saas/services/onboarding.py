@@ -3,6 +3,7 @@ from frappe import _
 from frappe.utils import add_days, today
 
 from verityai_saas.services import engine
+from verityai_saas.services.user_roles import assign_workspace_role
 
 
 CHECKLIST = (
@@ -39,6 +40,7 @@ def create_workspace(owner_user, account_name, workspace_name, business_name=Non
 		account = ensure_account(owner_user, account_name, values.get("billing_email"), values)
 		workspace = frappe.get_doc({"doctype": "VerityAI Workspace", "workspace_name": slug_name(workspace_name), "account": account, "owner_user": owner_user, "business_name": business_name or workspace_name, "business_nature": values.get("business_nature"), "website_url": values.get("website_url"), "country": values.get("country"), "currency": values.get("currency") or "USD", "timezone": values.get("timezone") or "Africa/Harare", "status": "Trial", "onboarding_status": "In Progress"}).insert(ignore_permissions=True)
 		member = frappe.get_doc({"doctype": "VerityAI Workspace Member", "workspace": workspace.name, "user": owner_user, "workspace_role": "Owner", "status": "Active", "can_manage_assistant": 1, "can_manage_widget": 1, "can_manage_knowledge": 1, "can_view_leads": 1, "can_manage_leads": 1, "can_view_conversations": 1, "can_manage_billing": 1, "can_manage_whatsapp": 1, "can_manage_email": 1, "can_approve_quotes": 1}).insert(ignore_permissions=True)
+		assign_workspace_role(owner_user, "Owner")
 		tenant = engine.create_engine_tenant(workspace.name)
 		configuration = engine.ensure_engine_configuration(workspace.name)
 		plan_name = plan_name or frappe.db.get_value("VerityAI Plan", {"plan_code": "TRIAL", "active": 1}, "name") or frappe.db.get_value("VerityAI Plan", {"active": 1}, "name")
@@ -56,7 +58,7 @@ def create_workspace(owner_user, account_name, workspace_name, business_name=Non
 		engine.apply_plan_limits(workspace.name, plan.name)
 		frappe.db.set_value("VerityAI Account", account, "default_workspace", workspace.name)
 		update_progress(workspace.name)
-		return {"workspace": workspace.name, "account": account, "member": member.name, "engine_tenant": tenant, "engine_configuration": configuration, "subscription": subscription.name, "wallet": wallet.name, "dashboard_url": f"/app/dashboard?workspace={workspace.name}"}
+		return {"workspace": workspace.name, "account": account, "member": member.name, "engine_tenant": tenant, "engine_configuration": configuration, "subscription": subscription.name, "wallet": wallet.name, "dashboard_url": f"/verityai/dashboard?workspace={workspace.name}"}
 	except Exception:
 		frappe.db.rollback(save_point=savepoint)
 		raise

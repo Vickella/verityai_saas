@@ -62,19 +62,19 @@ Engine secrets and `AI Configuration.system_prompt` are absent from response fie
 
 The shared SaaS portal shell provides:
 
-- `/app` and `/app/dashboard`
-- `/app/onboarding`
-- `/app/assistant`
-- `/app/widget`
-- `/app/knowledge`
-- `/app/leads`
-- `/app/conversations`
-- `/app/usage`
-- `/app/billing`
-- `/app/email`
-- `/app/whatsapp`
-- `/app/team`
-- `/app/admin` for operators
+- `/verityai` and `/verityai/dashboard`
+- `/verityai/onboarding`
+- `/verityai/assistant`
+- `/verityai/widget`
+- `/verityai/knowledge`
+- `/verityai/leads`
+- `/verityai/conversations`
+- `/verityai/usage`
+- `/verityai/billing`
+- `/verityai/email`
+- `/verityai/whatsapp`
+- `/verityai/team`
+- `/verityai/admin` for operators
 
 The portal uses product language and shared responsive CSS/JavaScript. The widget page displays embed code for `/assets/verity_ai/js/widget.js`; no SaaS widget runtime was created.
 
@@ -108,7 +108,7 @@ The portal uses product language and shared responsive CSS/JavaScript. The widge
 
 Passed:
 
-- Windows Python compilation: 51 Python files compiled without syntax errors.
+- Windows Python compilation: 56 Python files compiled without syntax errors.
 - Frappe bench-environment import validation: all service and API modules imported successfully.
 - Frappe bench-environment `compileall`: passed.
 - `node --check verityai_saas/public/js/portal.js`: passed.
@@ -116,7 +116,8 @@ Passed:
 - `bench --site farm.test install-app verityai_saas`: installed; the first attempt exposed and led to a fix for the cyclic Account/Workspace Link creation order.
 - `bench --site farm.test migrate`: passed. The pre-existing Frappe S3 backup `lib.GEN_EMAIL` warnings remained non-fatal.
 - `bench --site farm.test run-tests --app verity_ai`: passed, 35 tests.
-- `bench --site farm.test run-tests --app verityai_saas`: passed, 11 tests.
+- `bench --site farm.test run-tests --app verityai_saas`: passed, 15 tests, including real website-route resolution and portal-role checks.
+- Sequential SaaS and engine regression runs passed without fixture leakage: 15/15 and 35/35.
 - `bench build --app verity_ai`: passed.
 - `bench build --app verityai_saas`: passed.
 
@@ -129,11 +130,11 @@ MariaDB plus the bench Redis cache and queue were started for validation. The co
 - Full WhatsApp setup stores engine credentials safely and reports configuration presence, but does not perform a live Meta Graph connection test.
 - File extraction, OCR, website crawling, and semantic/vector search are not duplicated here; manual knowledge text uses the existing engine hook and chunker.
 - Quote approval and AI action approval remain engine-owned. A customer-friendly approval page can be added later without bypassing those hooks.
-- `/app` is also Frappe's conventional Desk prefix. Route precedence must be verified after migration on the target Frappe version; if Desk takes precedence, deploy the same portal under a non-reserved route and redirect customer roles there.
+- The customer portal uses the validated `/verityai` route because `/app` is reserved by Frappe Desk. Website users receive portal-only roles with `desk_access = 0`.
 
 ## Manual setup and next commands
 
 1. Keep the source tree synchronized or linked at `/home/frappe/frappe-bench/apps/verityai_saas`.
 2. Configure AI provider credentials through an operator-only engine workflow; they are intentionally absent from customer pages.
-3. Verify `/app` route precedence, a real allowed-domain/widget exchange, outbound email, and Meta webhook credentials before production launch.
+3. Verify a real allowed-domain/widget exchange, outbound email, and Meta webhook credentials before production launch.
 4. Re-run migration and both suites after future schema or engine integration changes.

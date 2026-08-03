@@ -3,6 +3,7 @@ from frappe.utils import now_datetime
 
 from verityai_saas.services import engine
 from verityai_saas.services.permissions import check_workspace_access
+from verityai_saas.services.user_roles import assign_workspace_role
 
 
 def workspace_summary(workspace_name, user=None):
@@ -38,5 +39,7 @@ def add_member(workspace_name, email, role="Viewer"):
 		user = frappe.get_doc("User", email)
 	if frappe.db.exists("VerityAI Workspace Member", {"workspace": workspace_name, "user": user.name}):
 		frappe.throw("This user is already a workspace member.", frappe.DuplicateEntryError)
-	return frappe.get_doc({"doctype": "VerityAI Workspace Member", "workspace": workspace_name, "user": user.name, "workspace_role": role, "status": "Active"}).insert(ignore_permissions=True).name
+	member = frappe.get_doc({"doctype": "VerityAI Workspace Member", "workspace": workspace_name, "user": user.name, "workspace_role": role, "status": "Active"}).insert(ignore_permissions=True)
+	assign_workspace_role(user.name, role)
+	return member.name
 

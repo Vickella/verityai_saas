@@ -4,6 +4,7 @@ import frappe
 from frappe.tests.utils import FrappeTestCase
 
 from verityai_saas import setup_doctypes
+from verityai_saas.tests.cleanup import cleanup_test_workspace
 from verityai_saas.services import billing, engine, notifications, onboarding, usage, whatsapp
 from verityai_saas.services.permissions import check_workspace_access, require_operator
 
@@ -23,6 +24,10 @@ class TestVerityAISaaS(FrappeTestCase):
 		self.created = onboarding.create_workspace(self.owner, f"Account {token}", f"Workspace {token}", f"Business {token}")
 		self.workspace = self.created["workspace"]
 		self.tenant = self.created["engine_tenant"]
+
+	def tearDown(self):
+		cleanup_test_workspace(self.workspace, users=[self.owner, self.other])
+		super().tearDown()
 
 	def create_user(self, email):
 		return frappe.get_doc({"doctype": "User", "email": email, "first_name": "SaaS", "last_name": "Tester", "user_type": "Website User", "send_welcome_email": 0}).insert(ignore_permissions=True).name
