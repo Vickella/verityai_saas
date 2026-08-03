@@ -7,7 +7,7 @@
 
   const esc = (value) => String(value ?? "").replace(/[&<>'"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[c]));
   const number = (value) => new Intl.NumberFormat().format(Number(value || 0));
-  const pill = (value) => `<span class="va-pill ${["Active","Connected","Done","Normal","Trial"].includes(value)?"good":["Failed","Suspended","Exhausted"].includes(value)?"bad":""}">${esc(value || "—")}</span>`;
+  const pill = (value) => `<span class="va-pill ${["Active","Connected","Done","Normal","Trial","Healthy"].includes(value)?"good":["Failed","Suspended","Exhausted","Critical"].includes(value)?"bad":""}">${esc(value || "—")}</span>`;
   const field = (label, name, value="", type="text", full=false) => `<div class="va-field ${full?"full":""}"><label>${esc(label)}</label>${type==="textarea"?`<textarea name="${name}">${esc(value)}</textarea>`:`<input type="${type}" name="${name}" value="${esc(value)}">`}</div>`;
   const json = (form) => Object.fromEntries(new FormData(form).entries());
 
@@ -33,6 +33,14 @@
     content.innerHTML = `<div class="va-grid"><div class="va-card va-metric"><span>Setup progress</span><strong>${number(d.workspace.setup_progress)}%</strong><div class="va-progress"><i style="width:${Number(d.workspace.setup_progress||0)}%"></i></div></div><div class="va-card va-metric"><span>Conversations</span><strong>${number(d.conversation_count)}</strong></div><div class="va-card va-metric"><span>New leads</span><strong>${number(d.new_leads)}</strong></div><div class="va-card va-metric"><span>Tokens remaining</span><strong>${number(d.wallet.tokens_remaining)}</strong></div></div><div class="va-grid two"><div class="va-card"><h2>Workspace health</h2><p>${pill(d.workspace.status)} ${pill(d.wallet.status)}</p><p class="muted">${d.recent_alerts.length ? esc(d.recent_alerts[0].summary) : "No recent alerts."}</p></div><div class="va-card"><h2>Current plan</h2><p><strong>${esc(d.subscription?.plan || "No plan")}</strong></p><p class="muted">${esc(d.subscription?.status || "Not configured")}</p></div></div>`;
   }
 
+  async function health(filters={}) {
+    const d = await call("verityai_saas.api.health.get", {workspace, ...filters});
+    const subscription = d.subscription || {};
+    const wallet = d.wallet || {};
+    const whatsapp = d.whatsapp || {};
+    content.innerHTML = `<div class="va-grid"><div class="va-card va-metric"><span>Overall health</span><strong>${pill(d.overall_status)}</strong></div><div class="va-card va-metric"><span>Open alerts</span><strong>${number(d.open_alerts)}</strong></div><div class="va-card va-metric"><span>Critical alerts</span><strong>${number(d.critical_alerts)}</strong></div><div class="va-card va-metric"><span>Total alerts</span><strong>${number(d.total_alerts)}</strong></div></div><div class="va-grid two"><div class="va-card"><h2>Services</h2><p>Workspace ${pill(d.workspace_status)}</p><p>Assistant ${pill(d.engine_active?"Active":"Inactive")}</p><p>Monitoring ${pill(d.monitoring_enabled?"Active":"Disabled")}</p></div><div class="va-card"><h2>Account health</h2><p>Subscription ${pill(subscription.status||"Not configured")}</p><p>Usage wallet ${pill(wallet.status||"Not configured")}</p><p>WhatsApp ${pill(whatsapp.setup_status||"Not configured")}</p></div></div><form id="health-filter" class="va-card va-form"><h2>Alert history</h2><div class="va-fields"><div class="va-field"><label>Status</label><select name="status"><option value="">All statuses</option>${["Open","Acknowledged","Resolved"].map(value=>`<option ${filters.status===value?"selected":""}>${value}</option>`).join("")}</select></div><div class="va-field"><label>Severity</label><select name="severity"><option value="">All severities</option>${["Critical","Warning","Info"].map(value=>`<option ${filters.severity===value?"selected":""}>${value}</option>`).join("")}</select></div></div><button class="va-button secondary">Apply filters</button></form>${table([["Alert",r=>`<strong>${esc(r.summary||r.alert_type)}</strong><br><span class="muted">${esc(r.alert_type||"")}</span>`],["Severity",r=>pill(r.severity)],["Status",r=>pill(r.status)],["Occurrences",r=>number(r.occurrence_count)],["Last seen",r=>esc(r.last_seen||r.creation)]],d.alerts)}`;
+    document.querySelector("#health-filter").addEventListener("submit", event => { event.preventDefault(); health(json(event.currentTarget)); });
+  }
   async function onboarding() {
     const d = await call("verityai_saas.api.workspace.get", {workspace});
     content.innerHTML = `<div class="va-card"><h2>Set up your assistant</h2><div class="va-progress"><i style="width:${Number(d.workspace.setup_progress||0)}%"></i></div><p class="muted">${number(d.workspace.setup_progress)}% complete</p></div>${table([["Step",r=>esc(r.step_label)],["Status",r=>pill(r.status)]], d.checklist)}`;
@@ -115,7 +123,7 @@
     bind("new-workspace", async f=>{const d=await call("verityai_saas.api.onboarding.create",json(f));location.href=d.dashboard_url;});
   }
 
-  const renderers={dashboard,onboarding,assistant,widget,knowledge,leads,conversations,quotes,usage,billing,email,whatsapp,team};
+  const renderers={dashboard,health,onboarding,assistant,widget,knowledge,leads,conversations,quotes,usage,billing,email,whatsapp,team};
   async function init(){try{const rows=await call("verityai_saas.api.workspace.list_workspaces");if(!rows.length){newWorkspace();return}const params=new URLSearchParams(location.search);workspace=params.get("workspace")||localStorage.getItem("verityai_workspace")||rows[0].name;if(!rows.some(r=>r.name===workspace))workspace=rows[0].name;picker.innerHTML=rows.map(r=>`<option value="${esc(r.name)}" ${r.name===workspace?"selected":""}>${esc(r.business_name||r.workspace_name)}</option>`).join("");picker.addEventListener("change",()=>{workspace=picker.value;localStorage.setItem("verityai_workspace",workspace);renderers[page]();});localStorage.setItem("verityai_workspace",workspace);await (renderers[page]||dashboard)()}catch(err){content.innerHTML=`<div class="va-card va-empty">${esc(err.message)}</div>`;alert(err.message,true)}}
   init();
 })();

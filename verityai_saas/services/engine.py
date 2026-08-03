@@ -225,9 +225,21 @@ def get_workspace_leads(workspace_name, filters=None):
 	return frappe.get_all("AI Lead", filters=query, fields=["name", "lead_name", "email", "phone", "source_channel", "status", "chat_session", "dynamic_details", "creation", "modified"], order_by="creation desc", limit=min(int(filters.get("limit") or 50), 200))
 
 
-def get_workspace_alerts(workspace_name):
+def get_workspace_alerts(workspace_name, filters=None):
 	tenant = get_workspace_engine_tenant(workspace_name)
-	return frappe.get_all("AI Monitoring Alert", filters={"tenant": tenant}, fields=["name", "alert_type", "severity", "status", "summary", "occurrence_count", "last_seen"], order_by="last_seen desc", limit=20)
+	filters = filters or {}
+	query = {"tenant": tenant}
+	for key in ("status", "severity"):
+		if filters.get(key):
+			query[key] = filters[key]
+	limit = min(max(int(filters.get("limit") or 20), 1), 200)
+	return frappe.get_all(
+		"AI Monitoring Alert",
+		filters=query,
+		fields=["name", "alert_type", "severity", "status", "summary", "occurrence_count", "last_seen", "creation"],
+		order_by="last_seen desc",
+		limit=limit,
+	)
 
 
 def get_workspace_quote_requests(workspace_name, status=None, limit=100):

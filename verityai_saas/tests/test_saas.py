@@ -32,7 +32,7 @@ class TestVerityAISaaS(FrappeTestCase):
 
 	def tearDown(self):
 		super().tearDown()
-		cleanup_test_workspace(self.workspace, users=[self.owner, self.other])
+		cleanup_test_workspace(self.workspace, users=[self.owner, self.other], engine_tenant=self.tenant)
 
 	def create_user(self, email):
 		return frappe.get_doc({"doctype": "User", "email": email, "first_name": "SaaS", "last_name": "Tester", "user_type": "Website User", "send_welcome_email": 0}).insert(ignore_permissions=True).name

@@ -33,7 +33,7 @@ class TestCustomerPortalRoutes(FrappeTestCase):
 
 	def tearDown(self):
 		super().tearDown()
-		cleanup_test_workspace(self.created["workspace"], users=[self.user])
+		cleanup_test_workspace(self.created["workspace"], users=[self.user], engine_tenant=self.created["engine_tenant"])
 
 	def test_customer_portal_uses_non_desk_route(self):
 		frappe.set_user(self.user)
@@ -41,9 +41,12 @@ class TestCustomerPortalRoutes(FrappeTestCase):
 		self.assertIn('data-verity-page="dashboard"', content)
 		self.assertIn("/verityai/assistant", content)
 		self.assertIn("/verityai/quotes", content)
+		self.assertIn("/verityai/health", content)
 		self.assertNotIn('href="/app/assistant"', content)
 		quote_content = get_response_content("/verityai/quotes")
 		self.assertIn('data-verity-page="quotes"', quote_content)
+		health_content = get_response_content("/verityai/health")
+		self.assertIn('data-verity-page="health"', health_content)
 
 	def test_onboarding_returns_safe_dashboard_url(self):
 		self.assertTrue(self.created["dashboard_url"].startswith("/verityai/dashboard"))

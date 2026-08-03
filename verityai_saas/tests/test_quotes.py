@@ -38,7 +38,7 @@ class TestQuoteApprovalPortal(FrappeTestCase):
 
 	def tearDown(self):
 		super().tearDown()
-		cleanup_test_workspace(self.workspace, users=[self.owner, self.other])
+		cleanup_test_workspace(self.workspace, users=[self.owner, self.other], engine_tenant=self.tenant)
 
 	def create_user(self, email):
 		return frappe.get_doc(

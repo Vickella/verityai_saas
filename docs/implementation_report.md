@@ -34,6 +34,7 @@ The installer also creates portal-only customer roles, operator/admin roles, the
 - `services/engine.py`: the sole main bridge to tenant, configuration, domains, widget embed code, knowledge, leads, conversations, usage, alerts, quotation requests, approvals, and plan limits.
 - `services/onboarding.py`: transactional account/workspace/member/tenant/configuration/subscription/wallet/checklist provisioning.
 - `services/workspace.py`: workspace dashboard and team summaries.
+- `services/health.py`: tenant-scoped health state, service status, alert counts, and filterable safe alert history.
 - `services/usage.py`: idempotent engine usage-log to SaaS transaction synchronization and wallet totals.
 - `services/billing.py`: plan assignment, manual billing events with usage snapshots, suspension, and trial/subscription expiry.
 - `services/notifications.py`: Frappe email delivery, new-lead/handoff hooks, usage warnings, daily summaries, and delivery logs.
@@ -50,6 +51,7 @@ All public SaaS methods return the required `{success, data, error, code}` envel
 - Knowledge
 - Leads
 - Conversations
+- Health and monitoring alerts
 - Usage
 - Billing
 - Email
@@ -64,6 +66,7 @@ Engine secrets and `AI Configuration.system_prompt` are absent from response fie
 The shared SaaS portal shell provides:
 
 - `/verityai` and `/verityai/dashboard`
+- `/verityai/health`
 - `/verityai/onboarding`
 - `/verityai/assistant`
 - `/verityai/widget`
@@ -108,11 +111,13 @@ The portal uses product language and shared responsive CSS/JavaScript. The widge
 
 `verityai_saas/tests/test_quotes.py` covers safe-field responses, tenant isolation, permission denial, and delegation through the authoritative engine document hook.
 
+`verityai_saas/tests/test_health.py` covers tenant-safe alert aggregation, status/severity filters, derived workspace health, and unauthorized access denial.
+
 ## Validation results
 
 Passed:
 
-- Windows Python compilation: 59 Python files compiled without syntax errors.
+- Windows Python compilation: 63 Python files compiled without syntax errors.
 - Frappe bench-environment import validation: all service and API modules imported successfully.
 - Frappe bench-environment `compileall`: passed.
 - `node --check verityai_saas/public/js/portal.js`: passed.
@@ -120,8 +125,8 @@ Passed:
 - `bench --site farm.test install-app verityai_saas`: installed; the first attempt exposed and led to a fix for the cyclic Account/Workspace Link creation order.
 - `bench --site farm.test migrate`: passed. The pre-existing Frappe S3 backup `lib.GEN_EMAIL` warnings remained non-fatal.
 - `bench --site farm.test run-tests --app verity_ai`: passed, 35 tests.
-- `bench --site farm.test run-tests --app verityai_saas`: passed, 19 tests, including website-route resolution, portal roles, quotation scoping, and approval delegation.
-- Sequential SaaS and engine regression runs passed without fixture leakage: 19/19 and 35/35.
+- `bench --site farm.test run-tests --app verityai_saas`: passed, 22 tests, including website routes, portal roles, health/alert scoping, quotation scoping, and approval delegation.
+- Sequential SaaS and engine regression runs passed without fixture leakage: 22/22 and 35/35.
 - `bench build --app verity_ai`: passed.
 - `bench build --app verityai_saas`: passed.
 
@@ -134,6 +139,7 @@ MariaDB plus the bench Redis cache and queue were started for validation. The co
 - Full WhatsApp setup stores engine credentials safely and reports configuration presence, but does not perform a live Meta Graph connection test.
 - File extraction, OCR, website crawling, and semantic/vector search are not duplicated here; manual knowledge text uses the existing engine hook and chunker.
 - Quote execution remains engine-owned. The customer page approves only tenant-scoped pending requests and deliberately triggers the existing engine hook; a live pilot must verify ERPNext quotation submission and the configured delivery channel.
+- Monitoring alert lifecycle and deduplication remain engine-owned; the customer health dashboard is intentionally read-only.
 - The customer portal uses the validated `/verityai` route because `/app` is reserved by Frappe Desk. Website users receive portal-only roles with `desk_access = 0`.
 
 ## Manual setup and next commands
