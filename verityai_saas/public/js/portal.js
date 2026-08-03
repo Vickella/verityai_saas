@@ -112,10 +112,33 @@
 
   async function team() {
     const rows = await call("verityai_saas.api.workspace.members", {workspace});
-    content.innerHTML = `<form id="team-form" class="va-card va-form"><h2>Invite a team member</h2><div class="va-fields">${field("Email","email","","email")}<div class="va-field"><label>Role</label><select name="role"><option>Viewer</option><option>Sales</option><option>Support</option><option>Admin</option><option>Billing Manager</option></select></div></div><button class="va-button">Invite member</button></form>${table([["User",r=>esc(r.user)],["Role",r=>esc(r.workspace_role)],["Status",r=>pill(r.status)]],rows)}`;
+    const roles = ["Viewer","Sales","Support","Admin","Billing Manager"];
+    const permissions = [["can_manage_assistant","Assistant"],["can_manage_widget","Widget"],["can_manage_knowledge","Knowledge"],["can_view_leads","View leads"],["can_manage_leads","Manage leads"],["can_view_conversations","Conversations"],["can_manage_billing","Billing"],["can_manage_whatsapp","WhatsApp"],["can_manage_email","Email"],["can_approve_quotes","Approve quotes"]];
+    const cards = rows.map(member => {
+      const owner = member.workspace_role === "Owner";
+      const disabled = member.status !== "Active";
+      if (owner) return `<div class="va-card"><h3>${esc(member.user)}</h3><p>${pill("Owner")} ${pill(member.status)}</p><p class="muted">The workspace owner always has full access.</p></div>`;
+      const roleOptions = roles.map(role=>`<option ${member.workspace_role===role?"selected":""}>${esc(role)}</option>`).join("");
+      const checks = permissions.map(([key,label])=>`<label><input type="checkbox" name="${key}" ${member[key]?"checked":""} ${disabled?"disabled":""}> ${esc(label)}</label>`).join("");
+      return `<form class="va-card va-form" data-member-form="${esc(member.name)}"><div><h3>${esc(member.user)}</h3><p>${pill(member.status)}</p></div><div class="va-field"><label>Workspace role</label><select name="role" ${disabled?"disabled":""}>${roleOptions}</select></div><div class="va-checks">${checks}</div><div class="va-actions"><button class="va-button" ${disabled?"disabled":""}>Save access</button>${disabled?'<span class="muted">Invite this email again to reactivate.</span>':`<button type="button" class="va-button danger" data-remove-member="${esc(member.name)}">Remove</button>`}</div></form>`;
+    }).join("");
+    content.innerHTML = `<form id="team-form" class="va-card va-form"><h2>Invite a team member</h2><div class="va-fields">${field("Email","email","","email")}<div class="va-field"><label>Role</label><select name="role">${roles.map(role=>`<option>${esc(role)}</option>`).join("")}</select></div></div><button class="va-button">Invite member</button></form><div class="va-grid two">${cards}</div>`;
     bind("team-form", f => call("verityai_saas.api.workspace.invite",{workspace,...json(f)}),team);
+    document.querySelectorAll("[data-member-form]").forEach(form => form.addEventListener("submit", async event => {
+      event.preventDefault();
+      const button = form.querySelector('button[type="submit"],button:not([type])');
+      const permissionValues = Object.fromEntries(permissions.map(([key])=>[key, form[key].checked?1:0]));
+      button.disabled = true;
+      try { await call("verityai_saas.api.workspace.update", {workspace,member:form.dataset.memberForm,role:form.role.value,permissions:permissionValues}); alert("Member access updated."); await team(); }
+      catch (err) { alert(err.message,true); button.disabled = false; }
+    }));
+    document.querySelectorAll("[data-remove-member]").forEach(button => button.addEventListener("click", async () => {
+      if (!window.confirm("Remove this member from the workspace?")) return;
+      button.disabled = true;
+      try { await call("verityai_saas.api.workspace.remove", {workspace,member:button.dataset.removeMember}); alert("Member removed."); await team(); }
+      catch (err) { alert(err.message,true); button.disabled = false; }
+    }));
   }
-
   function bind(id, action, after) { document.querySelector(`#${id}`).addEventListener("submit", async e => {e.preventDefault();const b=e.currentTarget.querySelector("button");b.disabled=true;try{await action(e.currentTarget);alert("Saved successfully.");if(after)await after();}catch(err){alert(err.message,true)}finally{b.disabled=false}}); }
 
   async function newWorkspace() {

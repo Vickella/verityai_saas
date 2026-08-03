@@ -2,7 +2,13 @@ import frappe
 
 from verityai_saas.api._response import endpoint, json_value
 from verityai_saas.services.permissions import get_user_workspaces, require_workspace_permission
-from verityai_saas.services.workspace import add_member, list_members, workspace_summary
+from verityai_saas.services.workspace import (
+	add_member,
+	list_members,
+	remove_member,
+	update_member,
+	workspace_summary,
+)
 
 
 @frappe.whitelist()
@@ -31,3 +37,23 @@ def invite(workspace, email, role="Viewer"):
 	require_workspace_permission(workspace, "manage_team")
 	return {"member": add_member(workspace, email, role)}
 
+
+@frappe.whitelist(methods=["POST"])
+@endpoint
+def update(workspace, member, role=None, permissions=None):
+	require_workspace_permission(workspace, "manage_team")
+	return {
+		"member": update_member(
+			workspace,
+			member,
+			role=role,
+			permissions=json_value(permissions, {}),
+		)
+	}
+
+
+@frappe.whitelist(methods=["POST"])
+@endpoint
+def remove(workspace, member):
+	require_workspace_permission(workspace, "manage_team")
+	return {"member": remove_member(workspace, member)}
