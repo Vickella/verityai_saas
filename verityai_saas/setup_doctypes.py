@@ -87,7 +87,7 @@ def ensure_doctypes():
 		field("country", "Country", "Link", options="Country"), field("currency", "Currency", "Link", options="Currency"),
 		field("status", "Status", "Select", options="Active\nSuspended\nCancelled", default="Active", in_list_view=1),
 		field("customer_type", "Customer Type", "Select", options="SME\nAgency\nEnterprise", default="SME"),
-		field("default_workspace", "Default Workspace", "Link", options="VerityAI Workspace"), field("notes", "Notes", "Small Text"),
+		field("notes", "Notes", "Small Text"),
 	], "field:account_name")
 
 	ensure_doctype("VerityAI Workspace", [
@@ -103,6 +103,11 @@ def ensure_doctypes():
 		field("setup_progress", "Setup Progress", "Percent", default=0), field("widget_installed", "Widget Installed", "Check", default=0),
 		field("first_lead_captured", "First Lead Captured", "Check", default=0),
 	], "field:workspace_name")
+
+	# Add the reverse link only after Workspace exists; Frappe validates Link targets on creation.
+	ensure_doctype("VerityAI Account", [
+		field("default_workspace", "Default Workspace", "Link", options="VerityAI Workspace"),
+	])
 
 	ensure_doctype("VerityAI Workspace Member", [
 		field("workspace", "Workspace", "Link", options="VerityAI Workspace", reqd=1, in_list_view=1),

@@ -113,16 +113,14 @@ Passed:
 - Frappe bench-environment `compileall`: passed.
 - `node --check verityai_saas/public/js/portal.js`: passed.
 - Trailing whitespace scan: passed.
-- `bench build --app verity_ai`: passed. Redis asset-cache update warnings were emitted because Redis is stopped.
-- `bench build --app verityai_saas`: passed. The same Redis warnings were emitted.
+- `bench --site farm.test install-app verityai_saas`: installed; the first attempt exposed and led to a fix for the cyclic Account/Workspace Link creation order.
+- `bench --site farm.test migrate`: passed. The pre-existing Frappe S3 backup `lib.GEN_EMAIL` warnings remained non-fatal.
+- `bench --site farm.test run-tests --app verity_ai`: passed, 35 tests.
+- `bench --site farm.test run-tests --app verityai_saas`: passed, 11 tests.
+- `bench build --app verity_ai`: passed.
+- `bench build --app verityai_saas`: passed.
 
-Blocked by local service state:
-
-- `bench --site farm.test migrate`
-- `bench --site farm.test run-tests --app verity_ai`
-- `bench --site farm.test run-tests --app verityai_saas`
-
-MariaDB is stopped and the current WSL user cannot start it without a sudo password. Bench database access fails with PyMySQL error 2003 (`Can't connect to MySQL server on 127.0.0.1`). Redis is also stopped. The commands were attempted but could not reach migration or test execution. No pass result is claimed for them.
+MariaDB plus the bench Redis cache and queue were started for validation. The complete mandated migration, regression, SaaS test, and build sequence now passes.
 
 ## Known limitations
 
@@ -132,24 +130,10 @@ MariaDB is stopped and the current WSL user cannot start it without a sudo passw
 - File extraction, OCR, website crawling, and semantic/vector search are not duplicated here; manual knowledge text uses the existing engine hook and chunker.
 - Quote approval and AI action approval remain engine-owned. A customer-friendly approval page can be added later without bypassing those hooks.
 - `/app` is also Frappe's conventional Desk prefix. Route precedence must be verified after migration on the target Frappe version; if Desk takes precedence, deploy the same portal under a non-reserved route and redirect customer roles there.
-- Runtime install/migration behavior and database-backed tests still require the local MariaDB/Redis services.
 
 ## Manual setup and next commands
 
-1. Start MariaDB and Redis in WSL with an account that has service privileges.
-2. Ensure the source tree is synchronized or linked at `/home/frappe/frappe-bench/apps/verityai_saas`.
-3. If the app is not yet installed in the site database, run `bench --site farm.test install-app verityai_saas`.
-4. Run:
-
-```bash
-cd /home/frappe/frappe-bench
-bench --site farm.test migrate
-bench --site farm.test run-tests --app verity_ai
-bench --site farm.test run-tests --app verityai_saas
-bench build --app verity_ai
-bench build --app verityai_saas
-```
-
-5. Configure the AI provider credentials through an operator-only engine workflow; they are intentionally not exposed to customer pages.
-6. Verify `/app` route precedence, a real allowed domain/widget exchange, email delivery, and Meta webhook credentials before production launch.
-
+1. Keep the source tree synchronized or linked at `/home/frappe/frappe-bench/apps/verityai_saas`.
+2. Configure AI provider credentials through an operator-only engine workflow; they are intentionally absent from customer pages.
+3. Verify `/app` route precedence, a real allowed-domain/widget exchange, outbound email, and Meta webhook credentials before production launch.
+4. Re-run migration and both suites after future schema or engine integration changes.
