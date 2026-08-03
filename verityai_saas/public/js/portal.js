@@ -67,6 +67,19 @@
     content.innerHTML = table([["Conversation",r=>`<strong>${esc(r.name)}</strong><br><span class="muted">${esc(r.user_identifier||"")}</span>`],["Platform",r=>esc(r.platform)],["Status",r=>pill(r.status)],["Updated",r=>esc(r.modified)]], rows);
   }
 
+  async function quotes() {
+    const rows = await call("verityai_saas.api.quotes.list_requests", {workspace});
+    const pending = rows.filter(row => row.status === "Pending").length;
+    content.innerHTML = `<div class="va-grid two"><div class="va-card va-metric"><span>Pending approval</span><strong>${number(pending)}</strong></div><div class="va-card"><h2>Safe approval flow</h2><p class="muted">Approval submits and sends the existing engine quotation. VerityAI never bypasses the engine approval hook.</p></div></div>${table([["Request",r=>`<strong>${esc(r.name)}</strong><br><span class="muted">${esc(r.erpnext_quotation_id||"Draft quotation")}</span>`],["Customer",r=>`<strong>${esc(r.customer_name)}</strong><br><span class="muted">${esc(r.client_email||r.client_whatsapp_number||"")}</span>`],["Total",r=>number(r.estimated_total)],["Status",r=>pill(r.status)],["Created",r=>esc(r.creation)],["Action",r=>r.status==="Pending"?`<button type="button" class="va-button" data-approve-quote="${esc(r.name)}">Approve &amp; send</button>`:'<span class="muted">Complete</span>']],rows)}`;
+    document.querySelectorAll("[data-approve-quote]").forEach(button => button.addEventListener("click", async () => {
+      const request = button.dataset.approveQuote;
+      if (!window.confirm(`Approve ${request}? This submits the quotation and sends it through the configured engine channel.`)) return;
+      const notes = window.prompt("Optional approval note", "") ?? "";
+      button.disabled = true;
+      try { await call("verityai_saas.api.quotes.approve", {workspace, quotation_request:request, notes}); alert("Quotation approved and processed."); await quotes(); }
+      catch (err) { alert(err.message, true); button.disabled = false; }
+    }));
+  }
   async function usage() {
     const d = await call("verityai_saas.api.usage.get", {workspace});
     content.innerHTML = `<div class="va-grid"><div class="va-card va-metric"><span>Total tokens</span><strong>${number(d.total_tokens)}</strong></div><div class="va-card va-metric"><span>Input tokens</span><strong>${number(d.input_tokens)}</strong></div><div class="va-card va-metric"><span>Output tokens</span><strong>${number(d.output_tokens)}</strong></div><div class="va-card va-metric"><span>Remaining</span><strong>${number(d.wallet?.tokens_remaining)}</strong></div></div><div class="va-grid two"><div class="va-card"><h2>Usage by channel</h2>${Object.entries(d.by_platform||{}).map(([k,v])=>`<p>${esc(k)} <strong>${number(v)}</strong></p>`).join("")||'<p class="muted">No usage yet.</p>'}</div><div class="va-card"><h2>Estimated cost</h2><p class="va-metric"><strong>${number(d.estimated_cost)}</strong></p><p class="muted">Based on server-side engine usage logs.</p></div></div>`;
@@ -102,7 +115,7 @@
     bind("new-workspace", async f=>{const d=await call("verityai_saas.api.onboarding.create",json(f));location.href=d.dashboard_url;});
   }
 
-  const renderers={dashboard,onboarding,assistant,widget,knowledge,leads,conversations,usage,billing,email,whatsapp,team};
+  const renderers={dashboard,onboarding,assistant,widget,knowledge,leads,conversations,quotes,usage,billing,email,whatsapp,team};
   async function init(){try{const rows=await call("verityai_saas.api.workspace.list_workspaces");if(!rows.length){newWorkspace();return}const params=new URLSearchParams(location.search);workspace=params.get("workspace")||localStorage.getItem("verityai_workspace")||rows[0].name;if(!rows.some(r=>r.name===workspace))workspace=rows[0].name;picker.innerHTML=rows.map(r=>`<option value="${esc(r.name)}" ${r.name===workspace?"selected":""}>${esc(r.business_name||r.workspace_name)}</option>`).join("");picker.addEventListener("change",()=>{workspace=picker.value;localStorage.setItem("verityai_workspace",workspace);renderers[page]();});localStorage.setItem("verityai_workspace",workspace);await (renderers[page]||dashboard)()}catch(err){content.innerHTML=`<div class="va-card va-empty">${esc(err.message)}</div>`;alert(err.message,true)}}
   init();
 })();

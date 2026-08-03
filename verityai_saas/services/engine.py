@@ -18,6 +18,12 @@ CONFIG_SAFE_FIELDS = [
 	"whatsapp_phone_id", "webhook_callback_url", "enable_erpnext_integration",
 ]
 
+QUOTE_SAFE_FIELDS = [
+	"name", "customer_name", "client_email", "client_whatsapp_number", "status",
+	"erpnext_quotation_id", "estimated_total", "sent_file_url", "approval_notes",
+	"creation", "modified",
+]
+
 
 def get_workspace(workspace_name):
 	if not workspace_name or not frappe.db.exists("VerityAI Workspace", workspace_name):
@@ -222,6 +228,37 @@ def get_workspace_leads(workspace_name, filters=None):
 def get_workspace_alerts(workspace_name):
 	tenant = get_workspace_engine_tenant(workspace_name)
 	return frappe.get_all("AI Monitoring Alert", filters={"tenant": tenant}, fields=["name", "alert_type", "severity", "status", "summary", "occurrence_count", "last_seen"], order_by="last_seen desc", limit=20)
+
+
+def get_workspace_quote_requests(workspace_name, status=None, limit=100):
+	tenant = get_workspace_engine_tenant(workspace_name)
+	filters = {"tenant": tenant}
+	if status:
+		filters["status"] = status
+	return frappe.get_all(
+		"AI Quotation Request",
+		filters=filters,
+		fields=QUOTE_SAFE_FIELDS,
+		order_by="creation desc",
+		limit=min(max(int(limit or 100), 1), 200),
+	)
+
+
+def approve_workspace_quote(workspace_name, quotation_request, notes=None):
+	tenant = get_workspace_engine_tenant(workspace_name)
+	if not frappe.db.exists("AI Quotation Request", {"name": quotation_request, "tenant": tenant}):
+		frappe.throw(_("Quotation request was not found."), frappe.DoesNotExistError)
+	doc = frappe.get_doc("AI Quotation Request", quotation_request)
+	if doc.status == "Approved":
+		return {field: doc.get(field) for field in QUOTE_SAFE_FIELDS}
+	if doc.status != "Pending":
+		frappe.throw(_("Only pending quotation requests can be approved."), frappe.ValidationError)
+	if notes is not None and doc.meta.has_field("approval_notes"):
+		doc.approval_notes = str(notes).strip()
+	doc.status = "Approved"
+	doc.save(ignore_permissions=True)
+	doc.reload()
+	return {field: doc.get(field) for field in QUOTE_SAFE_FIELDS}
 
 
 def apply_plan_limits(workspace_name, plan_name):

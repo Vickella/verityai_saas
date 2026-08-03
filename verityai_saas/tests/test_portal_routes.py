@@ -3,10 +3,15 @@ from frappe.tests.utils import FrappeTestCase
 from frappe.website.serve import get_response, get_response_content
 
 from verityai_saas.services.onboarding import create_workspace
-from verityai_saas.tests.cleanup import cleanup_test_workspace
+from verityai_saas.tests.cleanup import cleanup_all_test_fixtures, cleanup_test_workspace
 
 
 class TestCustomerPortalRoutes(FrappeTestCase):
+	@classmethod
+	def tearDownClass(cls):
+		super().tearDownClass()
+		cleanup_all_test_fixtures()
+
 	def setUp(self):
 		frappe.set_user("Administrator")
 		token = frappe.generate_hash(length=8).lower()
@@ -27,15 +32,18 @@ class TestCustomerPortalRoutes(FrappeTestCase):
 		)
 
 	def tearDown(self):
-		cleanup_test_workspace(self.created["workspace"], users=[self.user])
 		super().tearDown()
+		cleanup_test_workspace(self.created["workspace"], users=[self.user])
 
 	def test_customer_portal_uses_non_desk_route(self):
 		frappe.set_user(self.user)
 		content = get_response_content("/verityai/dashboard")
 		self.assertIn('data-verity-page="dashboard"', content)
 		self.assertIn("/verityai/assistant", content)
+		self.assertIn("/verityai/quotes", content)
 		self.assertNotIn('href="/app/assistant"', content)
+		quote_content = get_response_content("/verityai/quotes")
+		self.assertIn('data-verity-page="quotes"', quote_content)
 
 	def test_onboarding_returns_safe_dashboard_url(self):
 		self.assertTrue(self.created["dashboard_url"].startswith("/verityai/dashboard"))

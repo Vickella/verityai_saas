@@ -4,7 +4,7 @@ Date: 2026-08-03
 
 ## Implemented
 
-The repository now contains a complete Frappe app scaffold for the customer-facing SaaS layer around `verity_ai`. It provisions customer accounts and workspaces, links every workspace to one engine tenant, creates engine configuration, assigns a trial plan, creates a subscription and usage wallet, tracks onboarding, exposes workspace-authorized APIs, and supplies a product-styled portal.
+The repository now contains a complete Frappe app scaffold for the customer-facing SaaS layer around `verity_ai`. It provisions customer accounts and workspaces, links every workspace to one engine tenant, creates engine configuration, assigns a trial plan, creates a subscription and usage wallet, tracks onboarding, exposes workspace-authorized APIs, supplies a product-styled portal, and provides tenant-safe quotation approvals through the existing engine hook.
 
 The implementation does not duplicate the engine's model loop, public chat API, widget runtime, WhatsApp webhook, knowledge indexing/search, lead capture, quotation execution, action approval, usage logging, monitoring dedupe, redaction helpers, or retention.
 
@@ -31,7 +31,7 @@ The installer also creates portal-only customer roles, operator/admin roles, the
 ## Services created
 
 - `services/permissions.py`: login, operator detection, workspace membership/role/permission checks, and Frappe query conditions.
-- `services/engine.py`: the sole main bridge to tenant, configuration, domains, widget embed code, knowledge, leads, conversations, usage, alerts, and plan limits.
+- `services/engine.py`: the sole main bridge to tenant, configuration, domains, widget embed code, knowledge, leads, conversations, usage, alerts, quotation requests, approvals, and plan limits.
 - `services/onboarding.py`: transactional account/workspace/member/tenant/configuration/subscription/wallet/checklist provisioning.
 - `services/workspace.py`: workspace dashboard and team summaries.
 - `services/usage.py`: idempotent engine usage-log to SaaS transaction synchronization and wallet totals.
@@ -54,6 +54,7 @@ All public SaaS methods return the required `{success, data, error, code}` envel
 - Billing
 - Email
 - WhatsApp
+- Quotation requests and approval
 - Admin/operator dashboard
 
 Engine secrets and `AI Configuration.system_prompt` are absent from response field lists. WhatsApp token/secret responses contain presence booleans only.
@@ -69,6 +70,7 @@ The shared SaaS portal shell provides:
 - `/verityai/knowledge`
 - `/verityai/leads`
 - `/verityai/conversations`
+- `/verityai/quotes`
 - `/verityai/usage`
 - `/verityai/billing`
 - `/verityai/email`
@@ -87,7 +89,7 @@ The portal uses product language and shared responsive CSS/JavaScript. The widge
 - `AI Lead`, `AI Chat Session`, `AI Usage Log`, and `AI Monitoring Alert` for scoped dashboards.
 - Existing `verity_ai.api.chat` endpoints and widget assets for customer websites.
 - Existing `verity_ai.api.whatsapp.webhook` as the displayed Meta callback.
-- Existing engine approval hooks remain untouched.
+- `AI Quotation Request` for tenant-scoped review; setting a pending request to `Approved` delegates submission and delivery to the existing engine `on_update` hook.
 
 ## Tests added
 
@@ -104,11 +106,13 @@ The portal uses product language and shared responsive CSS/JavaScript. The widge
 - write-only WhatsApp secrets;
 - customer denial and administrator access for operator functions.
 
+`verityai_saas/tests/test_quotes.py` covers safe-field responses, tenant isolation, permission denial, and delegation through the authoritative engine document hook.
+
 ## Validation results
 
 Passed:
 
-- Windows Python compilation: 56 Python files compiled without syntax errors.
+- Windows Python compilation: 59 Python files compiled without syntax errors.
 - Frappe bench-environment import validation: all service and API modules imported successfully.
 - Frappe bench-environment `compileall`: passed.
 - `node --check verityai_saas/public/js/portal.js`: passed.
@@ -116,8 +120,8 @@ Passed:
 - `bench --site farm.test install-app verityai_saas`: installed; the first attempt exposed and led to a fix for the cyclic Account/Workspace Link creation order.
 - `bench --site farm.test migrate`: passed. The pre-existing Frappe S3 backup `lib.GEN_EMAIL` warnings remained non-fatal.
 - `bench --site farm.test run-tests --app verity_ai`: passed, 35 tests.
-- `bench --site farm.test run-tests --app verityai_saas`: passed, 15 tests, including real website-route resolution and portal-role checks.
-- Sequential SaaS and engine regression runs passed without fixture leakage: 15/15 and 35/35.
+- `bench --site farm.test run-tests --app verityai_saas`: passed, 19 tests, including website-route resolution, portal roles, quotation scoping, and approval delegation.
+- Sequential SaaS and engine regression runs passed without fixture leakage: 19/19 and 35/35.
 - `bench build --app verity_ai`: passed.
 - `bench build --app verityai_saas`: passed.
 
@@ -129,7 +133,7 @@ MariaDB plus the bench Redis cache and queue were started for validation. The co
 - Wallet state is synchronized from engine logs, while hard pre-call enforcement currently uses the engine's `monthly_token_limit`. A separate optional prepaid/subscription gate in `verity_ai` would require an explicit engine extension point.
 - Full WhatsApp setup stores engine credentials safely and reports configuration presence, but does not perform a live Meta Graph connection test.
 - File extraction, OCR, website crawling, and semantic/vector search are not duplicated here; manual knowledge text uses the existing engine hook and chunker.
-- Quote approval and AI action approval remain engine-owned. A customer-friendly approval page can be added later without bypassing those hooks.
+- Quote execution remains engine-owned. The customer page approves only tenant-scoped pending requests and deliberately triggers the existing engine hook; a live pilot must verify ERPNext quotation submission and the configured delivery channel.
 - The customer portal uses the validated `/verityai` route because `/app` is reserved by Frappe Desk. Website users receive portal-only roles with `desk_access = 0`.
 
 ## Manual setup and next commands

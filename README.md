@@ -6,4 +6,4 @@ The app requires Frappe and `verity_ai`. It deliberately does not implement chat
 
 ## Customer portal
 
-Customer and team users sign in through `/login` and use `/verityai`. Frappe's `/app` route remains reserved for Desk users. Customer roles have no Desk access.
+Customer and team users sign in through `/login` and use `/verityai`. Frappe's `/app` route remains reserved for Desk users. Customer roles have no Desk access. Workspace owners and authorized team members can review and approve tenant-scoped quotation requests at `/verityai/quotes`.
