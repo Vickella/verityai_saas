@@ -4,7 +4,7 @@ Date: 2026-08-03
 
 ## Implemented
 
-The repository now contains a complete Frappe app scaffold for the customer-facing SaaS layer around `verity_ai`. It provisions customer accounts and workspaces, links every workspace to one engine tenant, creates engine configuration, assigns a trial plan, creates a subscription and usage wallet, tracks onboarding, exposes workspace-authorized APIs, supplies a product-styled portal, and provides tenant-safe quotation approvals through the existing engine hook.
+The repository now contains a complete Frappe app scaffold for the customer-facing SaaS layer around `verity_ai`. It provides Frappe-backed customer signup, then provisions customer accounts and workspaces after verified login, links every workspace to one engine tenant, creates engine configuration, assigns a trial plan, creates a subscription and usage wallet, tracks onboarding, exposes workspace-authorized APIs, supplies a product-styled portal, and provides tenant-safe quotation approvals through the existing engine hook.
 
 The implementation does not duplicate the engine's model loop, public chat API, widget runtime, WhatsApp webhook, knowledge indexing/search, lead capture, quotation execution, action approval, usage logging, monitoring dedupe, redaction helpers, or retention.
 
@@ -44,6 +44,7 @@ The installer also creates portal-only customer roles, operator/admin roles, the
 
 All public SaaS methods return the required `{success, data, error, code}` envelope and enforce workspace access before customer-scoped work.
 
+- Customer signup through Frappe's built-in verification and rate controls
 - Workspace and team
 - Onboarding
 - Assistant
@@ -63,7 +64,7 @@ Engine secrets and `AI Configuration.system_prompt` are absent from response fie
 
 ## Pages created
 
-The shared SaaS portal shell provides:
+The SaaS website provides a guest signup page at `/verityai/signup`. After verification and login, the shared customer portal shell provides:
 
 - `/verityai` and `/verityai/dashboard`
 - `/verityai/health`
@@ -113,20 +114,22 @@ The portal uses product language and shared responsive CSS/JavaScript. The widge
 
 `verityai_saas/tests/test_health.py` covers tenant-safe alert aggregation, status/severity filters, derived workspace health, and unauthorized access denial.
 
+`verityai_saas/tests/test_signup.py` covers guest page access, input validation, Frappe signup delegation, and the sanitized post-login onboarding redirect.
+
 ## Validation results
 
 Passed:
 
-- Windows Python compilation: 63 Python files compiled without syntax errors.
+- Windows Python compilation: 66 Python files compiled without syntax errors.
 - Frappe bench-environment import validation: all service and API modules imported successfully.
 - Frappe bench-environment `compileall`: passed.
-- `node --check verityai_saas/public/js/portal.js`: passed.
+- `node --check` for `portal.js` and `signup.js`: passed.
 - Trailing whitespace scan: passed.
 - `bench --site farm.test install-app verityai_saas`: installed; the first attempt exposed and led to a fix for the cyclic Account/Workspace Link creation order.
 - `bench --site farm.test migrate`: passed. The pre-existing Frappe S3 backup `lib.GEN_EMAIL` warnings remained non-fatal.
 - `bench --site farm.test run-tests --app verity_ai`: passed, 35 tests.
-- `bench --site farm.test run-tests --app verityai_saas`: passed, 22 tests, including website routes, portal roles, health/alert scoping, quotation scoping, and approval delegation.
-- Sequential SaaS and engine regression runs passed without fixture leakage: 22/22 and 35/35.
+- `bench --site farm.test run-tests --app verityai_saas`: passed, 25 tests, including guest signup, website routes, portal roles, health/alert scoping, quotation scoping, and approval delegation.
+- Sequential SaaS and engine regression runs passed without fixture leakage: 25/25 and 35/35.
 - `bench build --app verity_ai`: passed.
 - `bench build --app verityai_saas`: passed.
 
@@ -134,6 +137,7 @@ MariaDB plus the bench Redis cache and queue were started for validation. The co
 
 ## Known limitations
 
+- Signup relies on Frappe's system signup settings and outgoing email. Workspace and tenant resources are deliberately created only after the verified user signs in.
 - The payment gateway, recurring invoices, automatic receipts, and paid upgrade checkout remain future work; billing is manual and stores immutable usage snapshots.
 - Wallet state is synchronized from engine logs, while hard pre-call enforcement currently uses the engine's `monthly_token_limit`. A separate optional prepaid/subscription gate in `verity_ai` would require an explicit engine extension point.
 - Full WhatsApp setup stores engine credentials safely and reports configuration presence, but does not perform a live Meta Graph connection test.

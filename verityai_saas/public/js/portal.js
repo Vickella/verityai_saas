@@ -119,7 +119,8 @@
   function bind(id, action, after) { document.querySelector(`#${id}`).addEventListener("submit", async e => {e.preventDefault();const b=e.currentTarget.querySelector("button");b.disabled=true;try{await action(e.currentTarget);alert("Saved successfully.");if(after)await after();}catch(err){alert(err.message,true)}finally{b.disabled=false}}); }
 
   async function newWorkspace() {
-    picker.hidden=true; content.innerHTML=`<form id="new-workspace" class="va-card va-form"><h2>Create your first workspace</h2><p class="muted">We will create your account, assistant, trial plan, usage wallet, and secure engine tenant together.</p><div class="va-fields">${field("Account name","account_name")}${field("Workspace name","workspace_name")}${field("Business name","business_name")}</div><button class="va-button">Create workspace</button></form>`;
+    const params = new URLSearchParams(location.search);
+    picker.hidden=true; content.innerHTML=`<form id="new-workspace" class="va-card va-form"><h2>Create your first workspace</h2><p class="muted">We will create your account, assistant, trial plan, usage wallet, and secure engine tenant together.</p><div class="va-fields">${field("Account name","account_name",params.get("account_name")||"")}${field("Workspace name","workspace_name",params.get("workspace_name")||"")}${field("Business name","business_name",params.get("business_name")||"")}</div><button class="va-button">Create workspace</button></form>`;
     bind("new-workspace", async f=>{const d=await call("verityai_saas.api.onboarding.create",json(f));location.href=d.dashboard_url;});
   }
 
