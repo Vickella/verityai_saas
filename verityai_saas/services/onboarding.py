@@ -53,7 +53,7 @@ def create_workspace(owner_user, account_name, workspace_name, business_name=Non
 		for code, label in CHECKLIST:
 			done = code in {"workspace", "assistant", "plan"}
 			frappe.get_doc({"doctype": "VerityAI Onboarding Checklist", "workspace": workspace.name, "step_code": code, "step_label": label, "status": "Done" if done else "Not Started", "completed_by": owner_user if done else None}).insert(ignore_permissions=True)
-		frappe.get_doc({"doctype": "VerityAI Notification Setting", "workspace": workspace.name, "notification_email": values.get("billing_email") or owner_user, "lead_notifications_enabled": 1, "human_handoff_alerts_enabled": 1, "usage_warning_alerts_enabled": 1, "status": "Active"}).insert(ignore_permissions=True)
+		frappe.get_doc({"doctype": "VerityAI Notification Setting", "workspace": workspace.name, "notification_email": values.get("billing_email") or owner_user, "lead_notifications_enabled": 1, "human_handoff_alerts_enabled": 1, "quote_request_alerts_enabled": 1, "usage_warning_alerts_enabled": 1, "provider_failure_alerts_enabled": 1, "status": "Active"}).insert(ignore_permissions=True)
 		frappe.get_doc({"doctype": "VerityAI WhatsApp Setup", "workspace": workspace.name, "mode": "Button Only", "setup_status": "Not Configured"}).insert(ignore_permissions=True)
 		engine.apply_plan_limits(workspace.name, plan.name)
 		frappe.db.set_value("VerityAI Account", account, "default_workspace", workspace.name)

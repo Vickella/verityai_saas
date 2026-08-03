@@ -38,7 +38,7 @@ The installer also creates portal-only customer roles, operator/admin roles, the
 - `services/health.py`: tenant-scoped health state, service status, alert counts, and filterable safe alert history.
 - `services/usage.py`: idempotent engine usage-log to SaaS transaction synchronization and wallet totals.
 - `services/billing.py`: plan assignment, manual billing events with usage snapshots, suspension, and trial/subscription expiry.
-- `services/notifications.py`: Frappe email delivery, new-lead/handoff hooks, usage warnings, daily summaries, and delivery logs.
+- `services/notifications.py`: Frappe email delivery, new-lead/handoff/quotation/provider hooks, usage warnings, daily summaries, and delivery logs.
 - `services/whatsapp.py`: button/alert/full-AI setup and write-only engine credential updates.
 
 ## APIs created
@@ -119,11 +119,13 @@ The portal uses product language and shared responsive CSS/JavaScript. The widge
 
 `verityai_saas/tests/test_team.py` covers plan limits, role synchronization, explicit permissions, owner protection, removal/reactivation, and unauthorized API denial.
 
+`verityai_saas/tests/test_notifications.py` covers complete notification settings, email validation and recipient normalization, permission denial, quotation/provider event filtering, and duplicate-delivery prevention.
+
 ## Validation results
 
 Passed:
 
-- Windows Python compilation: 67 Python files compiled without syntax errors.
+- Windows Python compilation: 68 Python files compiled without syntax errors.
 - Frappe bench-environment import validation: all service and API modules imported successfully.
 - Frappe bench-environment `compileall`: passed.
 - `node --check` for `portal.js` and `signup.js`: passed.
@@ -131,8 +133,8 @@ Passed:
 - `bench --site farm.test install-app verityai_saas`: installed; the first attempt exposed and led to a fix for the cyclic Account/Workspace Link creation order.
 - `bench --site farm.test migrate`: passed. The pre-existing Frappe S3 backup `lib.GEN_EMAIL` warnings remained non-fatal.
 - `bench --site farm.test run-tests --app verity_ai`: passed, 35 tests.
-- `bench --site farm.test run-tests --app verityai_saas`: passed, 29 tests, including guest signup, team lifecycle and plan limits, website routes, portal roles, health/alert scoping, quotation scoping, and approval delegation.
-- Sequential SaaS and engine regression runs passed without fixture leakage: 29/29 and 35/35.
+- `bench --site farm.test run-tests --app verityai_saas`: passed, 33 tests, including notification management, guest signup, team lifecycle and plan limits, website routes, portal roles, health/alert scoping, quotation scoping, and approval delegation.
+- Sequential SaaS and engine regression runs passed without fixture leakage: 33/33 and 35/35.
 - `bench build --app verity_ai`: passed.
 - `bench build --app verityai_saas`: passed.
 

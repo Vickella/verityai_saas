@@ -57,7 +57,7 @@ def cleanup_test_workspace(workspace_name, users=None, commit=True, engine_tenan
 
 
 def cleanup_all_test_fixtures():
-	patterns = ("owner-%@example.com", "portal-%@example.com", "quote-owner-%@example.com", "health-owner-%@example.com", "team-owner-%@example.com")
+	patterns = ("owner-%@example.com", "portal-%@example.com", "quote-owner-%@example.com", "health-owner-%@example.com", "team-owner-%@example.com", "notify-owner-%@example.com")
 	workspaces = []
 	for pattern in patterns:
 		workspaces.extend(
@@ -70,7 +70,7 @@ def cleanup_all_test_fixtures():
 			pluck="user",
 		)
 		cleanup_test_workspace(workspace_name, users=users, commit=False)
-	for pattern in ("other-%@example.com", "quote-other-%@example.com", "health-other-%@example.com", "team-other-%@example.com", "team-user-%@example.com"):
+	for pattern in ("other-%@example.com", "quote-other-%@example.com", "health-other-%@example.com", "team-other-%@example.com", "team-user-%@example.com", "notify-other-%@example.com"):
 		for user in frappe.get_all("User", filters={"name": ["like", pattern]}, pluck="name"):
 			frappe.delete_doc("User", user, ignore_permissions=True, force=True)
 	cleanup_orphan_test_tenants(commit=False)

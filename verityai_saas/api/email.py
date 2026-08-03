@@ -1,4 +1,5 @@
 import frappe
+from frappe.utils import cint, validate_email_address
 
 from verityai_saas.api._response import endpoint, json_value
 from verityai_saas.services.notifications import send_notification
@@ -7,6 +8,19 @@ from verityai_saas.services.permissions import check_workspace_access, require_w
 
 
 SAFE_FIELDS = ["notification_email", "reply_to_email", "lead_notifications_enabled", "daily_summary_enabled", "human_handoff_alerts_enabled", "quote_request_alerts_enabled", "usage_warning_alerts_enabled", "provider_failure_alerts_enabled", "alert_recipients", "email_branding_name", "email_footer", "status"]
+CHECK_FIELDS = {"lead_notifications_enabled", "daily_summary_enabled", "human_handoff_alerts_enabled", "quote_request_alerts_enabled", "usage_warning_alerts_enabled", "provider_failure_alerts_enabled"}
+
+
+def _email(value):
+	value = (value or "").strip()
+	if value:
+		validate_email_address(value, throw=True)
+	return value
+
+
+def _recipients(value):
+	values = (value or "").replace(";", ",").replace("\n", ",").split(",")
+	return ", ".join(dict.fromkeys(_email(value) for value in values if value.strip()))
 
 
 @frappe.whitelist()
@@ -25,7 +39,16 @@ def update(workspace, values):
 	doc = frappe.get_doc("VerityAI Notification Setting", name) if name else frappe.get_doc({"doctype": "VerityAI Notification Setting", "workspace": workspace})
 	for key in SAFE_FIELDS:
 		if key in values:
-			setattr(doc, key, values[key])
+			value = values[key]
+			if key in {"notification_email", "reply_to_email"}:
+				value = _email(value)
+			elif key == "alert_recipients":
+				value = _recipients(value)
+			elif key in CHECK_FIELDS:
+				value = cint(value)
+			elif key == "status" and value not in {"Active", "Disabled"}:
+				frappe.throw("Notification status must be Active or Disabled.")
+			setattr(doc, key, value)
 	if doc.get("__islocal"):
 		doc.insert(ignore_permissions=True)
 	else:

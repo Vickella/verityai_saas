@@ -41,5 +41,7 @@ scheduler_events = {
 doc_events = {
 	"AI Lead": {"after_insert": "verityai_saas.services.notifications.send_lead_notification"},
 	"AI Chat Session": {"on_update": "verityai_saas.services.notifications.send_handoff_notification"},
+	"AI Quotation Request": {"after_insert": "verityai_saas.services.notifications.send_quote_request_notification"},
+	"AI Monitoring Alert": {"after_insert": "verityai_saas.services.notifications.send_provider_failure_notification"},
 }
 

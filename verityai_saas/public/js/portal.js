@@ -100,8 +100,16 @@
 
   async function email() {
     const d = await call("verityai_saas.api.email.get", {workspace});
-    content.innerHTML = `<form id="email-form" class="va-card va-form"><h2>Email notifications</h2><div class="va-fields">${field("Notification email","notification_email",d.notification_email,"email")}${field("Additional recipients","alert_recipients",d.alert_recipients)}${field("Branding name","email_branding_name",d.email_branding_name)}${field("Email footer","email_footer",d.email_footer,"textarea",true)}</div><label><input type="checkbox" name="lead_notifications_enabled" ${d.lead_notifications_enabled?"checked":""}> New lead notifications</label><label><input type="checkbox" name="daily_summary_enabled" ${d.daily_summary_enabled?"checked":""}> Daily lead summary</label><label><input type="checkbox" name="usage_warning_alerts_enabled" ${d.usage_warning_alerts_enabled?"checked":""}> Usage warnings</label><button class="va-button">Save settings</button></form>`;
-    bind("email-form", f => {const v=json(f);["lead_notifications_enabled","daily_summary_enabled","usage_warning_alerts_enabled"].forEach(k=>v[k]=f[k].checked?1:0);return call("verityai_saas.api.email.update",{workspace,values:v});});
+    const toggles = [["lead_notifications_enabled","New lead notifications"],["human_handoff_alerts_enabled","Human handoff alerts"],["quote_request_alerts_enabled","Quotation approval requests"],["usage_warning_alerts_enabled","Usage warnings"],["provider_failure_alerts_enabled","Provider failure alerts"],["daily_summary_enabled","Daily lead summary"]];
+    const checks = toggles.map(([name,label])=>`<label><input type="checkbox" name="${name}" ${d[name]?"checked":""}> ${label}</label>`).join("");
+    content.innerHTML = `<form id="email-form" class="va-card va-form"><h2>Email notifications</h2><p class="muted">Choose who receives workspace alerts and which events trigger them. Delivery uses the outgoing email account configured in Frappe.</p><div class="va-fields">${field("Notification email","notification_email",d.notification_email,"email")}${field("Reply-to email","reply_to_email",d.reply_to_email,"email")}${field("Additional recipients","alert_recipients",d.alert_recipients)}${field("Branding name","email_branding_name",d.email_branding_name)}<div class="va-field"><label>Status</label><select name="status"><option ${d.status==="Active"?"selected":""}>Active</option><option ${d.status==="Disabled"?"selected":""}>Disabled</option></select></div>${field("Email footer","email_footer",d.email_footer,"textarea",true)}</div><div class="va-checks">${checks}</div><div class="va-actions"><button class="va-button">Save settings</button><button type="button" id="email-test" class="va-button secondary">Send test email</button></div></form>`;
+    bind("email-form", f => {const v=json(f);toggles.forEach(([key])=>v[key]=f[key].checked?1:0);return call("verityai_saas.api.email.update",{workspace,values:v});});
+    document.querySelector("#email-test").addEventListener("click", async event => {
+      const button = event.currentTarget; button.disabled = true;
+      try { const result = await call("verityai_saas.api.email.send_test", {workspace}); alert(`Test email processed for ${result.delivery_logs.length} recipient(s).`); }
+      catch (err) { alert(err.message, true); }
+      finally { button.disabled = false; }
+    });
   }
 
   async function whatsapp() {
