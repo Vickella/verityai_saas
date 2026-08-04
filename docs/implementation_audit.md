@@ -59,7 +59,7 @@ All engine access will resolve `VerityAI Workspace -> engine_tenant -> AI Tenant
 - `AI Tenant.widget_primary_color` and `widget_header_color` are preset selects, not arbitrary CSS color fields. The portal will expose the supported preset values.
 - The engine has no safe customer-editable prompt/tone field. Assistant setup will update identity, business nature, greeting, and limits only; it will not expose or mutate `system_prompt`.
 - Full WhatsApp credentials must be accepted write-only. Responses will expose presence/status booleans, never stored values.
-- There is no payment gateway in the roadmap MVP. Billing is manual and the upgrade action remains a clearly labelled placeholder.
+- Paynow is the first payment gateway: hosted checkout uses site-level credentials, signed messages, independent status polling, and idempotent subscription activation. Live merchant onboarding and recurring payments remain deployment/future work.
 - Engine usage retention can remove source logs. Immutable SaaS usage transactions and billing snapshots are required before cleanup; the scheduled sync reduces but cannot eliminate loss if it is disabled for longer than the engine retention window.
 
 ## Planned files and records

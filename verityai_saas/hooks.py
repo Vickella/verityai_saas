@@ -35,7 +35,7 @@ role_home_page = {
 }
 scheduler_events = {
 	"hourly": ["verityai_saas.services.usage.sync_all_usage", "verityai_saas.services.billing.check_subscription_expiry"],
-	"daily": ["verityai_saas.services.notifications.send_daily_summaries", "verityai_saas.services.billing.check_trial_expiry", "verityai_saas.services.notifications.send_usage_warnings"],
+	"daily": ["verityai_saas.services.notifications.send_daily_summaries", "verityai_saas.services.billing.check_trial_expiry", "verityai_saas.services.billing.roll_usage_periods", "verityai_saas.services.notifications.send_usage_warnings"],
 }
 
 doc_events = {

@@ -95,7 +95,20 @@
 
   async function billing() {
     const d = await call("verityai_saas.api.billing.get", {workspace}); const s=d.subscription?.[0];
-    content.innerHTML = `<div class="va-grid two"><div class="va-card"><h2>Current plan</h2><p class="va-metric"><strong>${esc(s?.plan||"No plan")}</strong></p><p>${pill(s?.status)}</p><p class="muted">Trial ends ${esc(s?.trial_end||"â€”")} Â· Renewal ${esc(s?.next_billing_date||"â€”")}</p><button class="va-button" disabled>Upgrade coming soon</button></div><div class="va-card"><h2>Usage</h2><p>Used <strong>${number(d.wallet?.tokens_used)}</strong></p><p>Remaining <strong>${number(d.wallet?.tokens_remaining)}</strong></p></div></div>${table([["Event",r=>esc(r.event_type)],["Amount",r=>`${esc(r.currency||"")} ${number(r.amount)}`],["Status",r=>pill(r.status)],["Date",r=>esc(r.creation)]],d.events)}`;
+    const paidPlans = (d.plans||[]).filter(plan=>plan.plan_code!=="TRIAL" && (Number(plan.monthly_price)>0 || Number(plan.annual_price)>0));
+    const plans = paidPlans.map(plan=>`<form class="va-card va-form" data-paynow-plan="${esc(plan.name)}"><div><h3>${esc(plan.plan_name)}</h3><p class="muted">${number(plan.monthly_token_limit)} tokens per month</p></div><div class="va-field"><label>Billing cycle</label><select name="billing_cycle"><option value="Monthly">Monthly · ${esc(plan.currency)} ${number(plan.monthly_price)}</option>${Number(plan.annual_price)>0?`<option value="Annual">Annual · ${esc(plan.currency)} ${number(plan.annual_price)}</option>`:""}</select></div><button class="va-button" ${d.paynow_configured?"":"disabled"}>Pay securely with Paynow</button></form>`).join("");
+    const checkout = plans || `<div class="va-card va-empty">No paid plans are available yet.</div>`;
+    content.innerHTML = `<div class="va-grid two"><div class="va-card"><h2>Current plan</h2><p class="va-metric"><strong>${esc(s?.plan||"No plan")}</strong></p><p>${pill(s?.status)}</p><p class="muted">Trial ends ${esc(s?.trial_end||"—")} · Renewal ${esc(s?.next_billing_date||"—")}</p></div><div class="va-card"><h2>Usage</h2><p>Used <strong>${number(d.wallet?.tokens_used)}</strong></p><p>Remaining <strong>${number(d.wallet?.tokens_remaining)}</strong></p></div></div><div><h2>Plans</h2>${d.paynow_configured?'<p class="muted">Checkout is completed securely on Paynow. Your plan activates only after server-side confirmation.</p>':'<p class="va-notice error">Paynow checkout is not configured yet. Contact support to activate payments.</p>'}<div class="va-grid two">${checkout}</div></div>${table([["Event",r=>`<strong>${esc(r.event_type)}</strong><br><span class="muted">${esc(r.provider||"Manual")}</span>`],["Amount",r=>`${esc(r.currency||"")} ${number(r.amount)}`],["Status",r=>`${pill(r.status)} ${r.gateway_status?pill(r.gateway_status):""}`],["Reference",r=>esc(r.gateway_reference||"—")],["Date",r=>esc(r.creation)]],d.events)}`;
+    document.querySelectorAll("[data-paynow-plan]").forEach(form=>form.addEventListener("submit", async event=>{
+      event.preventDefault(); const button=form.querySelector("button"); button.disabled=true;
+      try { const result=await call("verityai_saas.api.paynow.start",{workspace,plan:form.dataset.paynowPlan,billing_cycle:form.billing_cycle.value}); window.location.assign(result.checkout_url); }
+      catch(err){alert(err.message,true);button.disabled=false;}
+    }));
+    const payment = new URLSearchParams(location.search).get("payment");
+    if(payment){
+      try { const result=await call("verityai_saas.api.paynow.poll",{workspace,payment}); alert(result.status==="Completed"?"Payment confirmed and plan activated.":`Payment status: ${result.gateway_status||result.status}`); history.replaceState({},"",`/verityai/billing?workspace=${encodeURIComponent(workspace)}`); if(result.status==="Completed") window.setTimeout(()=>billing(),400); }
+      catch(err){alert(err.message,true);}
+    }
   }
 
   async function email() {

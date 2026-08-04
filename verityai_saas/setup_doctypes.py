@@ -171,7 +171,9 @@ def ensure_doctypes():
 		field("subscription", "Subscription", "Link", options="VerityAI Subscription"), field("event_type", "Event Type", "Select", options="Invoice\nPayment\nCredit\nAdjustment\nTop-Up\nRefund\nSubscription Activation", reqd=1),
 		field("amount", "Amount", "Currency"), field("currency", "Currency", "Link", options="Currency"), field("status", "Status", "Select", options="Pending\nCompleted\nFailed\nCancelled", default="Pending"),
 		field("provider", "Provider"), field("provider_reference", "Provider Reference"), field("period_start", "Period Start", "Date"), field("period_end", "Period End", "Date"),
-		field("usage_snapshot_json", "Usage Snapshot", "Code", options="JSON"), field("paid_on", "Paid On", "Datetime"),
+		field("target_plan", "Target Plan", "Link", options="VerityAI Plan"), field("billing_cycle", "Billing Cycle", "Select", options="Monthly\nAnnual\nManual"),
+		field("gateway_reference", "Gateway Reference"), field("gateway_status", "Gateway Status"), field("checkout_url", "Checkout URL", "Small Text"), field("poll_url", "Poll URL", "Small Text"),
+		field("gateway_response_json", "Gateway Response", "Code", options="JSON"), field("usage_snapshot_json", "Usage Snapshot", "Code", options="JSON"), field("paid_on", "Paid On", "Datetime"),
 	], "VBE-.#####")
 
 	ensure_doctype("VerityAI Onboarding Checklist", [

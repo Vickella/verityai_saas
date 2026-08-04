@@ -57,7 +57,7 @@ def cleanup_test_workspace(workspace_name, users=None, commit=True, engine_tenan
 
 
 def cleanup_all_test_fixtures():
-	patterns = ("owner-%@example.com", "portal-%@example.com", "quote-owner-%@example.com", "health-owner-%@example.com", "team-owner-%@example.com", "notify-owner-%@example.com")
+	patterns = ("owner-%@example.com", "portal-%@example.com", "quote-owner-%@example.com", "health-owner-%@example.com", "team-owner-%@example.com", "notify-owner-%@example.com", "paynow-owner-%@example.com")
 	workspaces = []
 	for pattern in patterns:
 		workspaces.extend(

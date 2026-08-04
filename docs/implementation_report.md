@@ -1,10 +1,10 @@
 # VerityAI SaaS Implementation Report
 
-Date: 2026-08-03
+Date: 2026-08-04
 
 ## Implemented
 
-The repository now contains a complete Frappe app scaffold for the customer-facing SaaS layer around `verity_ai`. It provides Frappe-backed customer signup, then provisions customer accounts and workspaces after verified login, links every workspace to one engine tenant, creates engine configuration, assigns a trial plan, creates a subscription and usage wallet, tracks onboarding, exposes workspace-authorized APIs, supplies a product-styled portal, and provides tenant-safe quotation approvals through the existing engine hook.
+The repository now contains a complete Frappe app scaffold for the customer-facing SaaS layer around `verity_ai`. It provides Frappe-backed customer signup, then provisions customer accounts and workspaces after verified login, links every workspace to one engine tenant, creates engine configuration, assigns a trial plan, creates a subscription and usage wallet, tracks onboarding, exposes workspace-authorized APIs, supplies a product-styled portal, provides tenant-safe quotation approvals through the existing engine hook, and adds Paynow hosted checkout with signed server-side confirmation.
 
 The implementation does not duplicate the engine's model loop, public chat API, widget runtime, WhatsApp webhook, knowledge indexing/search, lead capture, quotation execution, action approval, usage logging, monitoring dedupe, redaction helpers, or retention.
 
@@ -37,7 +37,8 @@ The installer also creates portal-only customer roles, operator/admin roles, the
 - `services/user_roles.py`: portal-role assignment and synchronization across all active workspace memberships.
 - `services/health.py`: tenant-scoped health state, service status, alert counts, and filterable safe alert history.
 - `services/usage.py`: idempotent engine usage-log to SaaS transaction synchronization and wallet totals.
-- `services/billing.py`: plan assignment, manual billing events with usage snapshots, suspension, and trial/subscription expiry.
+- `services/billing.py`: validated plan assignment, billing periods, immutable manual events/top-ups, wallet updates, suspension, and trial/subscription expiry.
+- `services/paynow.py`: SHA-512 signed checkout initiation, strict Paynow URL validation, callback verification, independent polling, amount/reference checks, and idempotent plan activation.
 - `services/notifications.py`: Frappe email delivery, new-lead/handoff/quotation/provider hooks, usage warnings, daily summaries, and delivery logs.
 - `services/whatsapp.py`: button/alert/full-AI setup and write-only engine credential updates.
 
@@ -55,7 +56,7 @@ All public SaaS methods return the required `{success, data, error, code}` envel
 - Conversations
 - Health and monitoring alerts
 - Usage
-- Billing
+- Billing and Paynow hosted checkout
 - Email
 - WhatsApp
 - Quotation requests and approval
@@ -121,11 +122,13 @@ The portal uses product language and shared responsive CSS/JavaScript. The widge
 
 `verityai_saas/tests/test_notifications.py` covers complete notification settings, email validation and recipient normalization, permission denial, quotation/provider event filtering, and duplicate-delivery prevention.
 
+`verityai_saas/tests/test_paynow.py` covers the documented Paynow hash vector, signed checkout initiation, tamper rejection, independent callback polling, idempotent activation, refund suspension, monthly wallet rollover, operator-only manual billing, and immutable top-up ledger updates.
+
 ## Validation results
 
 Passed:
 
-- Windows Python compilation: 68 Python files compiled without syntax errors.
+- Windows Python compilation: 73 Python files compiled without syntax errors.
 - Frappe bench-environment import validation: all service and API modules imported successfully.
 - Frappe bench-environment `compileall`: passed.
 - `node --check` for `portal.js` and `signup.js`: passed.
@@ -133,8 +136,8 @@ Passed:
 - `bench --site farm.test install-app verityai_saas`: installed; the first attempt exposed and led to a fix for the cyclic Account/Workspace Link creation order.
 - `bench --site farm.test migrate`: passed. The pre-existing Frappe S3 backup `lib.GEN_EMAIL` warnings remained non-fatal.
 - `bench --site farm.test run-tests --app verity_ai`: passed, 35 tests.
-- `bench --site farm.test run-tests --app verityai_saas`: passed, 33 tests, including notification management, guest signup, team lifecycle and plan limits, website routes, portal roles, health/alert scoping, quotation scoping, and approval delegation.
-- Sequential SaaS and engine regression runs passed without fixture leakage: 33/33 and 35/35.
+- `bench --site farm.test run-tests --app verityai_saas`: passed, 41 tests, including Paynow security/activation, notification management, guest signup, team lifecycle and plan limits, website routes, portal roles, health/alert scoping, quotation scoping, and approval delegation.
+- Sequential SaaS and engine regression runs passed without fixture leakage: 41/41 and 35/35.
 - `bench build --app verity_ai`: passed.
 - `bench build --app verityai_saas`: passed.
 
@@ -143,7 +146,7 @@ MariaDB plus the bench Redis cache and queue were started for validation. The co
 ## Known limitations
 
 - Signup relies on Frappe's system signup settings and outgoing email. Workspace and tenant resources are deliberately created only after the verified user signs in.
-- The payment gateway, recurring invoices, automatic receipts, and paid upgrade checkout remain future work; billing is manual and stores immutable usage snapshots.
+- Paynow hosted checkout is implemented, but live merchant credentials and a public HTTPS callback must be verified in Paynow test mode before launch. Recurring tokenized payments, automatic invoices, and receipts remain future work.
 - Wallet state is synchronized from engine logs, while hard pre-call enforcement currently uses the engine's `monthly_token_limit`. A separate optional prepaid/subscription gate in `verity_ai` would require an explicit engine extension point.
 - Full WhatsApp setup stores engine credentials safely and reports configuration presence, but does not perform a live Meta Graph connection test.
 - File extraction, OCR, website crawling, and semantic/vector search are not duplicated here; manual knowledge text uses the existing engine hook and chunker.
@@ -155,5 +158,6 @@ MariaDB plus the bench Redis cache and queue were started for validation. The co
 
 1. Keep the source tree synchronized or linked at `/home/frappe/frappe-bench/apps/verityai_saas`.
 2. Configure AI provider credentials through an operator-only engine workflow; they are intentionally absent from customer pages.
-3. Verify a real allowed-domain/widget exchange, outbound email, and Meta webhook credentials before production launch.
-4. Re-run migration and both suites after future schema or engine integration changes.
+3. Configure Paynow using `docs/paynow_setup.md`, then verify test-mode checkout on the public HTTPS host.
+4. Verify a real allowed-domain/widget exchange, outbound email, and Meta webhook credentials before production launch.
+5. Re-run migration and both suites after future schema or engine integration changes.
