@@ -13,7 +13,7 @@ def get(workspace):
 	return engine.safe_settings(workspace)
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 @endpoint
 def update(workspace, values):
 	require_workspace_permission(workspace, "manage_assistant")

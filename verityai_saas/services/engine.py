@@ -200,11 +200,19 @@ def get_workspace_usage(workspace_name, from_date=None, to_date=None):
 
 
 def get_workspace_conversations(workspace_name, filters=None):
-	tenant = get_workspace_engine_tenant(workspace_name); query = {"tenant": tenant}; filters = filters or {}
+	tenant = get_workspace_engine_tenant(workspace_name)
+	query = {"tenant": tenant}
+	filters = filters or {}
 	for key in ("platform", "status"):
-		if filters.get(key): query[key] = filters[key]
-	return frappe.get_all("AI Chat Session", filters=query, fields=["name", "session_id", "platform", "user_identifier", "status", "estimated_deal_value", "modified"], order_by="modified desc", limit=min(int(filters.get("limit") or 50), 200))
-
+		if filters.get(key):
+			query[key] = filters[key]
+	limit = min(max(int(filters.get("limit") or 50), 1), 200)
+	start = max(int(filters.get("start") or 0), 0)
+	search = (filters.get("search") or "").strip()
+	or_filters = None
+	if search:
+		or_filters = {"session_id": ["like", f"%{search}%"], "user_identifier": ["like", f"%{search}%"]}
+	return frappe.get_all("AI Chat Session", filters=query, or_filters=or_filters, fields=["name", "session_id", "platform", "user_identifier", "status", "estimated_deal_value", "modified"], order_by="modified desc", limit_start=start, limit_page_length=limit)
 
 def get_conversation(workspace_name, conversation_name):
 	tenant = get_workspace_engine_tenant(workspace_name)
@@ -217,13 +225,19 @@ def get_conversation(workspace_name, conversation_name):
 
 
 def get_workspace_leads(workspace_name, filters=None):
-	tenant = get_workspace_engine_tenant(workspace_name); filters = filters or {}; query = {"tenant": tenant}
+	tenant = get_workspace_engine_tenant(workspace_name)
+	filters = filters or {}
+	query = {"tenant": tenant}
 	for key in ("status", "source_channel"):
-		if filters.get(key): query[key] = filters[key]
-	search = filters.get("search")
-	if search: query["lead_name"] = ["like", f"%{search}%"]
-	return frappe.get_all("AI Lead", filters=query, fields=["name", "lead_name", "email", "phone", "source_channel", "status", "chat_session", "dynamic_details", "creation", "modified"], order_by="creation desc", limit=min(int(filters.get("limit") or 50), 200))
-
+		if filters.get(key):
+			query[key] = filters[key]
+	search = (filters.get("search") or "").strip()
+	or_filters = None
+	if search:
+		or_filters = {"lead_name": ["like", f"%{search}%"], "email": ["like", f"%{search}%"], "phone": ["like", f"%{search}%"]}
+	limit = min(max(int(filters.get("limit") or 50), 1), 200)
+	start = max(int(filters.get("start") or 0), 0)
+	return frappe.get_all("AI Lead", filters=query, or_filters=or_filters, fields=["name", "lead_name", "email", "phone", "source_channel", "status", "chat_session", "dynamic_details", "creation", "modified"], order_by="creation desc", limit_start=start, limit_page_length=limit)
 
 def get_workspace_alerts(workspace_name, filters=None):
 	tenant = get_workspace_engine_tenant(workspace_name)
@@ -279,6 +293,8 @@ def apply_plan_limits(workspace_name, plan_name):
 	for key in ("monthly_token_limit", "max_tokens", "public_rate_limit_per_minute", "max_public_message_chars"):
 		setattr(config, key, plan.get(key) or 0)
 	if not plan.can_use_erpnext_integration: config.enable_erpnext_integration = 0
+	if frappe.get_meta("AI Tenant").has_field("show_branding"):
+		frappe.db.set_value("AI Tenant", get_workspace_engine_tenant(workspace_name), "show_branding", 0 if plan.can_remove_branding else 1)
 	config.save(ignore_permissions=True)
 	return {key: config.get(key) for key in ("monthly_token_limit", "max_tokens", "public_rate_limit_per_minute", "max_public_message_chars")}
 

@@ -101,3 +101,20 @@ class TestWorkspaceHealthPortal(FrappeTestCase):
 		response = health_api.get(self.workspace)
 		self.assertFalse(response["success"])
 		self.assertEqual(response["code"], "WORKSPACE_FORBIDDEN")
+
+	def test_operator_can_acknowledge_and_resolve_scoped_alert(self):
+		alert = self.create_alert(severity="Warning")
+		response = health_api.update_alert(self.workspace, alert.name, "Acknowledged", "Investigating provider latency")
+		self.assertTrue(response["success"])
+		self.assertEqual(frappe.db.get_value("AI Monitoring Alert", alert.name, "status"), "Acknowledged")
+		details = frappe.parse_json(frappe.db.get_value("AI Monitoring Alert", alert.name, "details_json"))
+		self.assertEqual(details["operator_notes"][0]["note"], "Investigating provider latency")
+		response = health_api.update_alert(self.workspace, alert.name, "Resolved", "Provider recovered")
+		self.assertTrue(response["success"])
+
+	def test_customer_cannot_change_monitoring_alert_status(self):
+		alert = self.create_alert(severity="Warning")
+		frappe.set_user(self.owner)
+		response = health_api.update_alert(self.workspace, alert.name, "Resolved")
+		self.assertFalse(response["success"])
+		self.assertEqual(response["code"], "WORKSPACE_FORBIDDEN")

@@ -2,6 +2,12 @@ import frappe
 
 
 SAAS_WORKSPACE_DOCTYPES = (
+	"VerityAI Billing Document",
+	"VerityAI API Credential",
+	"VerityAI Lead Activity",
+	"VerityAI Knowledge Ingestion",
+	"VerityAI Report Schedule",
+	"VerityAI Conversation Handoff",
 	"VerityAI Email Delivery Log",
 	"VerityAI Integration Status",
 	"VerityAI WhatsApp Setup",
@@ -57,7 +63,7 @@ def cleanup_test_workspace(workspace_name, users=None, commit=True, engine_tenan
 
 
 def cleanup_all_test_fixtures():
-	patterns = ("owner-%@example.com", "portal-%@example.com", "quote-owner-%@example.com", "health-owner-%@example.com", "team-owner-%@example.com", "notify-owner-%@example.com", "paynow-owner-%@example.com", "ops-owner-%@example.com")
+	patterns = ("owner-%@example.com", "account-owner-%@example.com", "analytics-owner-%@example.com", "integration-owner-%@example.com", "billing-owner-%@example.com", "crm-owner-%@example.com", "ingest-owner-%@example.com", "entitlement-owner-%@example.com", "portal-%@example.com", "quote-owner-%@example.com", "health-owner-%@example.com", "team-owner-%@example.com", "notify-owner-%@example.com", "paynow-owner-%@example.com", "ops-owner-%@example.com")
 	workspaces = []
 	for pattern in patterns:
 		workspaces.extend(

@@ -1,10 +1,68 @@
-import frappe
-from frappe.utils import add_days, getdate, today
+import re
 
-from verityai_saas.api._response import endpoint
+import frappe
+from frappe.utils import add_days, cint, flt, getdate, today
+
+from verityai_saas.api._response import endpoint, json_value
 from verityai_saas.services import paynow
 from verityai_saas.services.permissions import require_operator
 
+
+
+PLAN_CHECK_FIELDS = (
+	"active", "can_remove_branding", "can_use_whatsapp_button", "can_use_whatsapp_ai",
+	"can_use_email_notifications", "can_use_custom_smtp", "can_use_erpnext_integration",
+	"can_use_quotation_workflow", "can_use_api_access", "can_bring_own_ai_provider_key",
+)
+PLAN_INT_FIELDS = (
+	"trial_days", "max_workspaces", "max_assistants", "max_team_members", "monthly_token_limit",
+	"max_tokens", "public_rate_limit_per_minute", "max_public_message_chars", "monthly_web_conversations",
+	"monthly_whatsapp_messages", "monthly_email_sends", "max_knowledge_sources", "max_allowed_domains",
+)
+PLAN_CURRENCY_FIELDS = ("monthly_price", "annual_price")
+PLAN_SAFE_FIELDS = (
+	"name", "plan_name", "plan_code", "active", "currency", *PLAN_CURRENCY_FIELDS, *PLAN_INT_FIELDS,
+	*PLAN_CHECK_FIELDS[1:], "support_level",
+)
+
+
+def _plan_data(plan):
+	return {field: plan.get(field) for field in PLAN_SAFE_FIELDS}
+
+
+def _apply_plan_values(plan, values, creating=False):
+	values = json_value(values, {})
+	if creating:
+		plan_code = (values.get("plan_code") or "").strip().upper()
+		if not re.fullmatch(r"[A-Z0-9][A-Z0-9_-]{1,39}", plan_code):
+			frappe.throw("Plan code must be 2-40 uppercase letters, numbers, underscores, or hyphens.", frappe.ValidationError)
+		plan.plan_code = plan_code
+	plan_name = (values.get("plan_name") or plan.plan_name or "").strip()
+	if not plan_name:
+		frappe.throw("Plan name is required.", frappe.ValidationError)
+	plan.plan_name = plan_name
+	if "currency" in values:
+		plan.currency = (values.get("currency") or "USD").strip().upper()
+	if "support_level" in values:
+		if values.get("support_level") not in {"Community", "Standard", "Priority"}:
+			frappe.throw("Unsupported support level.", frappe.ValidationError)
+		plan.support_level = values.get("support_level")
+	for field in PLAN_CHECK_FIELDS:
+		if field in values:
+			setattr(plan, field, 1 if cint(values.get(field)) else 0)
+	for field in PLAN_INT_FIELDS:
+		if field in values:
+			value = cint(values.get(field))
+			if value < 0:
+				frappe.throw(f"{field.replace('_', ' ').title()} cannot be negative.", frappe.ValidationError)
+			setattr(plan, field, value)
+	for field in PLAN_CURRENCY_FIELDS:
+		if field in values:
+			value = flt(values.get(field))
+			if value < 0:
+				frappe.throw(f"{field.replace('_', ' ').title()} cannot be negative.", frappe.ValidationError)
+			setattr(plan, field, value)
+	return plan
 
 def _latest_by_workspace(doctype, workspace_names, fields):
 	rows = frappe.get_all(
@@ -75,6 +133,21 @@ def dashboard():
 			if usage_percent >= 80:
 				high_usage.append({"workspace": workspace.name, "business_name": workspace.business_name, "usage_percent": usage_percent, "tokens_remaining": wallet.tokens_remaining})
 
+	provider_failures = frappe.get_all(
+		"AI Monitoring Alert",
+		filters={"alert_type": "System", "status": ["in", ["Open", "Acknowledged"]]},
+		fields=["name", "tenant", "severity", "status", "summary", "last_seen"],
+		order_by="last_seen desc",
+		limit=50,
+	)
+	workspace_by_tenant = {row.engine_tenant: row.name for row in workspaces if row.engine_tenant}
+	provider_failures = [
+		frappe._dict({**row, "workspace": workspace_by_tenant.get(row.tenant)})
+		for row in provider_failures if workspace_by_tenant.get(row.tenant)
+	]
+	for row in provider_failures:
+		row.pop("tenant", None)
+
 	return {
 		"accounts": frappe.db.count("VerityAI Account"),
 		"workspaces": workspaces,
@@ -83,8 +156,7 @@ def dashboard():
 		"trials": sum(bool(row.subscription and row.subscription.status == "Trial") for row in workspaces),
 		"plans": frappe.get_all(
 			"VerityAI Plan",
-			filters={"active": 1},
-			fields=["name", "plan_name", "plan_code", "currency", "monthly_price", "annual_price", "monthly_token_limit"],
+			fields=list(PLAN_SAFE_FIELDS),
 			order_by="monthly_price asc",
 		),
 		"recent_events": frappe.get_all(
@@ -101,12 +173,38 @@ def dashboard():
 			fields=["workspace", "mode", "setup_status", "last_tested_on"],
 			limit=100,
 		),
-		"provider_failures": frappe.get_all(
-			"AI Monitoring Alert",
-			filters={"alert_type": "System", "status": ["in", ["Open", "Acknowledged"]]},
-			fields=["name", "tenant", "severity", "summary", "last_seen"],
-			order_by="last_seen desc",
-			limit=50,
-		),
+		"provider_failures": provider_failures,
+
 		"paynow_configured": paynow.is_configured(),
 	}
+
+@frappe.whitelist(methods=["POST"])
+@endpoint
+def create_plan(values):
+	require_operator()
+	plan = _apply_plan_values(frappe.get_doc({"doctype": "VerityAI Plan"}), values, creating=True)
+	plan.insert(ignore_permissions=True)
+	return _plan_data(plan)
+
+
+@frappe.whitelist(methods=["POST"])
+@endpoint
+def update_plan(plan, values):
+	require_operator()
+	if not frappe.db.exists("VerityAI Plan", plan):
+		frappe.throw("Plan was not found.", frappe.DoesNotExistError)
+	doc = _apply_plan_values(frappe.get_doc("VerityAI Plan", plan), values)
+	doc.save(ignore_permissions=True)
+	return _plan_data(doc)
+
+
+@frappe.whitelist(methods=["POST"])
+@endpoint
+def archive_plan(plan):
+	require_operator()
+	if plan == "TRIAL" or frappe.db.get_value("VerityAI Plan", plan, "plan_code") == "TRIAL":
+		frappe.throw("The default trial plan cannot be archived.", frappe.ValidationError)
+	if not frappe.db.exists("VerityAI Plan", plan):
+		frappe.throw("Plan was not found.", frappe.DoesNotExistError)
+	frappe.db.set_value("VerityAI Plan", plan, "active", 0)
+	return {"plan": plan, "active": 0}

@@ -42,6 +42,7 @@ class TestCustomerPortalRoutes(FrappeTestCase):
 		self.assertIn("/verityai/assistant", content)
 		self.assertIn("/verityai/quotes", content)
 		self.assertIn("/verityai/health", content)
+		self.assertIn("/verityai/account", content)
 		self.assertNotIn('href="/app/assistant"', content)
 		quote_content = get_response_content("/verityai/quotes")
 		self.assertIn('data-verity-page="quotes"', quote_content)

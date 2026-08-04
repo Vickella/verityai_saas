@@ -5,15 +5,20 @@ from verityai_saas.services.onboarding import create_workspace, set_step
 from verityai_saas.services.permissions import check_workspace_access, is_operator, require_login
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 @endpoint
-def create(account_name, workspace_name, business_name=None, owner_user=None, plan=None, values=None):
+def create(account_name, workspace_name, business_name=None, owner_user=None, plan=None, values=None, account=None):
 	user = require_login()
 	owner = owner_user if owner_user and is_operator(user) else user
+	if account:
+		account_doc = frappe.get_doc("VerityAI Account", account)
+		if not is_operator(user) and account_doc.owner_user != owner:
+			frappe.throw("You do not own this account.", frappe.PermissionError)
+		account_name = account_doc.account_name
 	return create_workspace(owner, account_name, workspace_name, business_name, plan, json_value(values, {}))
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 @endpoint
 def update_step(workspace, step_code, status="Done"):
 	check_workspace_access(workspace)

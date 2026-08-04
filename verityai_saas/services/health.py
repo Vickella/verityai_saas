@@ -1,3 +1,5 @@
+import json
+
 import frappe
 from frappe.utils import now_datetime
 
@@ -81,3 +83,28 @@ def _overall_status(workspace_status, engine_active, critical_alerts, open_alert
 	}:
 		return "Attention"
 	return "Healthy"
+
+
+def update_workspace_alert(workspace_name, alert_name, status, note=None):
+	workspace = check_workspace_access(workspace_name)
+	status = (status or "").strip()
+	if status not in {"Acknowledged", "Resolved"}:
+		frappe.throw("Alert status must be Acknowledged or Resolved.", frappe.ValidationError)
+	tenant = engine.get_workspace_engine_tenant(workspace.name)
+	if not frappe.db.exists("AI Monitoring Alert", {"name": alert_name, "tenant": tenant}):
+		frappe.throw("Monitoring alert was not found.", frappe.DoesNotExistError)
+	alert = frappe.get_doc("AI Monitoring Alert", alert_name)
+	if alert.status == "Resolved" and status == "Acknowledged":
+		frappe.throw("A resolved alert cannot be moved back to Acknowledged.", frappe.ValidationError)
+	if note:
+		try:
+			details = json.loads(alert.details_json or "{}")
+		except Exception:
+			details = {"previous_details": str(alert.details_json or "")[:1000]}
+		notes = details.get("operator_notes") or []
+		notes.append({"user": frappe.session.user, "note": str(note).strip()[:1000], "timestamp": str(now_datetime())})
+		details["operator_notes"] = notes[-50:]
+		alert.details_json = frappe.as_json(details)
+	alert.status = status
+	alert.save(ignore_permissions=True)
+	return {"alert": alert.name, "status": alert.status}

@@ -162,6 +162,8 @@ def initiate_checkout(workspace_name, plan_name, billing_cycle="Monthly"):
 		"gateway_status": values.get("status"),
 		"gateway_response_json": _response_snapshot(values),
 	})
+	from verityai_saas.services.billing_documents import ensure_invoice_for_payment
+	ensure_invoice_for_payment(payment)
 	return {"payment": payment, "checkout_url": checkout_url, "status": "Pending"}
 
 
@@ -197,10 +199,16 @@ def apply_status(payment_name, values):
 			"last_payment_reference",
 			values.get("paynowreference"),
 		)
+		from verityai_saas.services.billing_documents import ensure_receipt_for_payment
+		ensure_receipt_for_payment(payment.name)
 	elif status_key in FINAL_FAILED_STATUSES:
+		was_completed = payment.status == "Completed"
+		if status_key == "refunded" and was_completed:
+			refund = billing.initiate_refund(payment.workspace, payment.name, payment.amount, "Paynow reported a completed refund")
+			billing.complete_refund(refund["refund"], values.get("paynowreference"))
 		updates["status"] = "Cancelled"
 		frappe.db.set_value("VerityAI Billing Event", payment.name, updates)
-		if status_key == "refunded" and payment.status == "Completed":
+		if status_key == "refunded" and was_completed:
 			billing.set_subscription_status(payment.workspace, "Suspended", "Paynow payment refunded")
 	elif status_key in RISK_STATUSES:
 		updates["status"] = "Pending"

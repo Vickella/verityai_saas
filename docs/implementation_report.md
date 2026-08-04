@@ -128,40 +128,28 @@ The portal uses product language and shared responsive CSS/JavaScript. The widge
 
 ## Validation results
 
-Passed:
+Validated on the local WSL Frappe site `farm.test` on 2026-08-04:
 
-- Windows Python compilation: 74 Python files compiled without syntax errors.
-- Frappe bench-environment import validation: all service and API modules imported successfully.
-- Frappe bench-environment `compileall`: passed.
-- `node --check` for `portal.js` and `signup.js`: passed.
-- Trailing whitespace scan: passed.
-- `bench --site farm.test install-app verityai_saas`: installed; the first attempt exposed and led to a fix for the cyclic Account/Workspace Link creation order.
-- `bench --site farm.test migrate`: passed. The pre-existing Frappe S3 backup `lib.GEN_EMAIL` warnings remained non-fatal.
-- `bench --site farm.test run-tests --app verity_ai`: passed, 35 tests.
-- `bench --site farm.test run-tests --app verityai_saas`: passed, 46 tests, including operator billing controls, Paynow security/activation, notification management, guest signup, team lifecycle and plan limits, website routes, portal roles, health/alert scoping, quotation scoping, and approval delegation.
-- Sequential SaaS and engine regression runs passed without fixture leakage: 46/46 and 35/35.
-- `bench build --app verity_ai`: passed.
-- `bench build --app verityai_saas`: passed.
+- Both Python app trees compile successfully.
+- `portal.js`, `admin.js`, and the engine widget pass `node --check`.
+- Both repositories pass `git diff --check` (Git reports only expected Windows line-ending notices).
+- `bench --site farm.test migrate` completed, applying engine patch `v0_0_22` and SaaS patch `v0_4`. The pre-existing Frappe S3 backup `lib.GEN_EMAIL` warnings remained non-fatal and are unrelated to these apps.
+- Complete `verityai_saas` suite: **82/82 passed**.
+- Complete `verity_ai` suite: **40/40 passed**.
+- Production assets for `verity_ai` and `verityai_saas` built successfully with Frappe's installed esbuild runner.
 
-MariaDB plus the bench Redis cache and queue were started for validation. The complete mandated migration, regression, SaaS test, and build sequence now passes.
+Coverage includes entitlement and quota enforcement, account/workspace capacity, plan CRUD, Paynow signing/callback/polling/idempotency, invoices/receipts/refunds/reminders/grace recovery, CRM assignment/notes/handoffs/exports/funnels, safe ingestion/crawling, analytics/reports, custom SMTP, scoped API credentials, BYO provider and ERPNext secret handling, widget branding, engine entitlement hooks, semantic retrieval, webhook replay, rate limits, approval controls, monitoring, and retention.
 
-## Known limitations
+## Implemented safeguards and boundaries
 
-- Signup relies on Frappe's system signup settings and outgoing email. Workspace and tenant resources are deliberately created only after the verified user signs in.
-- Paynow hosted checkout is implemented, but live merchant credentials and a public HTTPS callback must be verified in Paynow test mode before launch. Recurring tokenized payments, automatic invoices, and receipts remain future work.
-- Wallet state is synchronized from engine logs, while hard pre-call enforcement currently uses the engine's `monthly_token_limit`. A separate optional prepaid/subscription gate in `verity_ai` would require an explicit engine extension point.
-- Plan fields for workspace/assistant counts, channel-specific monthly volumes, and feature entitlements are not yet enforced consistently across every API; these are the highest-priority remaining code milestone.
-- Full WhatsApp setup stores engine credentials safely and reports configuration presence, but does not perform a live Meta Graph connection test.
-- File extraction, OCR, website crawling, and semantic/vector search are not duplicated here; manual knowledge text uses the existing engine hook and chunker.
-- Quote execution remains engine-owned. The customer page approves only tenant-scoped pending requests and deliberately triggers the existing engine hook; a live pilot must verify ERPNext quotation submission and the configured delivery channel.
-- Monitoring alert lifecycle and deduplication remain engine-owned; the customer health dashboard is intentionally read-only.
-- The customer portal uses the validated `/verityai` route because `/app` is reserved by Frappe Desk. Website users receive portal-only roles with `desk_access = 0`.
+- All tenant operations resolve through a workspace-to-engine-tenant link and enforce membership or operator scope.
+- Mutations are POST-only; public customer API tokens are high-entropy, SHA-256 hashed, scoped, revocable, rate-limited, and never shown after creation.
+- Provider, ERPNext, WhatsApp, SMTP, and Paynow secrets are encrypted or held in site configuration and never returned by status APIs.
+- Public URL and SMTP host validation rejects credentials, private/local/reserved destinations, unsafe ports, and redirect-based SSRF; network connections revalidate destinations.
+- Knowledge ingestion is queued and bounded. Semantic embeddings and hybrid retrieval remain engine-owned, with lexical fallback when a provider fails.
+- Recurring/tokenized Paynow payments are intentionally not enabled without merchant approval and a dedicated security review.
+- The customer portal remains at `/verityai`; `/app` remains reserved for Frappe Desk.
 
-## Manual setup and next commands
+## Live validation still required
 
-1. Keep the source tree synchronized or linked at `/home/frappe/frappe-bench/apps/verityai_saas`.
-2. Configure AI provider credentials through an operator-only engine workflow; they are intentionally absent from customer pages.
-3. Configure Paynow using `docs/paynow_setup.md`, then verify test-mode checkout on the public HTTPS host.
-4. Verify a real allowed-domain/widget exchange, outbound email, and Meta webhook credentials before production launch.
-5. Re-run migration and both suites after future schema or engine integration changes.
-6. Track prioritized remaining work in docs/remaining_work.md.
+Credentialed and infrastructure-dependent checks are tracked in `docs/remaining_work.md`: Paynow test/live transactions, real SMTP/Meta/widget/provider/ERPNext/API exercises, OCR system-package installation, production migration/backup/restore, authenticated browser smoke tests, production-sized load testing, disaster recovery, and independent security review.

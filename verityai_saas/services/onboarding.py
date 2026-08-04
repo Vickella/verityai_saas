@@ -3,6 +3,7 @@ from frappe import _
 from frappe.utils import add_days, today
 
 from verityai_saas.services import engine
+from verityai_saas.services.entitlements import assert_account_capacity
 from verityai_saas.services.user_roles import assign_workspace_role
 
 
@@ -38,8 +39,9 @@ def create_workspace(owner_user, account_name, workspace_name, business_name=Non
 	frappe.db.savepoint(savepoint)
 	try:
 		account = ensure_account(owner_user, account_name, values.get("billing_email"), values)
+		assert_account_capacity(account, plan_name=plan_name)
 		workspace = frappe.get_doc({"doctype": "VerityAI Workspace", "workspace_name": slug_name(workspace_name), "account": account, "owner_user": owner_user, "business_name": business_name or workspace_name, "business_nature": values.get("business_nature"), "website_url": values.get("website_url"), "country": values.get("country"), "currency": values.get("currency") or "USD", "timezone": values.get("timezone") or "Africa/Harare", "status": "Trial", "onboarding_status": "In Progress"}).insert(ignore_permissions=True)
-		member = frappe.get_doc({"doctype": "VerityAI Workspace Member", "workspace": workspace.name, "user": owner_user, "workspace_role": "Owner", "status": "Active", "can_manage_assistant": 1, "can_manage_widget": 1, "can_manage_knowledge": 1, "can_view_leads": 1, "can_manage_leads": 1, "can_view_conversations": 1, "can_manage_billing": 1, "can_manage_whatsapp": 1, "can_manage_email": 1, "can_approve_quotes": 1}).insert(ignore_permissions=True)
+		member = frappe.get_doc({"doctype": "VerityAI Workspace Member", "workspace": workspace.name, "user": owner_user, "workspace_role": "Owner", "status": "Active", "can_manage_assistant": 1, "can_manage_widget": 1, "can_manage_knowledge": 1, "can_view_leads": 1, "can_manage_leads": 1, "can_view_conversations": 1, "can_manage_conversations": 1, "can_manage_billing": 1, "can_manage_whatsapp": 1, "can_manage_email": 1, "can_approve_quotes": 1}).insert(ignore_permissions=True)
 		assign_workspace_role(owner_user, "Owner")
 		tenant = engine.create_engine_tenant(workspace.name)
 		configuration = engine.ensure_engine_configuration(workspace.name)

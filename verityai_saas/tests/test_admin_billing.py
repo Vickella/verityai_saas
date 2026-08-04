@@ -91,6 +91,7 @@ class TestOperatorBillingConsole(FrappeTestCase):
 		frappe.set_user(self.owner)
 		responses = [
 			admin_api.dashboard(),
+			admin_api.create_plan({"plan_name": "Nope", "plan_code": "NOPE"}),
 			billing_api.assign_plan(self.workspace, self.plan),
 			billing_api.set_status(self.workspace, "Suspended", "Not allowed"),
 			billing_api.manual_event(self.workspace, "Payment", 40, "Completed", "NOPE"),
@@ -151,3 +152,22 @@ class TestOperatorBillingConsole(FrappeTestCase):
 		frappe.set_user(self.owner)
 		with self.assertRaises(frappe.PermissionError):
 			admin_page.get_context(frappe._dict())
+	def test_operator_can_create_edit_and_archive_plan(self):
+		code = f"MANAGED-{frappe.generate_hash(length=6).upper()}"
+		created = admin_api.create_plan({
+			"plan_name": "Managed Plan", "plan_code": code, "active": 1, "currency": "USD",
+			"monthly_price": 25, "max_workspaces": 3, "monthly_web_conversations": 100,
+			"can_use_whatsapp_ai": 1, "support_level": "Priority",
+		})
+		self.assertTrue(created["success"])
+		plan = created["data"]["name"]
+		try:
+			updated = admin_api.update_plan(plan, {"monthly_price": 30, "max_workspaces": 4, "can_use_api_access": 1})
+			self.assertTrue(updated["success"])
+			self.assertEqual(updated["data"]["monthly_price"], 30)
+			self.assertEqual(updated["data"]["max_workspaces"], 4)
+			archived = admin_api.archive_plan(plan)
+			self.assertTrue(archived["success"])
+			self.assertEqual(frappe.db.get_value("VerityAI Plan", plan, "active"), 0)
+		finally:
+			frappe.db.delete("VerityAI Plan", {"name": plan})

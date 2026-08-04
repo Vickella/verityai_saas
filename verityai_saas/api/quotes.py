@@ -2,6 +2,7 @@ import frappe
 
 from verityai_saas.api._response import endpoint
 from verityai_saas.services import engine
+from verityai_saas.services.entitlements import require_workspace_feature
 from verityai_saas.services.permissions import require_workspace_permission
 
 

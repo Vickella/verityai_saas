@@ -1,4 +1,4 @@
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import frappe
 from frappe.tests.utils import FrappeTestCase
@@ -111,3 +111,26 @@ class TestVerityAISaaS(FrappeTestCase):
 		frappe.set_user("Administrator")
 		self.assertEqual(require_operator(), "Administrator")
 
+
+	def test_whatsapp_connection_test_and_webhook_activity_are_safe(self):
+		whatsapp.configure(self.workspace, {
+			"mode": "Full AI Automation", "whatsapp_phone_id": "phone-id",
+			"whatsapp_access_token": "access-secret", "meta_verify_token": "verify-secret",
+			"meta_app_secret": "app-secret", "verify_meta_signature": 1,
+		})
+		response = Mock(ok=True, content=b"{}", reason="OK")
+		response.json.return_value = {
+			"id": "phone-id", "display_phone_number": "+263700000000",
+			"verified_name": "Verity Test", "quality_rating": "GREEN",
+		}
+		with patch("requests.get", return_value=response) as graph_get:
+			result = whatsapp.test_connection(self.workspace)
+		self.assertTrue(result["connected"])
+		self.assertNotIn("access-secret", frappe.as_json(result))
+		self.assertEqual(graph_get.call_args.kwargs["timeout"], 20)
+		whatsapp.record_channel_activity(frappe._dict({
+			"platform": "WhatsApp", "tenant": self.tenant, "name": "wa-session-test",
+		}))
+		setup = whatsapp.safe_setup(self.workspace)
+		self.assertEqual(setup["webhook_health"]["status"], "Healthy")
+		self.assertEqual(setup["last_webhook_event"], "wa-session-test")

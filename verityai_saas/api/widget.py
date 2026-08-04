@@ -15,7 +15,7 @@ def get(workspace):
 	return data
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 @endpoint
 def update(workspace, values):
 	require_workspace_permission(workspace, "manage_widget")
@@ -24,7 +24,7 @@ def update(workspace, values):
 	return data
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 @endpoint
 def set_domains(workspace, domains):
 	require_workspace_permission(workspace, "manage_widget")

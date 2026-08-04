@@ -117,7 +117,7 @@ def ensure_doctypes():
 		*[field(key, label, "Check", default=0) for key, label in (
 			("can_manage_assistant", "Can Manage Assistant"), ("can_manage_widget", "Can Manage Widget"),
 			("can_manage_knowledge", "Can Manage Knowledge"), ("can_view_leads", "Can View Leads"),
-			("can_manage_leads", "Can Manage Leads"), ("can_view_conversations", "Can View Conversations"),
+			("can_manage_leads", "Can Manage Leads"), ("can_view_conversations", "Can View Conversations"), ("can_manage_conversations", "Can Manage Conversations"),
 			("can_manage_billing", "Can Manage Billing"), ("can_manage_whatsapp", "Can Manage WhatsApp"),
 			("can_manage_email", "Can Manage Email"), ("can_approve_quotes", "Can Approve Quotes"),
 		)],
@@ -176,11 +176,50 @@ def ensure_doctypes():
 		field("gateway_response_json", "Gateway Response", "Code", options="JSON"), field("usage_snapshot_json", "Usage Snapshot", "Code", options="JSON"), field("paid_on", "Paid On", "Datetime"),
 	], "VBE-.#####")
 
+	ensure_doctype("VerityAI Report Schedule", [
+		field("report_name", "Report Name", reqd=1, in_list_view=1), field("report_type", "Report Type", "Select", options="Operator Summary\nWorkspace Analytics", reqd=1, in_list_view=1),
+		field("workspace", "Workspace", "Link", options="VerityAI Workspace"), field("recipients", "Recipients", "Small Text", reqd=1), field("frequency", "Frequency", "Select", options="Daily\nWeekly\nMonthly", default="Weekly", in_list_view=1),
+		field("active", "Active", "Check", default=1, in_list_view=1), field("last_sent_on", "Last Sent On", "Datetime"), field("next_send_on", "Next Send On", "Datetime"), field("last_status", "Last Status"), field("last_error", "Last Error", "Small Text"),
+	], "VRS-.########")
+	ensure_doctype("VerityAI Knowledge Ingestion", [
+		field("workspace", "Workspace", "Link", options="VerityAI Workspace", reqd=1, in_list_view=1), field("knowledge_source", "Knowledge Source", "Link", options="AI Knowledge Source"),
+		field("title", "Title", reqd=1, in_list_view=1), field("source_type", "Source Type", "Select", options="Text\nFile\nURL", reqd=1, in_list_view=1),
+		field("source_url", "Source URL", "Small Text"), field("file_url", "File URL", "Data"), field("status", "Status", "Select", options="Pending\nProcessing\nReady\nFailed", default="Pending", in_list_view=1),
+		field("content_hash", "Content Hash"), field("pages_processed", "Pages Processed", "Int"), field("bytes_processed", "Bytes Processed", "Int"),
+		field("last_refreshed_on", "Last Refreshed On", "Datetime"), field("next_refresh_on", "Next Refresh On", "Datetime"), field("error", "Error", "Small Text"),
+	], "VKI-.########")
+	ensure_doctype("VerityAI Lead Activity", [
+		field("workspace", "Workspace", "Link", options="VerityAI Workspace", reqd=1, in_list_view=1), field("lead", "Lead", "Link", options="AI Lead", reqd=1, in_list_view=1),
+		field("activity_type", "Activity Type", "Select", options="Note\nAssignment\nStatus Change", reqd=1, in_list_view=1), field("note", "Note", "Small Text"),
+		field("assigned_to", "Assigned To", "Link", options="User"), field("old_status", "Old Status"), field("new_status", "New Status"), field("performed_by", "Performed By", "Link", options="User"),
+	], "VLA-.########")
+
+	ensure_doctype("VerityAI Conversation Handoff", [
+		field("workspace", "Workspace", "Link", options="VerityAI Workspace", reqd=1, in_list_view=1), field("conversation", "Conversation", "Link", options="AI Chat Session", reqd=1, unique=1, in_list_view=1),
+		field("status", "Status", "Select", options="Open\nAssigned\nResolved", default="Open", in_list_view=1), field("assigned_to", "Assigned To", "Link", options="User", in_list_view=1),
+		field("opened_on", "Opened On", "Datetime"), field("resolved_on", "Resolved On", "Datetime"), field("resolved_by", "Resolved By", "Link", options="User"), field("history_json", "History", "Code", options="JSON"),
+	], "VHO-.########")
+	ensure_doctype("VerityAI Billing Document", [
+		field("workspace", "Workspace", "Link", options="VerityAI Workspace", reqd=1, in_list_view=1), field("account", "Account", "Link", options="VerityAI Account", reqd=1),
+		field("subscription", "Subscription", "Link", options="VerityAI Subscription"), field("billing_event", "Billing Event", "Link", options="VerityAI Billing Event", reqd=1),
+		field("document_type", "Document Type", "Select", options="Invoice\nReceipt\nCredit Note\nRefund Confirmation", reqd=1, in_list_view=1),
+		field("document_number", "Document Number", reqd=1, unique=1, in_list_view=1), field("status", "Status", "Select", options="Draft\nIssued\nPaid\nCancelled", default="Issued", in_list_view=1),
+		field("issue_date", "Issue Date", "Date"), field("due_date", "Due Date", "Date"), field("paid_on", "Paid On", "Datetime"),
+		field("currency", "Currency", "Link", options="Currency"), field("subtotal", "Subtotal", "Currency"), field("tax_amount", "Tax Amount", "Currency"), field("total", "Total", "Currency"),
+		field("provider_reference", "Provider Reference"), field("rendered_html", "Rendered HTML", "Code", options="HTML"), field("checksum", "Checksum", unique=1),
+	], "VBILL-.########")
 	ensure_doctype("VerityAI Onboarding Checklist", [
 		field("workspace", "Workspace", "Link", options="VerityAI Workspace", reqd=1, in_list_view=1), field("step_code", "Step Code", reqd=1, in_list_view=1),
 		field("step_label", "Step Label", reqd=1), field("status", "Status", "Select", options="Not Started\nIn Progress\nDone\nSkipped", default="Not Started"),
 		field("completed_on", "Completed On", "Datetime"), field("completed_by", "Completed By", "Link", options="User"),
 	], "VOBC-.######")
+
+	ensure_doctype("VerityAI API Credential", [
+		field("workspace", "Workspace", "Link", options="VerityAI Workspace", reqd=1, in_list_view=1),
+		field("label", "Label", reqd=1, in_list_view=1), field("token_prefix", "Token Prefix", read_only=1, in_list_view=1),
+		field("token_hash", "Token Hash", read_only=1, reqd=1, unique=1), field("scopes", "Scopes", "Small Text", reqd=1),
+		field("active", "Active", "Check", default=1, in_list_view=1), field("last_used_on", "Last Used On", "Datetime", read_only=1),
+	], "VAPI-.########")
 
 	ensure_doctype("VerityAI Notification Setting", [
 		field("workspace", "Workspace", "Link", options="VerityAI Workspace", reqd=1, unique=1, in_list_view=1), field("notification_email", "Notification Email", options="Email"),
@@ -189,12 +228,14 @@ def ensure_doctypes():
 		field("quote_request_alerts_enabled", "Quote Request Alerts Enabled", "Check", default=1), field("usage_warning_alerts_enabled", "Usage Warning Alerts Enabled", "Check", default=1),
 		field("provider_failure_alerts_enabled", "Provider Failure Alerts Enabled", "Check", default=1), field("alert_recipients", "Alert Recipients", "Small Text"),
 		field("email_branding_name", "Email Branding Name"), field("email_footer", "Email Footer", "Small Text"), field("status", "Status", "Select", options="Active\nDisabled", default="Active"),
+		field("custom_smtp_enabled", "Use Custom SMTP", "Check"), field("smtp_host", "SMTP Host"), field("smtp_port", "SMTP Port", "Int", default=587),
+		field("smtp_use_tls", "Use STARTTLS", "Check", default=1), field("smtp_username", "SMTP Username"), field("smtp_password", "SMTP Password", "Password"), field("smtp_sender_email", "SMTP Sender Email", options="Email"),
 	], "VNS-.#####")
 
 	ensure_doctype("VerityAI Email Delivery Log", [
 		field("workspace", "Workspace", "Link", options="VerityAI Workspace", reqd=1, in_list_view=1), field("notification_type", "Notification Type", reqd=1),
 		field("recipient", "Recipient", reqd=1), field("subject", "Subject", reqd=1), field("status", "Status", "Select", options="Pending\nSent\nFailed", default="Pending"),
-		field("reference_doctype", "Reference DocType"), field("reference_name", "Reference Name"), field("error", "Error", "Small Text"), field("sent_on", "Sent On", "Datetime"),
+		field("reference_doctype", "Reference DocType"), field("reference_name", "Reference Name"), field("message", "Message", "Code", options="HTML"), field("error", "Error", "Small Text"), field("sent_on", "Sent On", "Datetime"),
 	], "VEDL-.########")
 
 	ensure_doctype("VerityAI WhatsApp Setup", [
@@ -202,7 +243,7 @@ def ensure_doctypes():
 		field("business_whatsapp_number", "Business WhatsApp Number"), field("whatsapp_button_enabled", "WhatsApp Button Enabled", "Check", default=1),
 		field("lead_alert_enabled", "Lead Alert Enabled", "Check"), field("full_ai_enabled", "Full AI Enabled", "Check"), field("setup_status", "Setup Status", "Select", options="Not Configured\nIn Progress\nConnected\nFailed", default="Not Configured"),
 		field("meta_phone_number_id_status", "Meta Phone Number ID Status"), field("access_token_status", "Access Token Status"), field("webhook_status", "Webhook Status"),
-		field("signature_verification_status", "Signature Verification Status"), field("last_tested_on", "Last Tested On", "Datetime"),
+		field("signature_verification_status", "Signature Verification Status"), field("last_tested_on", "Last Tested On", "Datetime"), field("last_webhook_on", "Last Webhook On", "Datetime"), field("last_webhook_event", "Last Webhook Event"),
 	], "VWA-.#####")
 
 	ensure_doctype("VerityAI Integration Status", [

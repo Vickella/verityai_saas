@@ -77,19 +77,20 @@ def assign_plan(workspace_name, plan_name, status="Active", billing_cycle="Month
 
 def set_subscription_status(workspace_name, status, reason=None):
 	_validate_choice(status, SUBSCRIPTION_STATUSES, "subscription status")
-	name = frappe.db.get_value("VerityAI Subscription", {"workspace": workspace_name}, "name", order_by="creation desc")
-	if not name:
+	subscription = frappe.db.get_value("VerityAI Subscription", {"workspace": workspace_name}, ["name", "grace_period_end"], as_dict=True, order_by="creation desc")
+	if not subscription:
 		frappe.throw("Subscription was not found.", frappe.DoesNotExistError)
-	frappe.db.set_value("VerityAI Subscription", name, {"status": status, "suspension_reason": reason})
-	active = status in {"Trial", "Active"}
+	frappe.db.set_value("VerityAI Subscription", subscription.name, {"status": status, "suspension_reason": reason})
+	grace_active = status == "Past Due" and subscription.grace_period_end and getdate(subscription.grace_period_end) >= getdate(today())
+	active = status in {"Trial", "Active"} or grace_active
 	engine.set_engine_active(workspace_name, active)
-	workspace_status = status if status in {"Trial", "Active", "Suspended", "Cancelled"} else "Suspended"
+	workspace_status = "Active" if grace_active else status if status in {"Trial", "Active", "Suspended", "Cancelled"} else "Suspended"
 	frappe.db.set_value("VerityAI Workspace", workspace_name, "status", workspace_status)
 	wallet_name = frappe.db.get_value("VerityAI Usage Wallet", {"workspace": workspace_name}, "name")
 	if wallet_name:
 		wallet_status = "Normal" if active else "Suspended"
 		frappe.db.set_value("VerityAI Usage Wallet", wallet_name, "status", wallet_status)
-	return name
+	return subscription.name
 
 
 def create_billing_event(workspace_name, event_type, amount=0, status="Pending", provider="Manual", provider_reference=None):
@@ -109,6 +110,8 @@ def create_billing_event(workspace_name, event_type, amount=0, status="Pending",
 	event = frappe.get_doc({"doctype": "VerityAI Billing Event", "account": workspace.account, "workspace": workspace.name, "subscription": subscription, "event_type": event_type, "amount": amount, "currency": workspace.currency or "USD", "status": status, "provider": provider, "provider_reference": provider_reference, "usage_snapshot_json": json.dumps(wallet, default=str), "period_start": wallet.get("period_start"), "period_end": wallet.get("period_end"), "paid_on": now_datetime() if event_type == "Payment" and status == "Completed" else None}).insert(ignore_permissions=True)
 	if event_type == "Payment" and status == "Completed" and subscription:
 		frappe.db.set_value("VerityAI Subscription", subscription, "last_payment_reference", provider_reference)
+		from verityai_saas.services.billing_documents import ensure_receipt_for_payment
+		ensure_receipt_for_payment(event.name)
 	return event.name
 
 
@@ -122,6 +125,8 @@ def add_top_up(workspace_name, tokens, amount=0, provider_reference=None):
 	workspace = frappe.get_doc("VerityAI Workspace", workspace_name)
 	wallet = frappe.get_doc("VerityAI Usage Wallet", wallet_name)
 	event = create_billing_event(workspace_name, "Top-Up", amount, "Completed", provider_reference=provider_reference)
+	from verityai_saas.services.billing_documents import ensure_document
+	ensure_document(event, "Receipt", status="Paid")
 	transaction = frappe.get_doc({
 		"doctype": "VerityAI Usage Transaction",
 		"workspace": workspace_name,
@@ -184,7 +189,56 @@ def check_trial_expiry():
 def check_subscription_expiry():
 	if not frappe.db.exists("DocType", "VerityAI Subscription"):
 		return
-	for row in frappe.get_all("VerityAI Subscription", filters={"status": "Active", "current_period_end": ["<", today()]}, fields=["workspace", "grace_period_end"]):
-		if not row.grace_period_end or getdate(row.grace_period_end) < getdate(today()):
-			set_subscription_status(row.workspace, "Expired", "Subscription period expired")
+	current_date = getdate(today())
+	for row in frappe.get_all("VerityAI Subscription", filters={"status": "Active", "current_period_end": ["<", current_date]}, fields=["name", "workspace", "grace_period_end"]):
+		grace_end = getdate(row.grace_period_end) if row.grace_period_end else add_days(current_date, 7)
+		frappe.db.set_value("VerityAI Subscription", row.name, "grace_period_end", grace_end)
+		set_subscription_status(row.workspace, "Past Due", f"Payment grace period ends {grace_end}")
+	for row in frappe.get_all("VerityAI Subscription", filters={"status": "Past Due", "grace_period_end": ["<", current_date]}, fields=["workspace"]):
+		set_subscription_status(row.workspace, "Expired", "Payment grace period expired")
 	frappe.db.commit()
+
+
+def send_payment_reminders():
+	from verityai_saas.services.notifications import send_notification
+
+	current_date = getdate(today())
+	for row in frappe.get_all("VerityAI Subscription", filters={"status": ["in", ["Trial", "Active", "Past Due"]]}, fields=["name", "workspace", "status", "next_billing_date", "grace_period_end", "amount", "currency"]):
+		due = getdate(row.next_billing_date) if row.next_billing_date else None
+		grace = getdate(row.grace_period_end) if row.grace_period_end else None
+		if row.status == "Active" and (not due or due > add_days(current_date, 3)):
+			continue
+		if frappe.db.exists("VerityAI Email Delivery Log", {"workspace": row.workspace, "notification_type": "Payment Reminder", "reference_name": row.name, "creation": [">=", current_date]}):
+			continue
+		if row.status == "Past Due":
+			message = f"Your payment is past due. The recovery grace period ends {grace or 'soon'}."
+		elif row.status == "Trial":
+			message = f"Your VerityAI trial ends on {due}. Choose a paid plan to avoid interruption."
+		else:
+			message = f"Your {row.currency or ''} {flt(row.amount):.2f} subscription payment is due on {due}."
+		send_notification(row.workspace, "Payment Reminder", "VerityAI payment reminder", message, "VerityAI Subscription", row.name)
+	frappe.db.commit()
+
+
+def initiate_refund(workspace_name, payment_event, amount=None, reason=None):
+	if not frappe.db.exists("VerityAI Billing Event", {"name": payment_event, "workspace": workspace_name, "event_type": "Payment", "status": "Completed"}):
+		frappe.throw("Completed payment was not found.", frappe.DoesNotExistError)
+	payment = frappe.get_doc("VerityAI Billing Event", payment_event)
+	amount = flt(amount if amount not in (None, "") else payment.amount)
+	completed = frappe.get_all("VerityAI Billing Event", filters={"workspace": workspace_name, "event_type": "Refund", "gateway_reference": payment.name, "status": ["in", ["Pending", "Completed"]]}, pluck="amount")
+	remaining = max(flt(payment.amount) - sum(flt(value) for value in completed), 0)
+	if amount <= 0 or amount > remaining:
+		frappe.throw(f"Refund amount must be greater than zero and no more than {remaining:.2f}.", frappe.ValidationError)
+	refund = create_billing_event(workspace_name, "Refund", amount, "Pending", provider=payment.provider or "Manual", provider_reference=f"Refund requested for {payment.name}: {(reason or 'No reason supplied')[:200]}")
+	frappe.db.set_value("VerityAI Billing Event", refund, {"gateway_reference": payment.name, "gateway_status": "Refund Requested"})
+	return {"refund": refund, "status": "Pending", "remaining_refundable": remaining - amount}
+
+
+def complete_refund(refund_event, provider_reference=None):
+	if not frappe.db.exists("VerityAI Billing Event", {"name": refund_event, "event_type": "Refund", "status": "Pending"}):
+		frappe.throw("Pending refund was not found.", frappe.DoesNotExistError)
+	refund = frappe.get_doc("VerityAI Billing Event", refund_event)
+	frappe.db.set_value("VerityAI Billing Event", refund.name, {"status": "Completed", "gateway_status": "Refunded", "paid_on": now_datetime(), "provider_reference": provider_reference or refund.provider_reference})
+	from verityai_saas.services.billing_documents import ensure_refund_confirmation
+	ensure_refund_confirmation(refund.name)
+	return {"refund": refund.name, "status": "Completed"}

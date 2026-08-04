@@ -20,6 +20,28 @@ def sync_workspace_usage(workspace_name):
 		wallet.tokens_used = int(totals[0] or 0)
 		wallet.tokens_remaining = max(int(wallet.opening_token_allowance or 0) + int(wallet.top_up_tokens or 0) - wallet.tokens_used, 0)
 		wallet.estimated_ai_cost = totals[1] or 0
+		period_filters = {
+			"tenant": tenant,
+			"creation": ["between", [wallet.period_start, f"{wallet.period_end} 23:59:59"]],
+			"status": ["!=", "Error"],
+		}
+		wallet.web_conversations_used = frappe.db.sql(
+			"""select count(distinct chat_session) from `tabAI Usage Log`
+			where tenant=%s and platform='Web' and status != 'Error'
+			and creation between %s and %s""",
+			(tenant, wallet.period_start, f"{wallet.period_end} 23:59:59"),
+		)[0][0] or 0
+		wallet.whatsapp_messages_used = frappe.db.count(
+			"AI Usage Log", {**period_filters, "platform": "WhatsApp"}
+		)
+		wallet.email_sends_used = frappe.db.count(
+			"VerityAI Email Delivery Log",
+			{
+				"workspace": workspace_name,
+				"status": "Sent",
+				"creation": ["between", [wallet.period_start, f"{wallet.period_end} 23:59:59"]],
+			},
+		)
 		percent = (wallet.tokens_used / max(int(wallet.opening_token_allowance or 0) + int(wallet.top_up_tokens or 0), 1)) * 100
 		wallet.status = "Exhausted" if wallet.tokens_remaining <= 0 else "Warning" if percent >= 80 else "Normal"
 		wallet.last_synced_from_usage_logs = now_datetime()

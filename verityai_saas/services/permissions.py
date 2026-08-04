@@ -5,9 +5,9 @@ from frappe import _
 OPERATOR_ROLES = {"System Manager", "VerityAI SaaS Administrator", "VerityAI Operator"}
 ROLE_DEFAULTS = {
 	"Owner": {"*"},
-	"Admin": {"manage_assistant", "manage_widget", "manage_knowledge", "view_leads", "manage_leads", "view_conversations", "manage_billing", "manage_whatsapp", "manage_email", "manage_team", "approve_quotes"},
+	"Admin": {"manage_assistant", "manage_widget", "manage_knowledge", "view_leads", "manage_leads", "view_conversations", "manage_conversations", "manage_billing", "manage_whatsapp", "manage_email", "manage_team", "approve_quotes"},
 	"Sales": {"view_leads", "manage_leads", "view_conversations"},
-	"Support": {"view_leads", "view_conversations"},
+	"Support": {"view_leads", "view_conversations", "manage_conversations"},
 	"Viewer": {"view_leads", "view_conversations"},
 	"Billing Manager": {"manage_billing"},
 }
@@ -54,7 +54,7 @@ def get_membership(workspace_name, user=None):
 	rows = frappe.get_all(
 		"VerityAI Workspace Member",
 		filters={"workspace": workspace_name, "user": user, "status": "Active"},
-		fields=["name", "workspace_role", "can_manage_assistant", "can_manage_widget", "can_manage_knowledge", "can_view_leads", "can_manage_leads", "can_view_conversations", "can_manage_billing", "can_manage_whatsapp", "can_manage_email", "can_approve_quotes"],
+		fields=["name", "workspace_role", "can_manage_assistant", "can_manage_widget", "can_manage_knowledge", "can_view_leads", "can_manage_leads", "can_view_conversations", "can_manage_conversations", "can_manage_billing", "can_manage_whatsapp", "can_manage_email", "can_approve_quotes"],
 		limit=1,
 	)
 	return rows[0] if rows else None

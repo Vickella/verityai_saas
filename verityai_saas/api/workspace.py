@@ -31,7 +31,7 @@ def members(workspace):
 	return list_members(workspace)
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 @endpoint
 def invite(workspace, email, role="Viewer"):
 	require_workspace_permission(workspace, "manage_team")

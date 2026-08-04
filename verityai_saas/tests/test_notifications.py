@@ -147,3 +147,17 @@ class TestNotificationManagement(FrappeTestCase):
 		self.assertEqual(second, [])
 		self.assertEqual(not_provider, [])
 		sendmail.assert_called_once()
+
+	def test_failed_email_delivery_can_be_retried(self):
+		log = frappe.get_doc({
+			"doctype": "VerityAI Email Delivery Log", "workspace": self.workspace,
+			"notification_type": "Test", "recipient": self.owner, "subject": "Retry me",
+			"message": "<p>Original safe message</p>", "status": "Failed", "error": "Temporary SMTP error",
+		}).insert(ignore_permissions=True)
+		frappe.set_user(self.owner)
+		with patch("frappe.sendmail") as sendmail:
+			response = email_api.retry(self.workspace, log.name)
+		self.assertTrue(response["success"])
+		self.assertEqual(response["data"]["status"], "Sent")
+		self.assertEqual(frappe.db.get_value("VerityAI Email Delivery Log", log.name, "error"), None)
+		self.assertEqual(sendmail.call_args.kwargs["message"], "<p>Original safe message</p>")

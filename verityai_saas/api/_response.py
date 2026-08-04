@@ -20,8 +20,9 @@ def endpoint(function):
 			frappe.local.response["http_status_code"] = 401
 			return failure(exc, "AUTH_REQUIRED")
 		except frappe.PermissionError as exc:
-			frappe.local.response["http_status_code"] = 403
-			return failure(exc, "WORKSPACE_FORBIDDEN")
+			status = frappe.local.response.get("http_status_code") or 403
+			frappe.local.response["http_status_code"] = status
+			return failure(exc, "RATE_LIMITED" if status == 429 else "WORKSPACE_FORBIDDEN")
 		except frappe.DoesNotExistError as exc:
 			frappe.local.response["http_status_code"] = 404
 			return failure(exc, "NOT_FOUND")

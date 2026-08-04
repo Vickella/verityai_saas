@@ -1,12 +1,51 @@
+from email.message import EmailMessage
 from html import escape
+import smtplib
+import ssl
 
 import frappe
 from frappe.utils import now_datetime
+
+from verityai_saas.services.entitlements import email_delivery_allowance, feature_allowed, workspace_context
 
 
 def workspace_for_tenant(tenant):
 	return frappe.db.get_value("VerityAI Workspace", {"engine_tenant": tenant}, "name")
 
+def _deliver_email(workspace_name, setting, recipient, subject, message):
+	context = workspace_context(workspace_name=workspace_name)
+	if setting.custom_smtp_enabled and feature_allowed(context, "can_use_custom_smtp"):
+		from verityai_saas.services.integrations import _smtp_host
+		host = _smtp_host(setting.smtp_host)
+		port = int(setting.smtp_port or 587)
+		if port not in {465, 587}:
+			frappe.throw("SMTP port must be 465 or 587.", frappe.ValidationError)
+		sender = setting.smtp_sender_email or setting.notification_email
+		password = setting.get_password("smtp_password", raise_exception=False)
+		if not sender or not setting.smtp_username or not password:
+			frappe.throw("Custom SMTP credentials are incomplete.", frappe.ValidationError)
+		email = EmailMessage()
+		email["From"] = sender
+		email["To"] = recipient
+		email["Subject"] = subject
+		if setting.reply_to_email:
+			email["Reply-To"] = setting.reply_to_email
+		email.set_content("This message requires an HTML-capable email client.")
+		email.add_alternative(message, subtype="html")
+		context_ssl = ssl.create_default_context()
+		if port == 465:
+			with smtplib.SMTP_SSL(host, port, timeout=15, context=context_ssl) as client:
+				client.login(setting.smtp_username, password)
+				client.send_message(email)
+		else:
+			with smtplib.SMTP(host, port, timeout=15) as client:
+				client.ehlo()
+				client.starttls(context=context_ssl)
+				client.ehlo()
+				client.login(setting.smtp_username, password)
+				client.send_message(email)
+		return
+	frappe.sendmail(recipients=[recipient], subject=subject, message=message, reply_to=setting.reply_to_email or None)
 
 def recipients(setting):
 	values = [setting.notification_email] + (setting.alert_recipients or "").replace(";", ",").split(",")
@@ -14,6 +53,9 @@ def recipients(setting):
 
 
 def send_notification(workspace_name, notification_type, subject, message, reference_doctype=None, reference_name=None):
+	allowance = email_delivery_allowance(workspace_name)
+	if allowance == 0:
+		return []
 	setting_name = frappe.db.get_value("VerityAI Notification Setting", {"workspace": workspace_name, "status": "Active"}, "name")
 	if not setting_name:
 		return []
@@ -24,16 +66,29 @@ def send_notification(workspace_name, notification_type, subject, message, refer
 	email_body = f"<p><strong>{branding}</strong></p><p>{body}</p>"
 	if footer:
 		email_body += f"<p>{footer}</p>"
+	recipient_values = recipients(setting)
+	if allowance is not None:
+		recipient_values = recipient_values[:allowance]
 	logs = []
-	for recipient in recipients(setting):
-		log = frappe.get_doc({"doctype": "VerityAI Email Delivery Log", "workspace": workspace_name, "notification_type": notification_type, "recipient": recipient, "subject": subject, "status": "Pending", "reference_doctype": reference_doctype, "reference_name": reference_name}).insert(ignore_permissions=True)
+	for recipient in recipient_values:
+		log = frappe.get_doc({"doctype": "VerityAI Email Delivery Log", "workspace": workspace_name, "notification_type": notification_type, "recipient": recipient, "subject": subject, "message": email_body, "status": "Pending", "reference_doctype": reference_doctype, "reference_name": reference_name}).insert(ignore_permissions=True)
 		try:
-			frappe.sendmail(recipients=[recipient], subject=subject, message=email_body, reply_to=setting.reply_to_email or None)
+			_deliver_email(workspace_name, setting, recipient, subject, email_body)
 			log.status, log.sent_on = "Sent", now_datetime()
 		except Exception as exc:
 			log.status, log.error = "Failed", str(exc)[:500]
 		log.save(ignore_permissions=True)
 		logs.append(log.name)
+	if logs:
+		wallet = frappe.db.get_value("VerityAI Usage Wallet", {"workspace": workspace_name}, "name")
+		if wallet:
+			period_start = frappe.db.get_value("VerityAI Usage Wallet", wallet, "period_start")
+			sent = frappe.db.count("VerityAI Email Delivery Log", {
+				"workspace": workspace_name,
+				"status": "Sent",
+				"creation": [">=", period_start],
+			})
+			frappe.db.set_value("VerityAI Usage Wallet", wallet, "email_sends_used", sent)
 	return logs
 
 
@@ -109,3 +164,38 @@ def send_daily_summaries():
 			frappe.log_error(title=f"VerityAI Daily Summary: {workspace}", message=frappe.get_traceback())
 	frappe.db.commit()
 
+
+
+def retry_failed_delivery(workspace_name, delivery_log):
+	allowance = email_delivery_allowance(workspace_name)
+	if allowance == 0:
+		frappe.throw("The email allowance for this workspace has been reached.", frappe.PermissionError)
+	if not frappe.db.exists("VerityAI Email Delivery Log", {"name": delivery_log, "workspace": workspace_name}):
+		frappe.throw("Email delivery log was not found.", frappe.DoesNotExistError)
+	log = frappe.get_doc("VerityAI Email Delivery Log", delivery_log)
+	if log.status != "Failed":
+		frappe.throw("Only failed email deliveries can be retried.", frappe.ValidationError)
+	setting_name = frappe.db.get_value("VerityAI Notification Setting", {"workspace": workspace_name, "status": "Active"}, "name")
+	if not setting_name:
+		frappe.throw("Active email notification settings are required.", frappe.ValidationError)
+	setting = frappe.get_doc("VerityAI Notification Setting", setting_name)
+	try:
+		_deliver_email(
+			workspace_name, setting, log.recipient, log.subject,
+			log.message or "This VerityAI notification is being retried after an earlier delivery failure.",
+		)
+		log.status = "Sent"
+		log.sent_on = now_datetime()
+		log.error = None
+	except Exception as exc:
+		log.error = str(exc)[:500]
+		log.save(ignore_permissions=True)
+		raise
+	log.save(ignore_permissions=True)
+	wallet = frappe.db.get_value("VerityAI Usage Wallet", {"workspace": workspace_name}, ["name", "period_start"], as_dict=True)
+	if wallet:
+		sent = frappe.db.count("VerityAI Email Delivery Log", {
+			"workspace": workspace_name, "status": "Sent", "creation": [">=", wallet.period_start],
+		})
+		frappe.db.set_value("VerityAI Usage Wallet", wallet.name, "email_sends_used", sent)
+	return {"delivery_log": log.name, "status": log.status, "sent_on": log.sent_on}

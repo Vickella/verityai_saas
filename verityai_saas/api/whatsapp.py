@@ -13,7 +13,7 @@ def get(workspace):
 	return whatsapp.safe_setup(workspace)
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 @endpoint
 def update(workspace, values):
 	require_workspace_permission(workspace, "manage_whatsapp")
@@ -21,3 +21,10 @@ def update(workspace, values):
 	set_step(workspace, "whatsapp")
 	return data
 
+
+
+@frappe.whitelist(methods=["POST"])
+@endpoint
+def test_connection(workspace):
+	require_workspace_permission(workspace, "manage_whatsapp")
+	return whatsapp.test_connection(workspace)

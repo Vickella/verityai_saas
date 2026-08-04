@@ -2,7 +2,8 @@ import frappe
 from frappe.utils import cint, validate_email_address
 
 from verityai_saas.api._response import endpoint, json_value
-from verityai_saas.services.notifications import send_notification
+from verityai_saas.services.notifications import retry_failed_delivery, send_notification
+from verityai_saas.services.entitlements import require_workspace_feature
 from verityai_saas.services.onboarding import set_step
 from verityai_saas.services.permissions import check_workspace_access, require_workspace_permission
 
@@ -30,7 +31,7 @@ def get(workspace):
 	return frappe.db.get_value("VerityAI Notification Setting", {"workspace": workspace}, ["name", *SAFE_FIELDS], as_dict=True) or {}
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 @endpoint
 def update(workspace, values):
 	require_workspace_permission(workspace, "manage_email")
@@ -57,9 +58,33 @@ def update(workspace, values):
 	return {key: doc.get(key) for key in SAFE_FIELDS}
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 @endpoint
 def send_test(workspace):
 	require_workspace_permission(workspace, "manage_email")
 	return {"delivery_logs": send_notification(workspace, "Test", "VerityAI notification test", "Your workspace email notifications are configured.")}
 
+
+
+@frappe.whitelist(methods=["POST"])
+@endpoint
+def retry(workspace, delivery_log):
+	require_workspace_permission(workspace, "manage_email")
+	return retry_failed_delivery(workspace, delivery_log)
+
+@frappe.whitelist()
+@endpoint
+def delivery_logs(workspace, status=None, limit=50):
+	require_workspace_permission(workspace, "manage_email")
+	filters = {"workspace": workspace}
+	if status:
+		if status not in {"Pending", "Sent", "Failed"}:
+			frappe.throw("Unsupported delivery status.", frappe.ValidationError)
+		filters["status"] = status
+	return frappe.get_all(
+		"VerityAI Email Delivery Log",
+		filters=filters,
+		fields=["name", "notification_type", "recipient", "subject", "status", "error", "sent_on", "creation"],
+		order_by="creation desc",
+		limit=min(max(cint(limit or 50), 1), 200),
+	)
