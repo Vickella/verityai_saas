@@ -98,6 +98,11 @@ def create_billing_event(workspace_name, event_type, amount=0, status="Pending",
 	amount = flt(amount)
 	if amount < 0:
 		frappe.throw("Billing event amount cannot be negative.", frappe.ValidationError)
+	if event_type == "Payment" and status == "Completed" and provider == "Manual":
+		if amount <= 0:
+			frappe.throw("A completed manual payment must have a positive amount.", frappe.ValidationError)
+		if not (provider_reference or "").strip():
+			frappe.throw("A completed manual payment requires a reference.", frappe.ValidationError)
 	workspace = frappe.get_doc("VerityAI Workspace", workspace_name)
 	subscription = frappe.db.get_value("VerityAI Subscription", {"workspace": workspace_name}, "name", order_by="creation desc")
 	wallet = frappe.db.get_value("VerityAI Usage Wallet", {"workspace": workspace_name}, ["tokens_used", "tokens_remaining", "estimated_ai_cost", "period_start", "period_end"], as_dict=True) or {}

@@ -1,2 +1,21 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{{ title }}</title><link rel="stylesheet" href="/assets/verityai_saas/css/portal.css"></head><body><main><header class="va-topbar"><div><p class="eyebrow">VerityCore Operations</p><h1>Operator dashboard</h1></div><a class="va-button" href="/verityai">Customer portal</a></header><div class="va-grid"><div class="va-card va-metric"><span>Accounts</span><strong>{{ accounts }}</strong></div><div class="va-card va-metric"><span>Workspaces</span><strong>{{ workspaces|length }}</strong></div><div class="va-card va-metric"><span>Suspended</span><strong>{{ suspended }}</strong></div></div><div class="va-card"><table class="va-table"><thead><tr><th>Workspace</th><th>Status</th><th>Plan</th><th>Subscription</th><th>Tokens used</th><th>Open alerts</th></tr></thead><tbody>{% for row in workspaces %}<tr><td><strong>{{ row.business_name }}</strong><br><span class="muted">{{ row.name }}</span></td><td>{{ row.status }}</td><td>{{ row.plan or "—" }}</td><td>{{ row.subscription_status or "—" }}</td><td>{{ row.tokens_used }}</td><td>{{ row.open_alerts }}</td></tr>{% endfor %}</tbody></table></div></main></body></html>
-
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width,initial-scale=1">
+	<title>{{ title }}</title>
+	<link rel="stylesheet" href="/assets/verityai_saas/css/portal.css">
+</head>
+<body>
+	<main>
+		<header class="va-topbar">
+			<div><p class="eyebrow">VerityCore Operations</p><h1>Operator dashboard</h1></div>
+			<a class="va-button" href="/verityai">Customer portal</a>
+		</header>
+		<div id="va-admin-notice" class="va-notice" hidden></div>
+		<div id="va-admin-content" class="va-content"><div class="va-card va-loading">Loading operations data�</div></div>
+	</main>
+	<script>window.csrf_token={{ (csrf_token or '') | tojson }};</script>
+	<script src="/assets/verityai_saas/js/admin.js"></script>
+</body>
+</html>

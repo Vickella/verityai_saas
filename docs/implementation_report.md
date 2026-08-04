@@ -37,7 +37,7 @@ The installer also creates portal-only customer roles, operator/admin roles, the
 - `services/user_roles.py`: portal-role assignment and synchronization across all active workspace memberships.
 - `services/health.py`: tenant-scoped health state, service status, alert counts, and filterable safe alert history.
 - `services/usage.py`: idempotent engine usage-log to SaaS transaction synchronization and wallet totals.
-- `services/billing.py`: validated plan assignment, billing periods, immutable manual events/top-ups, wallet updates, suspension, and trial/subscription expiry.
+- `services/billing.py`: validated plan assignment, billing periods, immutable operator audit events/manual payments/top-ups, wallet updates, suspension, and trial/subscription expiry.
 - `services/paynow.py`: SHA-512 signed checkout initiation, strict Paynow URL validation, callback verification, independent polling, amount/reference checks, and idempotent plan activation.
 - `services/notifications.py`: Frappe email delivery, new-lead/handoff/quotation/provider hooks, usage warnings, daily summaries, and delivery logs.
 - `services/whatsapp.py`: button/alert/full-AI setup and write-only engine credential updates.
@@ -60,7 +60,7 @@ All public SaaS methods return the required `{success, data, error, code}` envel
 - Email
 - WhatsApp
 - Quotation requests and approval
-- Admin/operator dashboard
+- Interactive admin/operator operations console with bulk workspace rollups, plan/status controls, manual payments, and top-ups
 
 Engine secrets and `AI Configuration.system_prompt` are absent from response field lists. WhatsApp token/secret responses contain presence booleans only.
 
@@ -82,7 +82,7 @@ The SaaS website provides a guest signup page at `/verityai/signup`. After verif
 - `/verityai/email`
 - `/verityai/whatsapp`
 - `/verityai/team` for invitations, role changes, explicit permissions, removal, and reactivation
-- `/verityai/admin` for operators
+- `/verityai/admin` for operators, with high-usage/trial/setup alerts and auditable billing controls
 
 The portal uses product language and shared responsive CSS/JavaScript. The widget page displays embed code for `/assets/verity_ai/js/widget.js`; no SaaS widget runtime was created.
 
@@ -124,11 +124,13 @@ The portal uses product language and shared responsive CSS/JavaScript. The widge
 
 `verityai_saas/tests/test_paynow.py` covers the documented Paynow hash vector, signed checkout initiation, tamper rejection, independent callback polling, idempotent activation, refund suspension, monthly wallet rollover, operator-only manual billing, and immutable top-up ledger updates.
 
+`verityai_saas/tests/test_admin_billing.py` covers bulk operator rollups, customer denial, plan/status engine synchronization, immutable operator audit events, strict manual-payment validation, top-ups, and operator page access.
+
 ## Validation results
 
 Passed:
 
-- Windows Python compilation: 73 Python files compiled without syntax errors.
+- Windows Python compilation: 74 Python files compiled without syntax errors.
 - Frappe bench-environment import validation: all service and API modules imported successfully.
 - Frappe bench-environment `compileall`: passed.
 - `node --check` for `portal.js` and `signup.js`: passed.
@@ -136,8 +138,8 @@ Passed:
 - `bench --site farm.test install-app verityai_saas`: installed; the first attempt exposed and led to a fix for the cyclic Account/Workspace Link creation order.
 - `bench --site farm.test migrate`: passed. The pre-existing Frappe S3 backup `lib.GEN_EMAIL` warnings remained non-fatal.
 - `bench --site farm.test run-tests --app verity_ai`: passed, 35 tests.
-- `bench --site farm.test run-tests --app verityai_saas`: passed, 41 tests, including Paynow security/activation, notification management, guest signup, team lifecycle and plan limits, website routes, portal roles, health/alert scoping, quotation scoping, and approval delegation.
-- Sequential SaaS and engine regression runs passed without fixture leakage: 41/41 and 35/35.
+- `bench --site farm.test run-tests --app verityai_saas`: passed, 46 tests, including operator billing controls, Paynow security/activation, notification management, guest signup, team lifecycle and plan limits, website routes, portal roles, health/alert scoping, quotation scoping, and approval delegation.
+- Sequential SaaS and engine regression runs passed without fixture leakage: 46/46 and 35/35.
 - `bench build --app verity_ai`: passed.
 - `bench build --app verityai_saas`: passed.
 
@@ -148,6 +150,7 @@ MariaDB plus the bench Redis cache and queue were started for validation. The co
 - Signup relies on Frappe's system signup settings and outgoing email. Workspace and tenant resources are deliberately created only after the verified user signs in.
 - Paynow hosted checkout is implemented, but live merchant credentials and a public HTTPS callback must be verified in Paynow test mode before launch. Recurring tokenized payments, automatic invoices, and receipts remain future work.
 - Wallet state is synchronized from engine logs, while hard pre-call enforcement currently uses the engine's `monthly_token_limit`. A separate optional prepaid/subscription gate in `verity_ai` would require an explicit engine extension point.
+- Plan fields for workspace/assistant counts, channel-specific monthly volumes, and feature entitlements are not yet enforced consistently across every API; these are the highest-priority remaining code milestone.
 - Full WhatsApp setup stores engine credentials safely and reports configuration presence, but does not perform a live Meta Graph connection test.
 - File extraction, OCR, website crawling, and semantic/vector search are not duplicated here; manual knowledge text uses the existing engine hook and chunker.
 - Quote execution remains engine-owned. The customer page approves only tenant-scoped pending requests and deliberately triggers the existing engine hook; a live pilot must verify ERPNext quotation submission and the configured delivery channel.
@@ -161,3 +164,4 @@ MariaDB plus the bench Redis cache and queue were started for validation. The co
 3. Configure Paynow using `docs/paynow_setup.md`, then verify test-mode checkout on the public HTTPS host.
 4. Verify a real allowed-domain/widget exchange, outbound email, and Meta webhook credentials before production launch.
 5. Re-run migration and both suites after future schema or engine integration changes.
+6. Track prioritized remaining work in docs/remaining_work.md.

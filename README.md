@@ -14,3 +14,7 @@ Customer and team users sign in through `/login` and use `/verityai`. Frappe's `
 ## Paynow billing
 
 Paid plans use Paynow hosted checkout with signed initiation, callback verification, independent server polling, and idempotent plan activation. Credentials stay in Frappe site configuration. See [Paynow setup](docs/paynow_setup.md).
+
+## Remaining work
+
+The core MVP is implemented. Production-pilot tasks and post-MVP features are tracked in [Remaining work](docs/remaining_work.md).

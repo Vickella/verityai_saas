@@ -28,15 +28,31 @@ def manual_event(workspace, event_type, amount=0, status="Pending", reference=No
 @frappe.whitelist(methods=["POST"])
 @endpoint
 def assign_plan(workspace, plan, status="Active", billing_cycle="Monthly"):
-	require_operator()
-	return {"subscription": billing.assign_plan(workspace, plan, status, billing_cycle)}
+	operator = require_operator()
+	subscription = billing.assign_plan(workspace, plan, status, billing_cycle)
+	event = billing.create_billing_event(
+		workspace,
+		"Subscription Activation",
+		0,
+		"Completed",
+		provider_reference=f"Plan {plan} set to {status} by {operator}",
+	)
+	return {"subscription": subscription, "event": event}
 
 
 @frappe.whitelist(methods=["POST"])
 @endpoint
 def set_status(workspace, status, reason=None):
-	require_operator()
-	return {"subscription": billing.set_subscription_status(workspace, status, reason)}
+	operator = require_operator()
+	subscription = billing.set_subscription_status(workspace, status, reason)
+	event = billing.create_billing_event(
+		workspace,
+		"Adjustment",
+		0,
+		"Completed",
+		provider_reference=f"Status {status} by {operator}: {(reason or 'No reason')[:100]}",
+	)
+	return {"subscription": subscription, "event": event}
 
 
 @frappe.whitelist(methods=["POST"])
