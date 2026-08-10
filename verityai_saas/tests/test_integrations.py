@@ -7,7 +7,7 @@ from verityai_saas import setup_doctypes
 from verityai_saas.api._response import RateLimitExceeded, endpoint
 from verityai_saas.api import assistant as assistant_api
 from verityai_saas.api import integrations as integrations_api
-from verityai_saas.services import engine, integrations, notifications, onboarding
+from verityai_saas.services import engine, integrations, notifications, onboarding, paynow
 from verityai_saas.tests.cleanup import cleanup_all_test_fixtures, cleanup_test_workspace
 
 
@@ -45,6 +45,10 @@ class TestSecureIntegrations(FrappeTestCase):
 
 	def tearDown(self):
 		super().tearDown()
+		settings = frappe.get_single("VerityAI Platform Settings")
+		settings.paynow_integration_id = None
+		settings.paynow_integration_key = None
+		settings.save(ignore_permissions=True)
 		cleanup_test_workspace(self.workspace, users=[self.owner], engine_tenant=self.tenant, commit=False)
 		if frappe.db.exists("VerityAI Plan", self.plan):
 			frappe.delete_doc("VerityAI Plan", self.plan, ignore_permissions=True, force=True)
@@ -61,6 +65,13 @@ class TestSecureIntegrations(FrappeTestCase):
 		config = engine.get_engine_configuration(self.workspace)
 		self.assertEqual(config.get_password("provider_api_key"), "provider-secret")
 		self.assertEqual(config.get_password("erpnext_api_secret"), "erp-secret")
+
+	def test_paynow_credentials_are_encrypted_and_write_only(self):
+		status = paynow.configure({"integration_id": "test-integration", "integration_key": "paynow-secret"})
+		self.assertTrue(status["configured"])
+		self.assertNotIn("paynow-secret", str(status))
+		settings = frappe.get_single("VerityAI Platform Settings")
+		self.assertEqual(settings.get_password("paynow_integration_key"), "paynow-secret")
 
 	def test_plan_gate_blocks_disabled_integrations(self):
 		frappe.db.set_value("VerityAI Plan", self.plan, "can_use_api_access", 0)
@@ -114,6 +125,7 @@ class TestSecureIntegrations(FrappeTestCase):
 			integrations_api.update_provider(self.workspace, {}),
 			integrations_api.update_erpnext(self.workspace, {}),
 			integrations_api.update_smtp(self.workspace, {}),
+			integrations_api.update_paynow(self.workspace, {}),
 			integrations_api.create_credential(self.workspace, "Blocked", ["leads:read"]),
 			integrations_api.revoke_credential(self.workspace, "missing"),
 		]

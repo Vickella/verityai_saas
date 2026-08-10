@@ -17,15 +17,65 @@ PAYNOW_HOSTS = {"paynow.co.zw", "www.paynow.co.zw", "staging.paynow.co.zw"}
 PAID_STATUSES = {"paid", "awaiting delivery", "delivered"}
 FINAL_FAILED_STATUSES = {"cancelled", "refunded"}
 RISK_STATUSES = {"disputed"}
+SETTINGS_DOCTYPE = "VerityAI Platform Settings"
+
+
+def _settings_credentials():
+	if not frappe.db.exists("DocType", SETTINGS_DOCTYPE):
+		return "", ""
+	settings = frappe.get_single(SETTINGS_DOCTYPE)
+	try:
+		integration_key = settings.get_password("paynow_integration_key", raise_exception=False) or ""
+	except Exception:
+		integration_key = ""
+	return str(settings.paynow_integration_id or "").strip(), str(integration_key).strip()
+
+
+def _configured_credentials():
+	integration_id, integration_key = _settings_credentials()
+	if integration_id and integration_key:
+		return integration_id, integration_key
+	return (
+		str(frappe.conf.get("paynow_integration_id") or "").strip(),
+		str(frappe.conf.get("paynow_integration_key") or "").strip(),
+	)
 
 
 def is_configured():
-	return bool(frappe.conf.get("paynow_integration_id") and frappe.conf.get("paynow_integration_key"))
+	return all(_configured_credentials())
+
+
+def configuration_status():
+	integration_id, integration_key = _settings_credentials()
+	if integration_id and integration_key:
+		return {"configured": True, "integration_id": integration_id, "source": "Encrypted platform settings"}
+	configured_id = str(frappe.conf.get("paynow_integration_id") or "").strip()
+	return {
+		"configured": bool(configured_id and frappe.conf.get("paynow_integration_key")),
+		"integration_id": configured_id,
+		"source": "Site configuration" if configured_id else "Not configured",
+	}
+
+
+def configure(values):
+	integration_id = str(values.get("integration_id") or "").strip()
+	integration_key = str(values.get("integration_key") or "").strip()
+	if not integration_id or len(integration_id) > 140:
+		frappe.throw("A valid Paynow integration ID is required.", frappe.ValidationError)
+	settings = frappe.get_single(SETTINGS_DOCTYPE)
+	if not integration_key:
+		_, existing_key = _settings_credentials()
+		if not existing_key:
+			frappe.throw("A Paynow integration key is required.", frappe.ValidationError)
+	settings.paynow_integration_id = integration_id
+	if integration_key:
+		settings.paynow_integration_key = integration_key
+	settings.save()
+	return configuration_status()
 
 
 def _credentials():
-	integration_id = str(frappe.conf.get("paynow_integration_id") or "").strip()
-	integration_key = str(frappe.conf.get("paynow_integration_key") or "").strip()
+	integration_id, integration_key = _configured_credentials()
 	if not integration_id or not integration_key:
 		frappe.throw("Paynow is not configured for this site.", frappe.ValidationError)
 	return integration_id, integration_key

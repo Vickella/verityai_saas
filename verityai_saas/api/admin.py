@@ -5,7 +5,7 @@ from frappe.utils import add_days, cint, flt, getdate, today
 
 from verityai_saas.api._response import endpoint, json_value
 from verityai_saas.services import paynow
-from verityai_saas.services.permissions import require_operator
+from verityai_saas.services.permissions import is_platform_admin, require_operator
 
 
 
@@ -149,6 +149,7 @@ def dashboard():
 		row.pop("tenant", None)
 
 	return {
+		"can_configure_platform": is_platform_admin(),
 		"accounts": frappe.db.count("VerityAI Account"),
 		"workspaces": workspaces,
 		"active": sum(row.status in {"Trial", "Active"} for row in workspaces),

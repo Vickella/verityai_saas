@@ -3,6 +3,7 @@ from frappe import _
 
 
 OPERATOR_ROLES = {"System Manager", "VerityAI SaaS Administrator", "VerityAI Operator"}
+PLATFORM_ADMIN_ROLES = {"System Manager", "VerityAI SaaS Administrator"}
 ROLE_DEFAULTS = {
 	"Owner": {"*"},
 	"Admin": {"manage_assistant", "manage_widget", "manage_knowledge", "view_leads", "manage_leads", "view_conversations", "manage_conversations", "manage_billing", "manage_whatsapp", "manage_email", "manage_team", "approve_quotes", "view_customers", "manage_customers", "view_catalog", "manage_catalog", "view_quotes", "manage_quotes"},
@@ -20,6 +21,11 @@ def current_user(user=None):
 def is_operator(user=None):
 	user = current_user(user)
 	return user != "Guest" and bool(OPERATOR_ROLES.intersection(set(frappe.get_roles(user))))
+
+
+def is_platform_admin(user=None):
+	user = current_user(user)
+	return user != "Guest" and bool(PLATFORM_ADMIN_ROLES.intersection(set(frappe.get_roles(user))))
 
 
 def require_login(user=None):
@@ -123,4 +129,11 @@ def require_operator(user=None):
 	user = require_login(user)
 	if not is_operator(user):
 		frappe.throw(_("Operator access is required."), frappe.PermissionError)
+	return user
+
+
+def require_platform_admin(user=None):
+	user = require_login(user)
+	if not is_platform_admin(user):
+		frappe.throw(_("Platform administrator access is required."), frappe.PermissionError)
 	return user

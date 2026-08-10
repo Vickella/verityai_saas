@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 import frappe
 from frappe.tests.utils import FrappeTestCase
 from frappe.website.serve import get_response, get_response_content
@@ -69,6 +71,9 @@ class TestCustomerPortalRoutes(FrappeTestCase):
 		with self.assertRaises(frappe.PermissionError):
 			integrations_context(frappe._dict())
 		frappe.set_user("Administrator")
+		with patch("verityai_saas.services.permissions.frappe.get_roles", return_value=["VerityAI Operator"]):
+			with self.assertRaises(frappe.PermissionError):
+				integrations_context(frappe._dict())
 		context = frappe._dict()
 		integrations_context(context)
 		self.assertEqual(context.portal_page, "integrations")

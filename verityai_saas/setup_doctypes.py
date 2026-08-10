@@ -1,3 +1,5 @@
+import json
+
 import frappe
 
 
@@ -19,6 +21,7 @@ def install():
 	ensure_module()
 	ensure_doctypes()
 	ensure_default_plan()
+	ensure_workspace()
 	frappe.db.commit()
 
 
@@ -37,24 +40,103 @@ def ensure_module():
 		)
 
 
+def workspace_link(label, link_to, parent_label):
+	# ``parent_label`` is used by newer Frappe releases. Older releases group
+	# links by their position after a Card Break and safely ignore this key.
+	return {"label": label, "type": "Link", "link_type": "DocType", "link_to": link_to, "parent_label": parent_label}
+
+
+def commerce_workspace_links():
+	return [
+		{"label": "Commerce", "type": "Card Break"},
+		workspace_link("Customers", "VerityAI Customer", "Commerce"),
+		workspace_link("Products", "VerityAI Product", "Commerce"),
+		workspace_link("Product Prices", "VerityAI Product Price", "Commerce"),
+		workspace_link("Quotations", "VerityAI Quotation", "Commerce"),
+	]
+
+
+def crm_workspace_links():
+	return [
+		workspace_link("Opportunities", "VerityAI Sales Opportunity", "Sales"),
+		workspace_link("Appointments", "VerityAI Appointment", "Sales"),
+		workspace_link("Activities", "VerityAI CRM Activity", "Sales"),
+	]
+
+
+def ensure_workspace():
+	"""Add SaaS commerce and CRM links to the engine's existing Desk workspace."""
+	name = "Verity AI"
+	if not frappe.db.exists("Workspace", name):
+		from verity_ai.setup_doctypes import ensure_workspace as ensure_engine_workspace
+
+		ensure_engine_workspace()
+
+	doc = frappe.get_doc("Workspace", name)
+	doc.hide_custom = 1
+
+	content = json.loads(doc.content or "[]")
+	content = [row for row in content if row.get("data", {}).get("card_name") != "Commerce"]
+	content.append({"type": "card", "data": {"card_name": "Commerce", "col": 3}})
+	doc.content = json.dumps(content)
+
+	crm_rows = crm_workspace_links()
+	crm_targets = {row["link_to"] for row in crm_rows}
+	links = []
+	current_card = None
+	for row in doc.links:
+		if row.type == "Card Break":
+			if current_card == "Sales":
+				links.extend(crm_rows)
+			current_card = row.label
+		if current_card == "Commerce":
+			continue
+		# Tenant-specific engine settings are managed through the authenticated
+		# platform integrations page, not exposed as a public Workspace link.
+		if row.get("link_to") == "AI Configuration":
+			continue
+		if current_card == "Sales" and row.link_to in crm_targets:
+			continue
+		links.append(
+			{
+				"label": row.label,
+				"type": row.type,
+				"link_type": row.get("link_type"),
+				"link_to": row.get("link_to"),
+				"parent_label": row.get("parent_label"),
+			}
+		)
+	if current_card == "Sales":
+		links.extend(crm_rows)
+	doc.set("links", links + commerce_workspace_links())
+	doc.flags.ignore_version = True
+	doc.save(ignore_permissions=True)
+
+
 def permissions():
 	full = {"read": 1, "write": 1, "create": 1, "delete": 1, "report": 1, "export": 1}
 	return [{"role": "System Manager", **full}, {"role": ADMIN_ROLE, **full}, {"role": OPERATOR_ROLE, "read": 1, "report": 1, "export": 1}]
+
+
+def platform_settings_permissions():
+	full = {"read": 1, "write": 1, "create": 1}
+	return [{"role": "System Manager", **full}, {"role": ADMIN_ROLE, **full}]
 
 
 def field(fieldname, label, fieldtype="Data", **values):
 	return {"fieldname": fieldname, "label": label, "fieldtype": fieldtype, **values}
 
 
-def ensure_doctype(name, fields, autoname=None, istable=False):
+def ensure_doctype(name, fields, autoname=None, istable=False, issingle=False, permission_rows=None):
 	values = {
 		"module": MODULE,
 		"custom": 1,
 		"istable": int(bool(istable)),
+		"issingle": int(bool(issingle)),
 		"track_changes": 1,
 		"allow_import": int(not istable),
 		"fields": [{**row, **({"default": str(row["default"])} if row.get("default") is not None else {})} for row in fields],
-		"permissions": [] if istable else permissions(),
+		"permissions": [] if istable else (permission_rows or permissions()),
 	}
 	if autoname:
 		values["autoname"] = autoname
@@ -70,7 +152,7 @@ def ensure_doctype(name, fields, autoname=None, istable=False):
 		doc.permissions = []
 		for row in values["permissions"]:
 			doc.append("permissions", row)
-		for key in ("module", "istable", "track_changes", "allow_import", "autoname"):
+		for key in ("module", "istable", "issingle", "track_changes", "allow_import", "autoname"):
 			if key in values:
 				setattr(doc, key, values[key])
 		doc.flags.ignore_version = True
@@ -80,6 +162,17 @@ def ensure_doctype(name, fields, autoname=None, istable=False):
 
 
 def ensure_doctypes():
+	ensure_doctype(
+		"VerityAI Platform Settings",
+		[
+			field("paynow_section", "Paynow", "Section Break"),
+			field("paynow_integration_id", "Integration ID"),
+			field("paynow_integration_key", "Integration Key", "Password"),
+		],
+		issingle=True,
+		permission_rows=platform_settings_permissions(),
+	)
+
 	ensure_doctype("VerityAI Account", [
 		field("account_name", "Account Name", reqd=1, unique=1, in_list_view=1),
 		field("owner_user", "Owner User", "Link", options="User", reqd=1),
