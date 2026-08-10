@@ -4,7 +4,7 @@
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<title>{{ title }}</title>
-	<link rel="stylesheet" href="/assets/verityai_saas/css/portal.css">
+	<link rel="stylesheet" href="/assets/verityai_saas/css/portal.css?v={{ asset_version }}">
 </head>
 <body data-verity-page="{{ portal_page }}">
 	<div class="va-shell">
@@ -27,6 +27,6 @@
 		</main>
 	</div>
 	<script>window.verityPage={{ portal_page | tojson }};window.csrf_token={{ (csrf_token or '') | tojson }};</script>
-	<script src="/assets/verityai_saas/js/portal.js"></script>
+	<script src="/assets/verityai_saas/js/portal.js?v={{ asset_version }}"></script>
 </body>
 </html>

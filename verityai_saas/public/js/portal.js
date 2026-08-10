@@ -18,9 +18,15 @@
     const body = new FormData();
     Object.entries(args).forEach(([key,value]) => body.append(key, typeof value === "object" ? JSON.stringify(value) : value ?? ""));
     const response = await fetch(`/api/method/${method}`, {method:"POST", headers:{"X-Frappe-CSRF-Token":window.csrf_token || ""}, body});
-    const payload = await response.json();
+    let payload;
+    try { payload=await response.json(); }
+    catch(error) { throw new Error(`Server returned an unreadable response (HTTP ${response.status}).`); }
     const result = payload.message || payload;
-    if (!result.success) throw new Error(result.error || "Request failed");
+    if (!response.ok || !result.success) {
+      const type=payload.exc_type || result.code || "";
+      const expired=type.includes("CSRF") || response.status===401;
+      throw new Error(result.error || (expired?"Your session expired. Refresh the page and sign in again.":`Server request failed${response.status?` (HTTP ${response.status})`:""}.`));
+    }
     return result.data;
   }
 
