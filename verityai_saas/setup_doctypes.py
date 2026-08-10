@@ -20,6 +20,9 @@ def install():
 	ensure_roles()
 	ensure_module()
 	ensure_doctypes()
+	from verityai_saas.services.business_natures import seed_business_natures
+
+	seed_business_natures()
 	ensure_default_plan()
 	ensure_workspace()
 	frappe.db.commit()

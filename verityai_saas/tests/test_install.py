@@ -3,12 +3,44 @@ from unittest.mock import patch
 
 import frappe
 from frappe.tests.utils import FrappeTestCase
+from verity_ai.engine.tools import get_lead_capture_schema
 
 from verityai_saas.install import REQUIRED_ENGINE_DOCTYPES, validate_engine_installation
+from verityai_saas.services.business_natures import BUSINESS_NATURES, seed_business_natures
 from verityai_saas.setup_doctypes import ensure_workspace
 
 
 class TestStandaloneInstallation(FrappeTestCase):
+	def test_business_natures_are_comprehensive_and_idempotent(self):
+		seed_business_natures()
+		seed_business_natures()
+		self.assertGreaterEqual(len(BUSINESS_NATURES), 16)
+		self.assertTrue(frappe.db.exists("AI Business Nature", "Consultancy"))
+		consultancy = frappe.get_doc("AI Business Nature", "Consultancy")
+		fields = {row.fieldname: row for row in consultancy.lead_fields}
+		self.assertTrue({"advisory_area", "current_challenge", "desired_outcome", "decision_makers"}.issubset(fields))
+		self.assertTrue(fields["current_challenge"].required)
+		self.assertEqual(len(fields), len(set(fields)))
+
+	def test_engine_reads_seeded_sales_discovery_schema(self):
+		seed_business_natures()
+		name = f"schema-{frappe.generate_hash(length=8).lower()}"
+		frappe.get_doc(
+			{
+				"doctype": "AI Tenant",
+				"tenant_name": name,
+				"business_nature": "Consultancy",
+				"active": 1,
+			}
+		).insert(ignore_permissions=True)
+		try:
+			schema = json.loads(get_lead_capture_schema(name))
+			self.assertTrue(schema["success"])
+			self.assertEqual(schema["business_nature"], "Consultancy")
+			self.assertIn("current_challenge", {field["fieldname"] for field in schema["fields"]})
+		finally:
+			frappe.delete_doc("AI Tenant", name, ignore_permissions=True, force=True)
+
 	def test_platform_settings_are_admin_only(self):
 		permissions = {row.role for row in frappe.get_meta("VerityAI Platform Settings").permissions if row.read}
 		self.assertEqual(permissions, {"System Manager", "VerityAI SaaS Administrator"})

@@ -3,6 +3,7 @@ from frappe import _
 from frappe.utils import add_days, today
 
 from verityai_saas.services import engine
+from verityai_saas.services.business_natures import validate_business_nature
 from verityai_saas.services.entitlements import assert_account_capacity
 from verityai_saas.services.user_roles import assign_workspace_role
 
@@ -35,6 +36,8 @@ def create_workspace(owner_user, account_name, workspace_name, business_name=Non
 	if not owner_user or owner_user == "Guest" or not frappe.db.exists("User", owner_user):
 		frappe.throw(_("A valid owner user is required."), frappe.ValidationError)
 	values = values or {}
+	if values.get("business_nature"):
+		values["business_nature"] = validate_business_nature(values["business_nature"])
 	savepoint = f"verityai_onboarding_{frappe.generate_hash(length=8)}"
 	frappe.db.savepoint(savepoint)
 	try:

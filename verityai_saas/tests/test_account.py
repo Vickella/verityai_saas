@@ -68,12 +68,19 @@ class TestAccountManagement(FrappeTestCase):
 		billing.assign_plan(self.workspace, self.plan, "Active", "Monthly")
 		frappe.set_user(self.owner)
 		response = onboarding_api.create(
-			"ignored", f"Additional {self.token}", account=self.created["account"]
+			"ignored",
+			f"Additional {self.token}",
+			business_nature="Consultancy",
+			account=self.created["account"],
 		)
 		self.assertTrue(response["success"])
 		self.additional = response["data"]
 		self.assertEqual(
 			frappe.db.get_value("VerityAI Workspace", self.additional["workspace"], "account"),
 			self.created["account"],
+		)
+		self.assertEqual(
+			frappe.db.get_value("VerityAI Workspace", self.additional["workspace"], "business_nature"),
+			"Consultancy",
 		)
 		self.assertEqual(account_api.get(self.workspace)["data"]["workspace_count"], 2)

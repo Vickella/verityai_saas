@@ -83,7 +83,7 @@ class TestCustomerPortalRoutes(FrappeTestCase):
 		frappe.set_user("Administrator")
 		content = get_response_content("/verityai/admin")
 		self.assertIn('id="va-admin-content"', content)
-		self.assertIn("/assets/verityai_saas/js/admin.js?v=0.1.1", content)
+		self.assertIn("/assets/verityai_saas/js/admin.js?v=0.2.0", content)
 		self.assertNotIn('window.csrf_token=""', content)
 
 	def test_guest_is_redirected_to_login(self):

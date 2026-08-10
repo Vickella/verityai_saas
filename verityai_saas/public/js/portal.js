@@ -12,7 +12,15 @@
   const number = (value) => new Intl.NumberFormat().format(Number(value || 0));
   const pill = (value) => `<span class="va-pill ${["Active","Connected","Done","Normal","Trial","Healthy"].includes(value)?"good":["Failed","Suspended","Exhausted","Critical"].includes(value)?"bad":""}">${esc(value || "—")}</span>`;
   const field = (label, name, value="", type="text", full=false) => `<div class="va-field ${full?"full":""}"><label>${esc(label)}</label>${type==="textarea"?`<textarea name="${name}">${esc(value)}</textarea>`:`<input type="${type}" name="${name}" value="${esc(value)}">`}</div>`;
+  const selectField = (label,name,options,value="",placeholder="Choose an option",full=false) => `<div class="va-field ${full?"full":""}"><label>${esc(label)}</label><select name="${name}" required><option value="">${esc(placeholder)}</option>${options.map(option=>`<option value="${esc(option.value)}" ${option.value===value?"selected":""}>${esc(option.label)}</option>`).join("")}</select></div>`;
   const json = (form) => Object.fromEntries(new FormData(form).entries());
+
+  const natureProfile = (name,natures) => {
+    const nature=(natures||[]).find(row=>row.business_nature===name);
+    if(!nature)return `<div class="va-context-panel"><p class="muted">Select a business nature to load a tailored sales discovery profile.</p></div>`;
+    const questions=(nature.lead_fields||[]).map(row=>`<span class="va-question-chip">${esc(row.label)}${row.required?' <b>Required</b>':''}</span>`).join("");
+    return `<div class="va-context-panel"><div><p class="eyebrow">Sales discovery profile</p><h3>${esc(nature.business_nature)}</h3><p class="muted">${esc(nature.description||"")}</p></div><div class="va-question-list">${questions}</div></div>`;
+  };
 
   async function call(method, args={}) {
     const body = new FormData();
@@ -68,7 +76,10 @@
 
   async function assistant() {
     const d = await call("verityai_saas.api.assistant.get", {workspace});
-    content.innerHTML = `<form id="assistant-form" class="va-card va-form"><h2>Assistant identity</h2><div class="va-fields">${field("Assistant name","assistant_name",d.assistant_name)}${field("Brand name","brand_name",d.brand_name)}${field("Business nature","business_nature",d.business_nature)}${field("Greeting","widget_greeting",d.widget_greeting,"textarea",true)}</div><button class="va-button">Save assistant</button></form>`;
+    const natures=d.business_natures||[];
+    const options=natures.map(row=>({value:row.business_nature,label:row.business_nature}));
+    content.innerHTML = `<form id="assistant-form" class="va-card va-form va-form-card"><div class="va-card-heading"><div><p class="eyebrow">Assistant configuration</p><h2>Identity &amp; sales profile</h2><p class="muted">Shape how your assistant represents the business and what it learns from each prospect.</p></div></div><div class="va-fields">${field("Assistant name","assistant_name",d.assistant_name)}${field("Brand name","brand_name",d.brand_name)}${selectField("Business nature","business_nature",options,d.business_nature,"Select your industry",true)}${field("Welcome greeting","widget_greeting",d.widget_greeting,"textarea",true)}</div><div id="nature-profile">${natureProfile(d.business_nature,natures)}</div><div class="va-form-actions"><button class="va-button">Save changes</button></div></form>`;
+    document.querySelector('#assistant-form [name="business_nature"]').addEventListener("change",event=>{document.querySelector("#nature-profile").innerHTML=natureProfile(event.target.value,natures);});
     bind("assistant-form", async f => call("verityai_saas.api.assistant.update", {workspace, values:json(f)}));
   }
 
@@ -292,11 +303,14 @@
 
   async function newWorkspace() {
     const params = new URLSearchParams(location.search);
-    picker.hidden=true; content.innerHTML=`<form id="new-workspace" class="va-card va-form"><h2>Create your first workspace</h2><p class="muted">We will create your account, assistant, trial plan, usage wallet, and secure engine tenant together.</p><div class="va-fields">${field("Account name","account_name",params.get("account_name")||"")}${field("Workspace name","workspace_name",params.get("workspace_name")||"")}${field("Business name","business_name",params.get("business_name")||"")}</div><button class="va-button">Create workspace</button></form>`;
+    const natures=await call("verityai_saas.api.assistant.business_natures");
+    const options=natures.map(row=>({value:row.business_nature,label:row.business_nature}));
+    picker.hidden=true; content.innerHTML=`<form id="new-workspace" class="va-card va-form va-form-card va-onboarding-card"><div class="va-card-heading"><div><p class="eyebrow">Guided setup</p><h2>Create your first workspace</h2><p class="muted">Your secure tenant, assistant, trial allowance, and sales discovery profile are created together.</p></div><span class="va-step-badge">Step 1 of 1</span></div><div class="va-fields">${field("Account name","account_name",params.get("account_name")||"")}${field("Workspace name","workspace_name",params.get("workspace_name")||"")}${field("Business name","business_name",params.get("business_name")||"")}${selectField("Business nature","business_nature",options,"","Select your industry")}</div><div id="nature-profile">${natureProfile("",natures)}</div><div class="va-form-actions"><button class="va-button">Create workspace</button></div></form>`;
+    document.querySelector('#new-workspace [name="business_nature"]').addEventListener("change",event=>{document.querySelector("#nature-profile").innerHTML=natureProfile(event.target.value,natures);});
     bind("new-workspace", async f=>{const d=await call("verityai_saas.api.onboarding.create",json(f));location.href=d.dashboard_url;});
   }
 
   const renderers={dashboard,health,onboarding,assistant,widget,knowledge,leads,crm,conversations,commerce,quotes,usage,billing,integrations,email,whatsapp,team,account};
-  async function init(){try{const rows=await call("verityai_saas.api.workspace.list_workspaces");if(!rows.length){newWorkspace();return}const params=new URLSearchParams(location.search);workspace=params.get("workspace")||localStorage.getItem("verityai_workspace")||rows[0].name;if(!rows.some(r=>r.name===workspace))workspace=rows[0].name;picker.innerHTML=rows.map(r=>`<option value="${esc(r.name)}" ${r.name===workspace?"selected":""}>${esc(r.business_name||r.workspace_name)}</option>`).join("");picker.addEventListener("change",()=>{workspace=picker.value;localStorage.setItem("verityai_workspace",workspace);renderers[page]();});localStorage.setItem("verityai_workspace",workspace);await (renderers[page]||dashboard)()}catch(err){content.innerHTML=`<div class="va-card va-empty">${esc(err.message)}</div>`;alert(err.message,true)}}
+  async function init(){try{const rows=await call("verityai_saas.api.workspace.list_workspaces");if(!rows.length){await newWorkspace();return}const params=new URLSearchParams(location.search);workspace=params.get("workspace")||localStorage.getItem("verityai_workspace")||rows[0].name;if(!rows.some(r=>r.name===workspace))workspace=rows[0].name;picker.innerHTML=rows.map(r=>`<option value="${esc(r.name)}" ${r.name===workspace?"selected":""}>${esc(r.business_name||r.workspace_name)}</option>`).join("");picker.addEventListener("change",()=>{workspace=picker.value;localStorage.setItem("verityai_workspace",workspace);renderers[page]();});localStorage.setItem("verityai_workspace",workspace);await (renderers[page]||dashboard)()}catch(err){content.innerHTML=`<div class="va-card va-empty">${esc(err.message)}</div>`;alert(err.message,true)}}
   init();
 })();

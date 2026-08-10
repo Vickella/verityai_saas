@@ -11,8 +11,14 @@
 		<aside class="va-sidebar">
 			<a class="va-brand" href="/verityai"><span>V</span>VerityAI</a>
 			<nav>
-				{% for route, label in (("dashboard", "Dashboard"), ("health", "Health"), ("onboarding", "Setup"), ("assistant", "Assistant"), ("widget", "Widget"), ("knowledge", "Knowledge"), ("leads", "Leads"), ("crm", "Sales CRM"), ("conversations", "Conversations"), ("commerce", "Commerce"), ("quotes", "AI Quote Requests"), ("usage", "Usage"), ("billing", "Billing"), ("email", "Email"), ("whatsapp", "WhatsApp"), ("team", "Team"), ("account", "Account")) %}
-				<a href="/verityai/{{ route }}" class="{% if portal_page == route %}active{% endif %}">{{ label }}</a>
+				{% for group, routes in (
+					("Overview", (("dashboard", "Dashboard"), ("health", "Health"), ("onboarding", "Setup"))),
+					("AI & Content", (("assistant", "Assistant"), ("widget", "Widget"), ("knowledge", "Knowledge"))),
+					("Sales", (("leads", "Leads"), ("crm", "Sales CRM"), ("conversations", "Conversations"), ("commerce", "Commerce"), ("quotes", "AI Quote Requests"))),
+					("Operations", (("usage", "Usage"), ("billing", "Billing"), ("email", "Email"), ("whatsapp", "WhatsApp"), ("team", "Team"), ("account", "Account")))
+				) %}
+				<p class="va-nav-label">{{ group }}</p>
+				{% for route, label in routes %}<a href="/verityai/{{ route }}" class="{% if portal_page == route %}active{% endif %}">{{ label }}</a>{% endfor %}
 				{% endfor %}
 			</nav>
 			<div class="va-user">{{ user_email }}</div>

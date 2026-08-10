@@ -2,8 +2,16 @@ import frappe
 
 from verityai_saas.api._response import endpoint, json_value
 from verityai_saas.services import engine
+from verityai_saas.services.business_natures import business_nature_options
 from verityai_saas.services.onboarding import set_step
-from verityai_saas.services.permissions import check_workspace_access, require_workspace_permission
+from verityai_saas.services.permissions import check_workspace_access, require_login, require_workspace_permission
+
+
+@frappe.whitelist()
+@endpoint
+def business_natures():
+	require_login()
+	return business_nature_options()
 
 
 @frappe.whitelist()
@@ -22,4 +30,3 @@ def update(workspace, values):
 	if data.get("business_nature"):
 		set_step(workspace, "business_nature")
 	return data
-

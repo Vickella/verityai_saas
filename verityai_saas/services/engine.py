@@ -7,6 +7,8 @@ from frappe.utils import get_url, now_datetime
 
 from verity_ai.tenant_security import normalize_domain
 
+from verityai_saas.services.business_natures import business_nature_options, validate_business_nature
+
 
 TENANT_SAFE_FIELDS = [
 	"name", "tenant_name", "assistant_name", "brand_name", "business_nature", "widget_title",
@@ -91,6 +93,7 @@ def safe_settings(workspace_name, include_configuration=False):
 	data["allowed_domains"] = frappe.get_all(
 		"AI Allowed Domain", filters={"parent": tenant, "parenttype": "AI Tenant"}, pluck="domain", order_by="idx asc"
 	)
+	data["business_natures"] = business_nature_options()
 	return data
 
 
@@ -99,6 +102,8 @@ def update_assistant_identity(workspace_name, values):
 	values = {key: value for key, value in (values or {}).items() if key in allowed}
 	if not values:
 		return safe_settings(workspace_name)
+	if "business_nature" in values:
+		values["business_nature"] = validate_business_nature(values.get("business_nature"), required=True)
 	tenant = get_workspace_engine_tenant(workspace_name)
 	doc = frappe.get_doc("AI Tenant", tenant)
 	for key, value in values.items():
@@ -306,4 +311,3 @@ def whatsapp_status(workspace_name):
 		try: return bool(config.get_password(fieldname, raise_exception=False))
 		except Exception: return False
 	return {"phone_id_present": bool(config.whatsapp_phone_id), "access_token_present": present("whatsapp_access_token"), "verify_token_present": bool(config.meta_verify_token), "app_secret_present": present("meta_app_secret"), "signature_verification_enabled": bool(config.verify_meta_signature), "callback_url": f"{get_url().rstrip('/')}/api/method/verity_ai.api.whatsapp.webhook", "checked_at": now_datetime()}
-

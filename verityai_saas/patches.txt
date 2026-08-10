@@ -6,3 +6,4 @@ verityai_saas.patches.v0_2.customer_portal_route
 verityai_saas.patches.v0_3.paynow_billing
 verityai_saas.patches.v0_4.commercial_operations
 verityai_saas.patches.v0_5.secure_platform_configuration
+verityai_saas.patches.v0_6.business_natures_and_portal_polish

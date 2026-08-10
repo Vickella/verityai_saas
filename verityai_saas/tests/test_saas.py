@@ -67,6 +67,15 @@ class TestVerityAISaaS(FrappeTestCase):
 		self.assertEqual(frappe.db.get_value("AI Tenant", self.tenant, "widget_title"), "Help")
 		self.assertEqual(frappe.db.get_value("AI Tenant", other_tenant.name, "assistant_name"), "Other")
 
+	def test_assistant_uses_curated_business_nature(self):
+		settings = engine.safe_settings(self.workspace)
+		self.assertIn("Consultancy", {row.business_nature for row in settings["business_natures"]})
+		updated = engine.update_assistant_identity(self.workspace, {"business_nature": "Consultancy"})
+		self.assertEqual(updated["business_nature"], "Consultancy")
+		self.assertEqual(frappe.db.get_value("VerityAI Workspace", self.workspace, "business_nature"), "Consultancy")
+		with self.assertRaises(frappe.ValidationError):
+			engine.update_assistant_identity(self.workspace, {"business_nature": "Made Up Industry"})
+
 	def test_allowed_domains_are_normalized_and_scoped(self):
 		self.assertEqual(engine.replace_allowed_domains(self.workspace, ["https://www.Example.com/path"]), ["example.com"])
 		self.assertEqual(frappe.get_all("AI Allowed Domain", filters={"parent": self.tenant}, pluck="domain"), ["example.com"])
