@@ -64,3 +64,7 @@ verity_ai_entitlement_check = ["verityai_saas.services.entitlements.check_engine
 verity_ai_item_price_handler = ["verityai_saas.services.commerce.handle_ai_item_price"]
 verity_ai_quotation_request_handler = ["verityai_saas.services.commerce.handle_ai_quotation_request"]
 verity_ai_quote_status_handler = ["verityai_saas.services.commerce.handle_ai_quote_status"]
+verity_ai_commerce_capability_handler = ["verityai_saas.services.commerce.handle_ai_commerce_capabilities"]
+verity_ai_catalog_search_handler = ["verityai_saas.services.commerce.handle_ai_catalog_search"]
+verity_ai_lead_capture_handler = ["verityai_saas.services.commerce.handle_ai_lead_capture"]
+verity_ai_sales_crm_handler = ["verityai_saas.services.commerce.handle_ai_sales_crm"]

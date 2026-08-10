@@ -1,4 +1,5 @@
 import json
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import frappe
@@ -107,7 +108,15 @@ class TestTenantNativeCommerce(FrappeTestCase):
 
 	def test_ai_quote_tools_use_native_commerce_unless_erpnext_is_enabled(self):
 		from verity_ai.engine import tools as ai_tools
+		from verity_ai.engine.openai_handler import get_tool_definitions
 
+		config = frappe.get_doc("AI Configuration", {"tenant": self.created["engine_tenant"]})
+		web_tools = {row["function"]["name"] for row in get_tool_definitions(config, platform="Web")}
+		desk_tools = {row["function"]["name"] for row in get_tool_definitions(config, platform="Desk")}
+		self.assertTrue({"search_product_catalog", "get_item_price", "request_quotation_approval", "check_quote_status"}.issubset(web_tools))
+		self.assertIn("manage_native_sales", desk_tools)
+		catalogue = json.loads(ai_tools.search_product_catalog(config, "consult"))
+		self.assertEqual(catalogue["products"][0]["item_code"], "CONSULT")
 		price = commerce.handle_ai_item_price(self.created["engine_tenant"], "consult")
 		self.assertTrue(price["handled"])
 		self.assertEqual(price["public_selling_price"], 100)
@@ -133,9 +142,44 @@ class TestTenantNativeCommerce(FrappeTestCase):
 		))
 		self.assertTrue(engine_created["success"])
 		self.assertEqual(engine_created["estimated_total"], 100)
-		config = frappe.db.get_value("AI Configuration", {"tenant": self.created["engine_tenant"]}, "name")
-		frappe.db.set_value("AI Configuration", config, "enable_erpnext_integration", 1)
+		frappe.db.set_value("AI Configuration", config.name, "enable_erpnext_integration", 1)
 		self.assertIsNone(commerce.handle_ai_item_price(self.created["engine_tenant"], "CONSULT"))
+
+	def test_ai_lead_appointments_and_desk_crm_are_mapped_to_native_sales(self):
+		from verity_ai.engine import tools as ai_tools
+		from verity_ai.engine.openai_handler import execute_tool_call_impl
+
+		result = json.loads(ai_tools.capture_lead(
+			self.created["engine_tenant"], None, "Scheduled Buyer",
+			email="scheduled@example.com", appointment_requested=True,
+			appointment_date="2026-08-25", appointment_time="14:00",
+			appointment_mode="Online", appointment_notes="Product demonstration",
+		))
+		self.assertTrue(result["success"])
+		self.assertIsNone(result["customer"])
+		self.assertTrue(result["appointment"])
+		self.assertEqual(frappe.db.get_value("VerityAI Appointment", result["appointment"], "workspace"), self.workspace)
+		self.assertTrue(frappe.db.exists("VerityAI CRM Activity", {"workspace": self.workspace, "lead": result["lead_id"]}))
+
+		pipeline = json.loads(ai_tools.manage_native_sales(
+			self.created["engine_tenant"], self.owner, "pipeline_summary"
+		))
+		self.assertTrue(pipeline["success"])
+		self.assertIn("counts", pipeline["data"])
+		tool_call = SimpleNamespace(function=SimpleNamespace(
+			name="manage_native_sales", arguments=json.dumps({"action": "list_appointments"})
+		))
+		dispatched = json.loads(execute_tool_call_impl(
+			tool_call,
+			frappe.get_doc("AI Configuration", {"tenant": self.created["engine_tenant"]}),
+			self.created["engine_tenant"], SimpleNamespace(name=None), self.owner, platform="Desk",
+		))
+		self.assertTrue(dispatched["success"])
+		self.assertEqual(dispatched["data"][0]["name"], result["appointment"])
+		forbidden = json.loads(ai_tools.manage_native_sales(
+			self.created["engine_tenant"], self.other_owner, "pipeline_summary"
+		))
+		self.assertFalse(forbidden["success"])
 
 	def test_lead_conversion_creates_scoped_customer_and_opportunity(self):
 		lead = self.create_lead()

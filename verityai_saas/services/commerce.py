@@ -1,7 +1,7 @@
 from html import escape
 
 import frappe
-from frappe.utils import flt, get_datetime, getdate, now_datetime, nowdate, validate_email_address
+from frappe.utils import add_to_date, flt, get_datetime, getdate, now_datetime, nowdate, validate_email_address
 
 
 CUSTOMER_FIELDS = ["name", "customer_name", "customer_type", "email", "phone", "tax_id", "address", "city", "country", "notes", "status", "external_system", "external_id", "last_synced_on", "creation", "modified"]
@@ -530,6 +530,117 @@ def _workspace_for_tenant(tenant_name):
 	if frappe.db.get_value("AI Configuration", {"tenant": tenant_name}, "enable_erpnext_integration"):
 		return None
 	return workspace
+
+
+def handle_ai_commerce_capabilities(tenant_name):
+	workspace = _workspace_for_tenant(tenant_name)
+	if not workspace:
+		return None
+	return {"handled": True, "native_commerce": True, "catalog": True, "quotations": True, "crm": True}
+
+
+def handle_ai_catalog_search(tenant_name, query=None, limit=10):
+	workspace = _workspace_for_tenant(tenant_name)
+	if not workspace:
+		return None
+	currency = _workspace_currency(workspace)
+	products = list_products(workspace, search=query, active=1, limit=limit)
+	rows = []
+	for product in products:
+		try:
+			rate = _product_rate(workspace, product.name, "Standard Selling", currency, getdate(nowdate()))
+		except frappe.ValidationError:
+			rate = None
+		rows.append({
+			"item_code": product.item_code,
+			"item_name": product.item_name,
+			"description": product.description,
+			"item_group": product.item_group,
+			"uom": product.stock_uom,
+			"public_selling_price": rate,
+			"currency": currency if rate is not None else None,
+		})
+	return {"handled": True, "success": True, "products": rows, "count": len(rows)}
+
+
+def handle_ai_lead_capture(
+	tenant_name, lead, name, email=None, phone=None, appointment_requested=None,
+	appointment_date=None, appointment_time=None, appointment_mode=None,
+	appointment_notes=None, source_channel=None,
+):
+	workspace = _workspace_for_tenant(tenant_name)
+	if not workspace:
+		return None
+	_scoped_lead(workspace, lead)
+	activity = save_activity(workspace, {
+		"activity_type": "Note",
+		"subject": "Lead captured by Verity AI",
+		"details": f"Lead details captured from {source_channel or 'AI assistant'}.",
+		"lead": lead,
+		"status": "Completed",
+	})
+	appointment = None
+	if appointment_requested and appointment_date:
+		starts_on = get_datetime(f"{appointment_date} {appointment_time or '09:00:00'}")
+		appointment = frappe.db.get_value(
+			"VerityAI Appointment",
+			{"workspace": workspace, "lead": lead, "starts_on": starts_on, "status": ["!=", "Cancelled"]},
+			"name",
+		)
+		if not appointment:
+			appointment = save_appointment(workspace, {
+				"subject": f"Meeting with {name}",
+				"lead": lead,
+				"starts_on": starts_on,
+				"ends_on": add_to_date(starts_on, minutes=30),
+				"mode": appointment_mode or "Online",
+				"notes": appointment_notes,
+			}).name
+	return {"handled": True, "customer": None, "activity": activity.name, "appointment": appointment}
+
+
+def handle_ai_sales_crm(tenant_name, user, action, reference=None, status=None, values=None, filters=None, limit=50):
+	workspace = _workspace_for_tenant(tenant_name)
+	if not workspace:
+		return None
+	from verityai_saas.services.permissions import require_workspace_permission
+
+	values = values or {}
+	filters = filters or {}
+	read_actions = {"list_customers", "list_products", "list_quotations", "pipeline_summary", "list_opportunities", "list_appointments", "list_activities"}
+	if action in read_actions:
+		permission = "view_catalog" if action == "list_products" else "view_quotes" if action == "list_quotations" else "view_customers"
+		require_workspace_permission(workspace, permission, user=user)
+	else:
+		require_workspace_permission(workspace, "manage_customers", user=user)
+
+	if action == "list_customers":
+		data = list_customers(workspace, search=filters.get("search"), status=status, limit=limit)
+	elif action == "list_products":
+		data = list_products(workspace, search=filters.get("search"), active=filters.get("active"), limit=limit)
+	elif action == "list_quotations":
+		data = list_quotations(workspace, status=status, customer=filters.get("customer"), limit=limit)
+	elif action in {"pipeline_summary", "list_opportunities"}:
+		data = list_opportunities(workspace, stage=status or filters.get("stage"), assigned_to=filters.get("assigned_to"), limit=limit)
+	elif action == "convert_lead":
+		data = convert_lead(workspace, reference, values)
+	elif action == "set_opportunity_stage":
+		data = set_opportunity_stage(workspace, reference, status, lost_reason=values.get("lost_reason"))
+	elif action == "list_appointments":
+		data = list_appointments(workspace, status=status, from_date=filters.get("from_date"), to_date=filters.get("to_date"), limit=limit)
+	elif action == "schedule_appointment":
+		data = save_appointment(workspace, values)
+	elif action == "set_appointment_status":
+		data = set_appointment_status(workspace, reference, status, outcome=values.get("outcome"))
+	elif action == "list_activities":
+		data = list_activities(workspace, lead=filters.get("lead"), customer=filters.get("customer"), opportunity=filters.get("opportunity"), status=status, limit=limit)
+	elif action == "log_activity":
+		data = save_activity(workspace, values)
+	elif action == "set_activity_status":
+		data = set_activity_status(workspace, reference, status)
+	else:
+		frappe.throw("Unsupported native sales CRM action.", frappe.ValidationError)
+	return {"handled": True, "success": True, "action": action, "data": data}
 
 
 def handle_ai_item_price(tenant_name, item_code):
