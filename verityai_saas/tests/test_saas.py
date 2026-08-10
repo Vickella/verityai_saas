@@ -37,6 +37,10 @@ class TestVerityAISaaS(FrappeTestCase):
 	def create_user(self, email):
 		return frappe.get_doc({"doctype": "User", "email": email, "first_name": "SaaS", "last_name": "Tester", "user_type": "Website User", "send_welcome_email": 0}).insert(ignore_permissions=True).name
 
+	def enable_full_whatsapp_for_test(self):
+		plan = frappe.db.get_value("VerityAI Subscription", self.created["subscription"], "plan")
+		frappe.db.set_value("VerityAI Plan", plan, "can_use_whatsapp_ai", 1)
+
 	def test_onboarding_creates_complete_core_graph(self):
 		self.assertTrue(frappe.db.exists("VerityAI Account", self.created["account"]))
 		self.assertTrue(frappe.db.exists("VerityAI Workspace Member", self.created["member"]))
@@ -95,6 +99,7 @@ class TestVerityAISaaS(FrappeTestCase):
 		self.assertEqual(frappe.db.get_value("VerityAI Email Delivery Log", logs[0], "status"), "Sent")
 
 	def test_whatsapp_secrets_are_write_only(self):
+		self.enable_full_whatsapp_for_test()
 		data = whatsapp.configure(self.workspace, {"mode": "Full AI Automation", "whatsapp_phone_id": "phone-id", "whatsapp_access_token": "access-secret", "meta_verify_token": "verify-secret", "meta_app_secret": "app-secret", "verify_meta_signature": 1})
 		serialized = frappe.as_json(data)
 		self.assertNotIn("access-secret", serialized)
@@ -113,6 +118,7 @@ class TestVerityAISaaS(FrappeTestCase):
 
 
 	def test_whatsapp_connection_test_and_webhook_activity_are_safe(self):
+		self.enable_full_whatsapp_for_test()
 		whatsapp.configure(self.workspace, {
 			"mode": "Full AI Automation", "whatsapp_phone_id": "phone-id",
 			"whatsapp_access_token": "access-secret", "meta_verify_token": "verify-secret",

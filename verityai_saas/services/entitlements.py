@@ -53,8 +53,6 @@ def subscription_entitled(context):
 def feature_allowed(context, feature):
 	if not context or not context.subscription or not context.plan:
 		return False
-	if context.subscription.status == "Trial":
-		return True
 	return bool(context.plan.get(feature))
 
 

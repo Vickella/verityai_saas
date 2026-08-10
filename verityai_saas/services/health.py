@@ -13,7 +13,7 @@ OPEN_ALERT_STATUSES = ("Open", "Acknowledged")
 def workspace_health(workspace_name, status=None, severity=None, limit=100, user=None):
 	workspace = check_workspace_access(workspace_name, user)
 	tenant = engine.get_workspace_engine_tenant(workspace.name)
-	settings = engine.safe_settings(workspace.name)
+	settings = engine.safe_settings(workspace.name, include_configuration=True)
 	configuration = settings.get("configuration") or {}
 	alert_filters = {"status": status, "severity": severity, "limit": limit}
 	alerts = engine.get_workspace_alerts(workspace.name, alert_filters)

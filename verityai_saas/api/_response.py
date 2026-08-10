@@ -3,6 +3,10 @@ from functools import wraps
 import frappe
 
 
+class RateLimitExceeded(frappe.PermissionError):
+	pass
+
+
 def success(data=None):
 	return {"success": True, "data": data if data is not None else {}, "error": None, "code": None}
 
@@ -19,10 +23,12 @@ def endpoint(function):
 		except frappe.AuthenticationError as exc:
 			frappe.local.response["http_status_code"] = 401
 			return failure(exc, "AUTH_REQUIRED")
+		except RateLimitExceeded as exc:
+			frappe.local.response["http_status_code"] = 429
+			return failure(exc, "RATE_LIMITED")
 		except frappe.PermissionError as exc:
-			status = frappe.local.response.get("http_status_code") or 403
-			frappe.local.response["http_status_code"] = status
-			return failure(exc, "RATE_LIMITED" if status == 429 else "WORKSPACE_FORBIDDEN")
+			frappe.local.response["http_status_code"] = 403
+			return failure(exc, "WORKSPACE_FORBIDDEN")
 		except frappe.DoesNotExistError as exc:
 			frappe.local.response["http_status_code"] = 404
 			return failure(exc, "NOT_FOUND")

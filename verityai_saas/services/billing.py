@@ -206,7 +206,7 @@ def send_payment_reminders():
 	for row in frappe.get_all("VerityAI Subscription", filters={"status": ["in", ["Trial", "Active", "Past Due"]]}, fields=["name", "workspace", "status", "next_billing_date", "grace_period_end", "amount", "currency"]):
 		due = getdate(row.next_billing_date) if row.next_billing_date else None
 		grace = getdate(row.grace_period_end) if row.grace_period_end else None
-		if row.status == "Active" and (not due or due > add_days(current_date, 3)):
+		if row.status in {"Trial", "Active"} and (not due or due > add_days(current_date, 3)):
 			continue
 		if frappe.db.exists("VerityAI Email Delivery Log", {"workspace": row.workspace, "notification_type": "Payment Reminder", "reference_name": row.name, "creation": [">=", current_date]}):
 			continue

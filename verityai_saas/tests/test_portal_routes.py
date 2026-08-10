@@ -3,6 +3,7 @@ from frappe.tests.utils import FrappeTestCase
 from frappe.website.serve import get_response, get_response_content
 
 from verityai_saas.services.onboarding import create_workspace
+from verityai_saas.www.verityai.integrations import get_context as integrations_context
 from verityai_saas.tests.cleanup import cleanup_all_test_fixtures, cleanup_test_workspace
 
 
@@ -43,6 +44,7 @@ class TestCustomerPortalRoutes(FrappeTestCase):
 		self.assertIn("/verityai/quotes", content)
 		self.assertIn("/verityai/health", content)
 		self.assertIn("/verityai/account", content)
+		self.assertNotIn("/verityai/integrations", content)
 		self.assertNotIn('href="/app/assistant"', content)
 		quote_content = get_response_content("/verityai/quotes")
 		self.assertIn('data-verity-page="quotes"', quote_content)
@@ -56,6 +58,14 @@ class TestCustomerPortalRoutes(FrappeTestCase):
 		self.assertIn("VerityAI Customer Owner", frappe.get_roles(self.user))
 		self.assertEqual(frappe.db.get_value("Role", "VerityAI Customer Owner", "desk_access"), 0)
 
+	def test_integration_configuration_page_is_operator_only(self):
+		frappe.set_user(self.user)
+		with self.assertRaises(frappe.PermissionError):
+			integrations_context(frappe._dict())
+		frappe.set_user("Administrator")
+		context = frappe._dict()
+		integrations_context(context)
+		self.assertEqual(context.portal_page, "integrations")
 	def test_guest_is_redirected_to_login(self):
 		frappe.set_user("Guest")
 		response = get_response("/verityai/dashboard")

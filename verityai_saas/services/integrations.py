@@ -7,6 +7,8 @@ from urllib.parse import urlsplit
 import frappe
 from frappe.utils import cint, now_datetime, validate_email_address
 
+from verityai_saas.api._response import RateLimitExceeded
+
 from verityai_saas.services import engine
 from verityai_saas.services.entitlements import require_workspace_feature, subscription_entitled, workspace_context
 
@@ -212,7 +214,6 @@ def authenticate_api(scope):
 	if count == 1 and hasattr(cache, "expire"):
 		cache.expire(key, 70)
 	if count > limit:
-		frappe.local.response["http_status_code"] = 429
-		frappe.throw("API rate limit exceeded.", frappe.PermissionError)
+		raise RateLimitExceeded("API rate limit exceeded.")
 	frappe.db.set_value("VerityAI API Credential", row.name, "last_used_on", now_datetime(), update_modified=False)
 	return context

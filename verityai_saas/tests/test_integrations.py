@@ -4,7 +4,9 @@ import frappe
 from frappe.tests.utils import FrappeTestCase
 
 from verityai_saas import setup_doctypes
-from verityai_saas.api._response import endpoint
+from verityai_saas.api._response import RateLimitExceeded, endpoint
+from verityai_saas.api import assistant as assistant_api
+from verityai_saas.api import integrations as integrations_api
 from verityai_saas.services import engine, integrations, notifications, onboarding
 from verityai_saas.tests.cleanup import cleanup_all_test_fixtures, cleanup_test_workspace
 
@@ -100,12 +102,29 @@ class TestSecureIntegrations(FrappeTestCase):
 	def test_api_rate_limit_keeps_http_429(self):
 		@endpoint
 		def limited():
-			frappe.local.response["http_status_code"] = 429
-			frappe.throw("API rate limit exceeded.", frappe.PermissionError)
+			raise RateLimitExceeded("API rate limit exceeded.")
 		result = limited()
 		self.assertFalse(result["success"])
 		self.assertEqual(result["code"], "RATE_LIMITED")
 		self.assertEqual(frappe.local.response["http_status_code"], 429)
+	def test_customer_cannot_view_or_change_integration_configuration(self):
+		frappe.set_user(self.owner)
+		responses = [
+			integrations_api.get(self.workspace),
+			integrations_api.update_provider(self.workspace, {}),
+			integrations_api.update_erpnext(self.workspace, {}),
+			integrations_api.update_smtp(self.workspace, {}),
+			integrations_api.create_credential(self.workspace, "Blocked", ["leads:read"]),
+			integrations_api.revoke_credential(self.workspace, "missing"),
+		]
+		for response in responses:
+			self.assertFalse(response["success"])
+			self.assertEqual(response["code"], "WORKSPACE_FORBIDDEN")
+		assistant = assistant_api.get(self.workspace)
+		self.assertTrue(assistant["success"])
+		self.assertNotIn("configuration", assistant["data"])
+		frappe.set_user("Administrator")
+		self.assertTrue(integrations_api.get(self.workspace)["success"])
 	def test_plan_controls_widget_branding(self):
 		engine.apply_plan_limits(self.workspace, self.plan)
 		self.assertEqual(frappe.db.get_value("AI Tenant", self.tenant, "show_branding"), 0)

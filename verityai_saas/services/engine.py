@@ -82,11 +82,12 @@ def set_engine_active(workspace_name, active):
 	return bool(active)
 
 
-def safe_settings(workspace_name):
+def safe_settings(workspace_name, include_configuration=False):
 	tenant = get_workspace_engine_tenant(workspace_name)
 	data = frappe.db.get_value("AI Tenant", tenant, TENANT_SAFE_FIELDS, as_dict=True) or {}
-	config_name = frappe.db.get_value("AI Configuration", {"tenant": tenant}, "name")
-	data["configuration"] = frappe.db.get_value("AI Configuration", config_name, CONFIG_SAFE_FIELDS, as_dict=True) if config_name else {}
+	if include_configuration:
+		config_name = frappe.db.get_value("AI Configuration", {"tenant": tenant}, "name")
+		data["configuration"] = frappe.db.get_value("AI Configuration", config_name, CONFIG_SAFE_FIELDS, as_dict=True) if config_name else {}
 	data["allowed_domains"] = frappe.get_all(
 		"AI Allowed Domain", filters={"parent": tenant, "parenttype": "AI Tenant"}, pluck="domain", order_by="idx asc"
 	)

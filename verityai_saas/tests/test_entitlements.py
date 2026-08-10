@@ -93,6 +93,14 @@ class TestEntitlements(FrappeTestCase):
 		self._usage_log(session=session.name)
 		self.assertEqual(entitlements.check_engine_request(self.tenant, "Web")["code"], "CHANNEL_QUOTA_EXHAUSTED")
 
+	def test_trial_respects_explicit_plan_feature_flags(self):
+		frappe.db.set_value("VerityAI Subscription", self.created["subscription"], {"plan": self.plan, "status": "Trial"})
+		frappe.db.set_value("VerityAI Plan", self.plan, "can_use_whatsapp_ai", 0)
+		context = entitlements.workspace_context(workspace_name=self.workspace)
+		self.assertFalse(entitlements.feature_allowed(context, "can_use_whatsapp_ai"))
+		frappe.db.set_value("VerityAI Plan", self.plan, "can_use_whatsapp_ai", 1)
+		context = entitlements.workspace_context(workspace_name=self.workspace)
+		self.assertTrue(entitlements.feature_allowed(context, "can_use_whatsapp_ai"))
 	def test_email_allowance_is_period_scoped(self):
 		self._activate_plan()
 		self.assertEqual(entitlements.email_delivery_allowance(self.workspace), 1)
