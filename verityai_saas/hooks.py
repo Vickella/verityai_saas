@@ -28,6 +28,13 @@ permission_query_conditions = {
 	"VerityAI Email Delivery Log": "verityai_saas.services.permissions.workspace_child_query_condition",
 	"VerityAI WhatsApp Setup": "verityai_saas.services.permissions.workspace_child_query_condition",
 	"VerityAI Integration Status": "verityai_saas.services.permissions.workspace_child_query_condition",
+	"VerityAI Customer": "verityai_saas.services.permissions.workspace_child_query_condition",
+	"VerityAI Product": "verityai_saas.services.permissions.workspace_child_query_condition",
+	"VerityAI Product Price": "verityai_saas.services.permissions.workspace_child_query_condition",
+	"VerityAI Quotation": "verityai_saas.services.permissions.workspace_child_query_condition",
+	"VerityAI Sales Opportunity": "verityai_saas.services.permissions.workspace_child_query_condition",
+	"VerityAI Appointment": "verityai_saas.services.permissions.workspace_child_query_condition",
+	"VerityAI CRM Activity": "verityai_saas.services.permissions.workspace_child_query_condition",
 }
 
 role_home_page = {
@@ -54,3 +61,6 @@ doc_events = {
 }
 
 verity_ai_entitlement_check = ["verityai_saas.services.entitlements.check_engine_request"]
+verity_ai_item_price_handler = ["verityai_saas.services.commerce.handle_ai_item_price"]
+verity_ai_quotation_request_handler = ["verityai_saas.services.commerce.handle_ai_quotation_request"]
+verity_ai_quote_status_handler = ["verityai_saas.services.commerce.handle_ai_quote_status"]

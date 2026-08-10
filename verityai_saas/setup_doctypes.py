@@ -46,15 +46,15 @@ def field(fieldname, label, fieldtype="Data", **values):
 	return {"fieldname": fieldname, "label": label, "fieldtype": fieldtype, **values}
 
 
-def ensure_doctype(name, fields, autoname=None):
+def ensure_doctype(name, fields, autoname=None, istable=False):
 	values = {
 		"module": MODULE,
 		"custom": 1,
-		"istable": 0,
+		"istable": int(bool(istable)),
 		"track_changes": 1,
-		"allow_import": 1,
+		"allow_import": int(not istable),
 		"fields": [{**row, **({"default": str(row["default"])} if row.get("default") is not None else {})} for row in fields],
-		"permissions": permissions(),
+		"permissions": [] if istable else permissions(),
 	}
 	if autoname:
 		values["autoname"] = autoname
@@ -70,7 +70,7 @@ def ensure_doctype(name, fields, autoname=None):
 		doc.permissions = []
 		for row in values["permissions"]:
 			doc.append("permissions", row)
-		for key in ("module", "track_changes", "allow_import", "autoname"):
+		for key in ("module", "istable", "track_changes", "allow_import", "autoname"):
 			if key in values:
 				setattr(doc, key, values[key])
 		doc.flags.ignore_version = True
@@ -120,8 +120,105 @@ def ensure_doctypes():
 			("can_manage_leads", "Can Manage Leads"), ("can_view_conversations", "Can View Conversations"), ("can_manage_conversations", "Can Manage Conversations"),
 			("can_manage_billing", "Can Manage Billing"), ("can_manage_whatsapp", "Can Manage WhatsApp"),
 			("can_manage_email", "Can Manage Email"), ("can_approve_quotes", "Can Approve Quotes"),
+			("can_view_customers", "Can View Customers"), ("can_manage_customers", "Can Manage Customers"),
+			("can_view_catalog", "Can View Catalogue"), ("can_manage_catalog", "Can Manage Catalogue"),
+			("can_view_quotes", "Can View SaaS Quotes"), ("can_manage_quotes", "Can Manage SaaS Quotes"),
 		)],
 	], "hash")
+
+	ensure_doctype("VerityAI Customer", [
+		field("workspace", "Workspace", "Link", options="VerityAI Workspace", reqd=1, in_list_view=1, search_index=1),
+		field("customer_name", "Customer Name", reqd=1, in_list_view=1, search_index=1),
+		field("customer_type", "Customer Type", "Select", options="Company\nIndividual", default="Company"),
+		field("email", "Email", options="Email", in_list_view=1, search_index=1), field("phone", "Phone", in_list_view=1),
+		field("tax_id", "Tax ID"), field("address", "Address", "Small Text"), field("city", "City"),
+		field("country", "Country", "Link", options="Country"), field("notes", "Notes", "Small Text"),
+		field("status", "Status", "Select", options="Active\nDisabled", default="Active", in_list_view=1),
+		field("external_system", "External System", "Select", options="\nERPNext"),
+		field("external_id", "External ID"), field("last_synced_on", "Last Synced On", "Datetime", read_only=1),
+		field("source_lead", "Source Lead", "Link", options="AI Lead", search_index=1), field("converted_on", "Converted On", "Datetime", read_only=1),
+		field("lifetime_value", "Lifetime Value", "Currency", read_only=1), field("last_contact_on", "Last Contact On", "Datetime", read_only=1),
+		field("next_follow_up_on", "Next Follow-up", "Datetime"),
+	], "VCUST-.########")
+
+	ensure_doctype("VerityAI Sales Opportunity", [
+		field("workspace", "Workspace", "Link", options="VerityAI Workspace", reqd=1, in_list_view=1, search_index=1),
+		field("opportunity_name", "Opportunity Name", reqd=1, in_list_view=1, search_index=1),
+		field("lead", "Lead", "Link", options="AI Lead", search_index=1), field("customer", "Customer", "Link", options="VerityAI Customer", search_index=1),
+		field("stage", "Stage", "Select", options="New\nQualified\nProposal\nNegotiation\nWon\nLost", default="New", reqd=1, in_list_view=1),
+		field("amount", "Expected Value", "Currency", in_list_view=1), field("currency", "Currency", "Link", options="Currency", default="USD"),
+		field("probability", "Probability %", "Percent", default=10), field("expected_close_date", "Expected Close Date", "Date", in_list_view=1),
+		field("source", "Source"), field("assigned_to", "Assigned To", "Link", options="User", in_list_view=1),
+		field("last_contact_on", "Last Contact On", "Datetime", read_only=1), field("next_follow_up_on", "Next Follow-up", "Datetime"),
+		field("lost_reason", "Lost Reason", "Small Text"), field("notes", "Notes", "Text Editor"),
+		field("external_system", "External System", "Select", options="\nERPNext"), field("external_id", "External ID"),
+	], "VOPP-.########")
+
+	ensure_doctype("VerityAI Appointment", [
+		field("workspace", "Workspace", "Link", options="VerityAI Workspace", reqd=1, in_list_view=1, search_index=1),
+		field("subject", "Subject", reqd=1, in_list_view=1), field("customer", "Customer", "Link", options="VerityAI Customer", search_index=1),
+		field("lead", "Lead", "Link", options="AI Lead", search_index=1), field("opportunity", "Opportunity", "Link", options="VerityAI Sales Opportunity", search_index=1),
+		field("starts_on", "Starts On", "Datetime", reqd=1, in_list_view=1), field("ends_on", "Ends On", "Datetime"), field("timezone", "Timezone"),
+		field("mode", "Mode", "Select", options="Online\nPhone\nOnsite", default="Online"), field("location", "Location"), field("meeting_url", "Meeting URL"),
+		field("assigned_to", "Assigned To", "Link", options="User", in_list_view=1),
+		field("status", "Status", "Select", options="Scheduled\nConfirmed\nCompleted\nCancelled\nNo Show", default="Scheduled", in_list_view=1),
+		field("notes", "Notes", "Small Text"), field("outcome", "Outcome", "Small Text"), field("reminder_sent", "Reminder Sent", "Check", read_only=1),
+	], "VAPT-.########")
+
+	ensure_doctype("VerityAI CRM Activity", [
+		field("workspace", "Workspace", "Link", options="VerityAI Workspace", reqd=1, in_list_view=1, search_index=1),
+		field("activity_type", "Activity Type", "Select", options="Call\nEmail\nMeeting\nNote\nFollow-up\nStatus Change", reqd=1, in_list_view=1),
+		field("subject", "Subject", reqd=1, in_list_view=1), field("details", "Details", "Small Text"),
+		field("lead", "Lead", "Link", options="AI Lead", search_index=1), field("customer", "Customer", "Link", options="VerityAI Customer", search_index=1),
+		field("opportunity", "Opportunity", "Link", options="VerityAI Sales Opportunity", search_index=1), field("appointment", "Appointment", "Link", options="VerityAI Appointment"),
+		field("scheduled_on", "Scheduled On", "Datetime"), field("completed_on", "Completed On", "Datetime", read_only=1),
+		field("assigned_to", "Assigned To", "Link", options="User"), field("status", "Status", "Select", options="Open\nCompleted\nCancelled", default="Open", in_list_view=1),
+	], "VCRM-.########")
+
+	ensure_doctype("VerityAI Product", [
+		field("workspace", "Workspace", "Link", options="VerityAI Workspace", reqd=1, in_list_view=1, search_index=1),
+		field("item_code", "Item Code", reqd=1, in_list_view=1, search_index=1),
+		field("item_name", "Item Name", reqd=1, in_list_view=1, search_index=1),
+		field("description", "Description", "Text Editor"), field("item_group", "Item Group", default="Services"),
+		field("stock_uom", "Unit of Measure", default="Unit"), field("is_stock_item", "Track Stock", "Check", default=0),
+		field("standard_rate", "Standard Rate", "Currency"), field("currency", "Currency", "Link", options="Currency", default="USD"),
+		field("active", "Active", "Check", default=1, in_list_view=1),
+		field("external_system", "External System", "Select", options="\nERPNext"),
+		field("external_id", "External ID"), field("last_synced_on", "Last Synced On", "Datetime", read_only=1),
+	], "VPROD-.########")
+
+	ensure_doctype("VerityAI Product Price", [
+		field("workspace", "Workspace", "Link", options="VerityAI Workspace", reqd=1, in_list_view=1, search_index=1),
+		field("product", "Product", "Link", options="VerityAI Product", reqd=1, in_list_view=1, search_index=1),
+		field("price_list", "Price List", default="Standard Selling", reqd=1, in_list_view=1),
+		field("currency", "Currency", "Link", options="Currency", default="USD", reqd=1),
+		field("rate", "Rate", "Currency", reqd=1, in_list_view=1), field("valid_from", "Valid From", "Date"),
+		field("valid_upto", "Valid Until", "Date"), field("active", "Active", "Check", default=1, in_list_view=1),
+	], "VPRICE-.########")
+
+	ensure_doctype("VerityAI Quotation Item", [
+		field("product", "Product", "Link", options="VerityAI Product", reqd=1, in_list_view=1),
+		field("item_code", "Item Code", reqd=1, in_list_view=1), field("item_name", "Item Name", reqd=1),
+		field("description", "Description", "Small Text"), field("qty", "Quantity", "Float", reqd=1, default=1),
+		field("uom", "Unit of Measure"), field("rate", "Rate", "Currency", reqd=1),
+		field("discount_percent", "Discount %", "Percent", default=0), field("amount", "Amount", "Currency", read_only=1),
+	], istable=True)
+
+	ensure_doctype("VerityAI Quotation", [
+		field("workspace", "Workspace", "Link", options="VerityAI Workspace", reqd=1, in_list_view=1, search_index=1),
+		field("customer", "Customer", "Link", options="VerityAI Customer", reqd=1, in_list_view=1, search_index=1),
+		field("customer_name", "Customer Name", read_only=1, in_list_view=1), field("customer_email", "Customer Email", options="Email", read_only=1),
+		field("transaction_date", "Quotation Date", "Date", reqd=1, in_list_view=1), field("valid_till", "Valid Until", "Date"),
+		field("price_list", "Price List", default="Standard Selling"), field("currency", "Currency", "Link", options="Currency", default="USD", reqd=1),
+		field("status", "Status", "Select", options="Draft\nPending Approval\nApproved\nSent\nAccepted\nRejected\nExpired\nCancelled", default="Draft", in_list_view=1),
+		field("items", "Items", "Table", options="VerityAI Quotation Item", reqd=1),
+		field("subtotal", "Subtotal", "Currency", read_only=1), field("discount_amount", "Additional Discount", "Currency", default=0),
+		field("tax_rate", "Tax Rate %", "Percent", default=0), field("tax_amount", "Tax Amount", "Currency", read_only=1),
+		field("total", "Total", "Currency", read_only=1, in_list_view=1), field("notes", "Terms and Notes", "Text Editor"),
+		field("external_system", "External System", "Select", options="\nERPNext"), field("external_id", "External ID"),
+		field("sync_status", "Sync Status", "Select", options="Not Synced\nPending\nSynced\nFailed", default="Not Synced"),
+		field("sync_error", "Sync Error", "Small Text", read_only=1), field("last_synced_on", "Last Synced On", "Datetime", read_only=1),
+	], "VQUOTE-.########")
 
 	ensure_doctype("VerityAI Plan", [
 		field("plan_name", "Plan Name", reqd=1, unique=1, in_list_view=1), field("plan_code", "Plan Code", reqd=1, unique=1),
@@ -262,4 +359,3 @@ def ensure_default_plan():
 			"max_team_members": 3, "max_knowledge_sources": 10, "max_allowed_domains": 2,
 			"can_use_whatsapp_button": 1, "can_use_email_notifications": 1,
 		}).insert(ignore_permissions=True)
-

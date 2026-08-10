@@ -11,7 +11,7 @@
 		<aside class="va-sidebar">
 			<a class="va-brand" href="/verityai"><span>V</span>VerityAI</a>
 			<nav>
-				{% for route, label in (("dashboard", "Dashboard"), ("health", "Health"), ("onboarding", "Setup"), ("assistant", "Assistant"), ("widget", "Widget"), ("knowledge", "Knowledge"), ("leads", "Leads"), ("conversations", "Conversations"), ("quotes", "Quotes"), ("usage", "Usage"), ("billing", "Billing"), ("email", "Email"), ("whatsapp", "WhatsApp"), ("team", "Team"), ("account", "Account")) %}
+				{% for route, label in (("dashboard", "Dashboard"), ("health", "Health"), ("onboarding", "Setup"), ("assistant", "Assistant"), ("widget", "Widget"), ("knowledge", "Knowledge"), ("leads", "Leads"), ("crm", "Sales CRM"), ("conversations", "Conversations"), ("commerce", "Commerce"), ("quotes", "AI Quote Requests"), ("usage", "Usage"), ("billing", "Billing"), ("email", "Email"), ("whatsapp", "WhatsApp"), ("team", "Team"), ("account", "Account")) %}
 				<a href="/verityai/{{ route }}" class="{% if portal_page == route %}active{% endif %}">{{ label }}</a>
 				{% endfor %}
 			</nav>
@@ -30,4 +30,3 @@
 	<script src="/assets/verityai_saas/js/portal.js"></script>
 </body>
 </html>
-

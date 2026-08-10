@@ -42,12 +42,18 @@ class TestCustomerPortalRoutes(FrappeTestCase):
 		self.assertIn('data-verity-page="dashboard"', content)
 		self.assertIn("/verityai/assistant", content)
 		self.assertIn("/verityai/quotes", content)
+		self.assertIn("/verityai/commerce", content)
+		self.assertIn("/verityai/crm", content)
 		self.assertIn("/verityai/health", content)
 		self.assertIn("/verityai/account", content)
 		self.assertNotIn("/verityai/integrations", content)
 		self.assertNotIn('href="/app/assistant"', content)
 		quote_content = get_response_content("/verityai/quotes")
 		self.assertIn('data-verity-page="quotes"', quote_content)
+		commerce_content = get_response_content("/verityai/commerce")
+		self.assertIn('data-verity-page="commerce"', commerce_content)
+		crm_content = get_response_content("/verityai/crm")
+		self.assertIn('data-verity-page="crm"', crm_content)
 		health_content = get_response_content("/verityai/health")
 		self.assertIn('data-verity-page="health"', health_content)
 
@@ -71,4 +77,3 @@ class TestCustomerPortalRoutes(FrappeTestCase):
 		response = get_response("/verityai/dashboard")
 		self.assertIn(response.status_code, {301, 302, 303, 307, 308})
 		self.assertIn("/login", response.headers.get("Location", ""))
-

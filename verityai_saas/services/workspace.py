@@ -13,10 +13,17 @@ PERMISSION_FIELDS = (
 	"can_view_leads",
 	"can_manage_leads",
 	"can_view_conversations",
+	"can_manage_conversations",
 	"can_manage_billing",
 	"can_manage_whatsapp",
 	"can_manage_email",
 	"can_approve_quotes",
+	"can_view_customers",
+	"can_manage_customers",
+	"can_view_catalog",
+	"can_manage_catalog",
+	"can_view_quotes",
+	"can_manage_quotes",
 )
 
 

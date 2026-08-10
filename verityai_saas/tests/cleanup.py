@@ -2,6 +2,13 @@ import frappe
 
 
 SAAS_WORKSPACE_DOCTYPES = (
+	"VerityAI CRM Activity",
+	"VerityAI Appointment",
+	"VerityAI Sales Opportunity",
+	"VerityAI Quotation",
+	"VerityAI Product Price",
+	"VerityAI Product",
+	"VerityAI Customer",
 	"VerityAI Billing Document",
 	"VerityAI API Credential",
 	"VerityAI Lead Activity",
@@ -44,8 +51,12 @@ def cleanup_test_workspace(workspace_name, users=None, commit=True, engine_tenan
 	)
 	if workspace:
 		engine_tenant = engine_tenant or workspace.engine_tenant
+		quotation_names = frappe.get_all("VerityAI Quotation", filters={"workspace": workspace_name}, pluck="name") if frappe.db.exists("DocType", "VerityAI Quotation") else []
+		if quotation_names:
+			frappe.db.delete("VerityAI Quotation Item", {"parent": ["in", quotation_names], "parenttype": "VerityAI Quotation"})
 		for doctype in SAAS_WORKSPACE_DOCTYPES:
-			frappe.db.delete(doctype, {"workspace": workspace_name})
+			if frappe.db.exists("DocType", doctype):
+				frappe.db.delete(doctype, {"workspace": workspace_name})
 		frappe.db.delete("VerityAI Workspace", {"name": workspace_name})
 	if engine_tenant:
 		frappe.db.delete("AI Allowed Domain", {"parent": engine_tenant})
@@ -63,7 +74,7 @@ def cleanup_test_workspace(workspace_name, users=None, commit=True, engine_tenan
 
 
 def cleanup_all_test_fixtures():
-	patterns = ("owner-%@example.com", "account-owner-%@example.com", "analytics-owner-%@example.com", "integration-owner-%@example.com", "billing-owner-%@example.com", "crm-owner-%@example.com", "ingest-owner-%@example.com", "entitlement-owner-%@example.com", "portal-%@example.com", "quote-owner-%@example.com", "health-owner-%@example.com", "team-owner-%@example.com", "notify-owner-%@example.com", "paynow-owner-%@example.com", "ops-owner-%@example.com")
+	patterns = ("owner-%@example.com", "account-owner-%@example.com", "analytics-owner-%@example.com", "integration-owner-%@example.com", "billing-owner-%@example.com", "crm-owner-%@example.com", "commerce-owner-%@example.com", "commerce-other-%@example.com", "ingest-owner-%@example.com", "entitlement-owner-%@example.com", "portal-%@example.com", "quote-owner-%@example.com", "health-owner-%@example.com", "team-owner-%@example.com", "notify-owner-%@example.com", "paynow-owner-%@example.com", "ops-owner-%@example.com")
 	workspaces = []
 	for pattern in patterns:
 		workspaces.extend(
