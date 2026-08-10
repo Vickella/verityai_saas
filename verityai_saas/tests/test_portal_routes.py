@@ -77,6 +77,13 @@ class TestCustomerPortalRoutes(FrappeTestCase):
 		context = frappe._dict()
 		integrations_context(context)
 		self.assertEqual(context.portal_page, "integrations")
+
+	def test_platform_admin_page_renders_as_utf8(self):
+		frappe.set_user("Administrator")
+		content = get_response_content("/verityai/admin")
+		self.assertIn('id="va-admin-content"', content)
+		self.assertIn("/assets/verityai_saas/js/admin.js", content)
+
 	def test_guest_is_redirected_to_login(self):
 		frappe.set_user("Guest")
 		response = get_response("/verityai/dashboard")
