@@ -4,6 +4,7 @@ import frappe
 from frappe.tests.utils import FrappeTestCase
 from frappe.website.serve import get_response, get_response_content
 
+from verityai_saas import __version__
 from verityai_saas.services.onboarding import create_workspace
 from verityai_saas.www.verityai.integrations import get_context as integrations_context
 from verityai_saas.tests.cleanup import cleanup_all_test_fixtures, cleanup_test_workspace
@@ -83,7 +84,7 @@ class TestCustomerPortalRoutes(FrappeTestCase):
 		frappe.set_user("Administrator")
 		content = get_response_content("/verityai/admin")
 		self.assertIn('id="va-admin-content"', content)
-		self.assertIn("/assets/verityai_saas/js/admin.js?v=0.2.0", content)
+		self.assertIn(f"/assets/verityai_saas/js/admin.js?v={__version__}", content)
 		self.assertNotIn('window.csrf_token=""', content)
 
 	def test_guest_is_redirected_to_login(self):

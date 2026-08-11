@@ -281,6 +281,14 @@ def business_nature_options():
 	return rows
 
 
+def ensure_business_natures():
+	"""Repair missing curated profiles before presenting the selector to a user."""
+	existing = set(frappe.get_all("AI Business Nature", pluck="name"))
+	if not set(BUSINESS_NATURES).issubset(existing):
+		seed_business_natures()
+	return business_nature_options()
+
+
 def validate_business_nature(value, *, required=False):
 	value = str(value or "").strip()
 	if not value and not required:

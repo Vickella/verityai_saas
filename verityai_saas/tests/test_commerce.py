@@ -70,6 +70,14 @@ class TestTenantNativeCommerce(FrappeTestCase):
 		self.assertEqual(quote.total, 230)
 		self.assertFalse(quote.external_id)
 
+	def test_standard_selling_price_comes_from_product(self):
+		commerce.save_price(self.workspace, {"product": self.product.name, "price_list": "Standard Selling", "currency": "USD", "rate": 999})
+		updated = commerce.save_product(self.workspace, {"item_code": "CONSULT", "item_name": "Consulting", "standard_rate": 135, "currency": "USD"}, product=self.product.name)
+		quote = commerce.save_quotation(self.workspace, {"customer": self.customer.name, "items": [{"product": self.product.name, "qty": 2}]})
+		self.assertEqual(updated.standard_rate, 135)
+		self.assertEqual(quote["items"][0]["rate"], 135)
+		self.assertEqual(quote.total, 270)
+
 	def test_cross_workspace_references_and_customer_api_access_are_blocked(self):
 		other_product = commerce.save_product(self.other["workspace"], {"item_code": "PRIVATE", "item_name": "Private Product", "standard_rate": 50})
 		with self.assertRaises(frappe.DoesNotExistError):

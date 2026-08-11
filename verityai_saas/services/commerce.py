@@ -195,6 +195,11 @@ def delete_price(workspace, price):
 
 
 def _product_rate(workspace, product, price_list, currency, on_date):
+	product_defaults = frappe.db.get_value("VerityAI Product", product, ["standard_rate", "currency"], as_dict=True)
+	if price_list == "Standard Selling":
+		if product_defaults.currency != currency:
+			frappe.throw(f"No {currency} price is configured for this product.", frappe.ValidationError)
+		return flt(product_defaults.standard_rate, 2)
 	rows = frappe.get_all("VerityAI Product Price", filters={"workspace": workspace, "product": product, "price_list": price_list, "currency": currency, "active": 1}, fields=["rate", "valid_from", "valid_upto"], order_by="valid_from desc, creation desc", limit_page_length=100)
 	for row in rows:
 		if row.valid_from and getdate(row.valid_from) > on_date:
@@ -202,7 +207,6 @@ def _product_rate(workspace, product, price_list, currency, on_date):
 		if row.valid_upto and getdate(row.valid_upto) < on_date:
 			continue
 		return flt(row.rate, 2)
-	product_defaults = frappe.db.get_value("VerityAI Product", product, ["standard_rate", "currency"], as_dict=True)
 	if product_defaults.currency != currency:
 		frappe.throw(f"No {currency} price is configured for this product.", frappe.ValidationError)
 	return flt(product_defaults.standard_rate, 2)

@@ -7,7 +7,7 @@ from frappe.utils import get_url, now_datetime
 
 from verity_ai.tenant_security import normalize_domain
 
-from verityai_saas.services.business_natures import business_nature_options, validate_business_nature
+from verityai_saas.services.business_natures import ensure_business_natures, validate_business_nature
 
 
 TENANT_SAFE_FIELDS = [
@@ -93,7 +93,7 @@ def safe_settings(workspace_name, include_configuration=False):
 	data["allowed_domains"] = frappe.get_all(
 		"AI Allowed Domain", filters={"parent": tenant, "parenttype": "AI Tenant"}, pluck="domain", order_by="idx asc"
 	)
-	data["business_natures"] = business_nature_options()
+	data["business_natures"] = ensure_business_natures()
 	return data
 
 
