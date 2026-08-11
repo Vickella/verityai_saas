@@ -5,7 +5,8 @@ from frappe.utils import add_days, cint, flt, getdate, today
 
 from verityai_saas.api._response import endpoint, json_value
 from verityai_saas.services import paynow
-from verityai_saas.services.permissions import is_platform_admin, require_operator
+from verityai_saas.services.admin_reauth import require_admin_reauthentication
+from verityai_saas.services.permissions import is_platform_admin
 
 
 
@@ -92,7 +93,7 @@ def _counts_by_tenant(doctype, tenants, filters=None):
 @frappe.whitelist()
 @endpoint
 def dashboard():
-	require_operator()
+	require_admin_reauthentication()
 	workspaces = frappe.get_all(
 		"VerityAI Workspace",
 		fields=["name", "workspace_name", "business_name", "engine_tenant", "status", "setup_progress", "account", "currency"],
@@ -182,7 +183,7 @@ def dashboard():
 @frappe.whitelist(methods=["POST"])
 @endpoint
 def create_plan(values):
-	require_operator()
+	require_admin_reauthentication()
 	plan = _apply_plan_values(frappe.get_doc({"doctype": "VerityAI Plan"}), values, creating=True)
 	plan.insert(ignore_permissions=True)
 	return _plan_data(plan)
@@ -191,7 +192,7 @@ def create_plan(values):
 @frappe.whitelist(methods=["POST"])
 @endpoint
 def update_plan(plan, values):
-	require_operator()
+	require_admin_reauthentication()
 	if not frappe.db.exists("VerityAI Plan", plan):
 		frappe.throw("Plan was not found.", frappe.DoesNotExistError)
 	doc = _apply_plan_values(frappe.get_doc("VerityAI Plan", plan), values)
@@ -202,7 +203,7 @@ def update_plan(plan, values):
 @frappe.whitelist(methods=["POST"])
 @endpoint
 def archive_plan(plan):
-	require_operator()
+	require_admin_reauthentication()
 	if plan == "TRIAL" or frappe.db.get_value("VerityAI Plan", plan, "plan_code") == "TRIAL":
 		frappe.throw("The default trial plan cannot be archived.", frappe.ValidationError)
 	if not frappe.db.exists("VerityAI Plan", plan):

@@ -1049,6 +1049,17 @@ article.va-member-row,
 /* Operator console */
 .va-admin-page { min-height: 100vh; }
 .va-admin-main { max-width: 1500px; }
+.va-admin-locked-page { background: radial-gradient(circle at 50% -15%, rgba(40,121,237,.16), transparent 35rem), #eef3f9; }
+.va-admin-unlock-shell { min-height: 100vh; display: grid; place-items: center; padding: 24px; }
+.va-admin-unlock-card { width: min(470px,100%); display: grid; gap: 20px; padding: 30px; border: 1px solid rgba(207,218,232,.9); border-radius: 20px; background: rgba(255,255,255,.97); box-shadow: 0 25px 70px rgba(14,38,69,.13); }
+.va-admin-unlock-card h1 { margin: 0; font-size: 27px; line-height: 1.15; letter-spacing: -.04em; }
+.va-admin-unlock-card p:not(.eyebrow) { margin: 7px 0 0; color: var(--ink-500); font-size: 12px; }
+.va-admin-unlock-card .va-button { width: 100% !important; }
+.va-admin-unlock-card > .va-button.ghost { width: auto !important; justify-self: center; }
+.va-admin-lock-icon { width: 48px; height: 48px; display: grid; place-items: center; border-radius: 15px; color: #fff; background: linear-gradient(145deg,#246fe0,#694fe4); box-shadow: 0 10px 24px rgba(36,104,235,.24); font-size: 24px; transform: rotate(45deg); }
+.va-admin-security-note { display: grid; gap: 2px; padding: 12px 13px; border: 1px solid #dbe6f5; border-radius: 10px; color: #295689; background: #f5f9ff; }
+.va-admin-security-note strong { font-size: 11px; }
+.va-admin-security-note span { color: #58708d; font-size: 10px; }
 .va-admin-tabs {
   position: sticky;
   top: 0;

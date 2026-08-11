@@ -5,7 +5,8 @@ import frappe
 
 from verityai_saas.api._response import endpoint
 from verityai_saas.services import billing, billing_documents, paynow
-from verityai_saas.services.permissions import check_workspace_access, require_operator
+from verityai_saas.services.admin_reauth import require_admin_reauthentication
+from verityai_saas.services.permissions import check_workspace_access
 
 
 @frappe.whitelist()
@@ -25,14 +26,14 @@ def get(workspace):
 @frappe.whitelist(methods=["POST"])
 @endpoint
 def manual_event(workspace, event_type, amount=0, status="Pending", reference=None):
-	require_operator()
+	require_admin_reauthentication()
 	return {"event": billing.create_billing_event(workspace, event_type, amount, status, provider_reference=reference)}
 
 
 @frappe.whitelist(methods=["POST"])
 @endpoint
 def assign_plan(workspace, plan, status="Active", billing_cycle="Monthly"):
-	operator = require_operator()
+	operator = require_admin_reauthentication()
 	subscription = billing.assign_plan(workspace, plan, status, billing_cycle)
 	event = billing.create_billing_event(
 		workspace,
@@ -47,7 +48,7 @@ def assign_plan(workspace, plan, status="Active", billing_cycle="Monthly"):
 @frappe.whitelist(methods=["POST"])
 @endpoint
 def set_status(workspace, status, reason=None):
-	operator = require_operator()
+	operator = require_admin_reauthentication()
 	subscription = billing.set_subscription_status(workspace, status, reason)
 	event = billing.create_billing_event(
 		workspace,
@@ -62,7 +63,7 @@ def set_status(workspace, status, reason=None):
 @frappe.whitelist(methods=["POST"])
 @endpoint
 def top_up(workspace, tokens, amount=0, reference=None):
-	require_operator()
+	require_admin_reauthentication()
 	return billing.add_top_up(workspace, tokens, amount, reference)
 
 @frappe.whitelist()
@@ -80,14 +81,14 @@ def download_document(workspace, document):
 @frappe.whitelist(methods=["POST"])
 @endpoint
 def initiate_refund(workspace, payment, amount=None, reason=None):
-	require_operator()
+	require_admin_reauthentication()
 	return billing.initiate_refund(workspace, payment, amount, reason)
 
 
 @frappe.whitelist(methods=["POST"])
 @endpoint
 def complete_refund(workspace, refund, provider_reference=None):
-	require_operator()
+	require_admin_reauthentication()
 	if not frappe.db.exists("VerityAI Billing Event", {"name": refund, "workspace": workspace, "event_type": "Refund"}):
 		frappe.throw("Refund was not found.", frappe.DoesNotExistError)
 	return billing.complete_refund(refund, provider_reference)
@@ -100,7 +101,7 @@ def _csv_safe(value):
 
 @frappe.whitelist()
 def reconciliation_export(date_from=None, date_to=None):
-	require_operator()
+	require_admin_reauthentication()
 	filters = {}
 	if date_from and date_to:
 		filters["creation"] = ["between", [date_from, f"{date_to} 23:59:59"]]

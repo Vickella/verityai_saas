@@ -3,7 +3,8 @@ from frappe.utils import cint
 
 from verityai_saas.api._response import endpoint, json_value
 from verityai_saas.services import analytics
-from verityai_saas.services.permissions import check_workspace_access, require_operator
+from verityai_saas.services.admin_reauth import require_admin_reauthentication
+from verityai_saas.services.permissions import check_workspace_access
 
 
 @frappe.whitelist()
@@ -55,14 +56,14 @@ def _schedule_values(values, doc=None):
 @frappe.whitelist()
 @endpoint
 def schedules():
-	require_operator()
+	require_admin_reauthentication()
 	return frappe.get_all("VerityAI Report Schedule", fields=["name", "report_name", "report_type", "workspace", "recipients", "frequency", "active", "last_sent_on", "next_send_on", "last_status", "last_error"], order_by="creation desc", limit=200)
 
 
 @frappe.whitelist(methods=["POST"])
 @endpoint
 def create_schedule(values):
-	require_operator()
+	require_admin_reauthentication()
 	doc = _schedule_values(values)
 	doc.insert(ignore_permissions=True)
 	return {"schedule": doc.name}
@@ -71,7 +72,7 @@ def create_schedule(values):
 @frappe.whitelist(methods=["POST"])
 @endpoint
 def update_schedule(schedule, values):
-	require_operator()
+	require_admin_reauthentication()
 	if not frappe.db.exists("VerityAI Report Schedule", schedule):
 		frappe.throw("Report schedule was not found.", frappe.DoesNotExistError)
 	doc = _schedule_values(values, frappe.get_doc("VerityAI Report Schedule", schedule))
@@ -81,7 +82,7 @@ def update_schedule(schedule, values):
 
 @frappe.whitelist()
 def operator_export():
-	require_operator()
+	require_admin_reauthentication()
 	frappe.local.response.filename = "verityai-operator-summary.csv"
 	frappe.local.response.filecontent = analytics.operator_summary_csv()
 	frappe.local.response.type = "download"

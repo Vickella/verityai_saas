@@ -5,6 +5,7 @@ from frappe.utils import now_datetime
 from verityai_saas import setup_doctypes
 from verityai_saas.api import health as health_api
 from verityai_saas.services.health import workspace_health
+from verityai_saas.services.admin_reauth import mark_admin_reauthenticated
 from verityai_saas.services.onboarding import create_workspace
 from verityai_saas.tests.cleanup import cleanup_all_test_fixtures, cleanup_test_workspace
 
@@ -23,6 +24,7 @@ class TestWorkspaceHealthPortal(FrappeTestCase):
 
 	def setUp(self):
 		frappe.set_user("Administrator")
+		mark_admin_reauthenticated()
 		token = frappe.generate_hash(length=8).lower()
 		self.owner = self.create_user(f"health-owner-{token}@example.com")
 		self.other = self.create_user(f"health-other-{token}@example.com")

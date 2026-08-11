@@ -7,6 +7,7 @@ from frappe.utils import add_days, today
 from verityai_saas import setup_doctypes
 from verityai_saas.api import billing as billing_api
 from verityai_saas.services import billing, billing_documents, entitlements
+from verityai_saas.services.admin_reauth import mark_admin_reauthenticated
 from verityai_saas.services.onboarding import create_workspace
 from verityai_saas.tests.cleanup import cleanup_all_test_fixtures, cleanup_test_workspace
 
@@ -25,6 +26,7 @@ class TestBillingDocumentsAndRecovery(FrappeTestCase):
 
 	def setUp(self):
 		frappe.set_user("Administrator")
+		mark_admin_reauthenticated()
 		token = frappe.generate_hash(length=8).lower()
 		self.owner = frappe.get_doc({
 			"doctype": "User", "email": f"billing-owner-{token}@example.com", "first_name": "Billing",

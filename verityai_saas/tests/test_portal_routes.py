@@ -5,6 +5,7 @@ from frappe.tests.utils import FrappeTestCase
 from frappe.website.serve import get_response, get_response_content
 
 from verityai_saas import __version__
+from verityai_saas.services.admin_reauth import mark_admin_reauthenticated
 from verityai_saas.services.onboarding import create_workspace
 from verityai_saas.www.verityai.integrations import get_context as integrations_context
 from verityai_saas.tests.cleanup import cleanup_all_test_fixtures, cleanup_test_workspace
@@ -18,6 +19,7 @@ class TestCustomerPortalRoutes(FrappeTestCase):
 
 	def setUp(self):
 		frappe.set_user("Administrator")
+		mark_admin_reauthenticated()
 		token = frappe.generate_hash(length=8).lower()
 		self.user = frappe.get_doc(
 			{

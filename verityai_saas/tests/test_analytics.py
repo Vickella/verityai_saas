@@ -9,6 +9,7 @@ from frappe.utils import add_days, now_datetime, today
 from verityai_saas import setup_doctypes
 from verityai_saas.api import analytics as analytics_api
 from verityai_saas.services import analytics, billing
+from verityai_saas.services.admin_reauth import mark_admin_reauthenticated
 from verityai_saas.services.onboarding import create_workspace
 from verityai_saas.tests.cleanup import cleanup_all_test_fixtures, cleanup_test_workspace
 
@@ -27,6 +28,7 @@ class TestAnalyticsAndReports(FrappeTestCase):
 
 	def setUp(self):
 		frappe.set_user("Administrator")
+		mark_admin_reauthenticated()
 		token = frappe.generate_hash(length=8).lower()
 		self.owner = frappe.get_doc({"doctype": "User", "email": f"analytics-owner-{token}@example.com", "first_name": "Analytics", "last_name": "Owner", "user_type": "Website User", "send_welcome_email": 0}).insert(ignore_permissions=True).name
 		self.created = create_workspace(self.owner, f"Analytics Account {token}", f"Analytics Workspace {token}")

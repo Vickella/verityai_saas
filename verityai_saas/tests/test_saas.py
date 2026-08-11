@@ -6,6 +6,7 @@ from frappe.tests.utils import FrappeTestCase
 from verityai_saas import setup_doctypes
 from verityai_saas.tests.cleanup import cleanup_all_test_fixtures, cleanup_test_workspace
 from verityai_saas.services import billing, engine, notifications, onboarding, usage, whatsapp
+from verityai_saas.services.admin_reauth import mark_admin_reauthenticated
 from verityai_saas.services.permissions import check_workspace_access, require_operator
 
 
@@ -23,6 +24,7 @@ class TestVerityAISaaS(FrappeTestCase):
 
 	def setUp(self):
 		frappe.set_user("Administrator")
+		mark_admin_reauthenticated()
 		token = frappe.generate_hash(length=8).lower()
 		self.owner = self.create_user(f"owner-{token}@example.com")
 		self.other = self.create_user(f"other-{token}@example.com")

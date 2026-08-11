@@ -8,6 +8,7 @@ from verityai_saas.api._response import RateLimitExceeded, endpoint
 from verityai_saas.api import assistant as assistant_api
 from verityai_saas.api import integrations as integrations_api
 from verityai_saas.services import engine, integrations, notifications, onboarding, paynow
+from verityai_saas.services.admin_reauth import mark_admin_reauthenticated
 from verityai_saas.tests.cleanup import cleanup_all_test_fixtures, cleanup_test_workspace
 
 
@@ -25,6 +26,7 @@ class TestSecureIntegrations(FrappeTestCase):
 
 	def setUp(self):
 		frappe.set_user("Administrator")
+		mark_admin_reauthenticated()
 		self.token = frappe.generate_hash(length=8).lower()
 		self.owner = frappe.get_doc({
 			"doctype": "User", "email": f"integration-owner-{self.token}@example.com",
