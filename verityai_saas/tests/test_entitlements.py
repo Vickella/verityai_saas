@@ -81,6 +81,15 @@ class TestEntitlements(FrappeTestCase):
 		frappe.db.set_value("VerityAI Usage Wallet", self.created["wallet"], "tokens_remaining", 0)
 		self.assertEqual(entitlements.check_engine_request(self.tenant, "Web")["code"], "WALLET_EXHAUSTED")
 
+	def test_expired_trial_is_synchronously_disabled(self):
+		frappe.db.set_value("VerityAI Subscription", self.created["subscription"], {
+			"status": "Trial", "trial_end": frappe.utils.add_days(frappe.utils.today(), -1),
+		})
+		result = entitlements.check_engine_request(self.tenant, "Web")
+		self.assertEqual(result["code"], "TRIAL_EXPIRED")
+		self.assertEqual(frappe.db.get_value("AI Tenant", self.tenant, "active"), 0)
+		self.assertEqual(frappe.db.get_value("VerityAI Usage Wallet", self.created["wallet"], "status"), "Suspended")
+
 	def test_paid_plan_channel_feature_and_quota_are_enforced(self):
 		self._activate_plan()
 		frappe.db.set_value("VerityAI Plan", self.plan, "can_use_whatsapp_ai", 0)

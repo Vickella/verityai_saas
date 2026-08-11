@@ -183,6 +183,7 @@ def ensure_doctypes():
 		field("country", "Country", "Link", options="Country"), field("currency", "Currency", "Link", options="Currency"),
 		field("status", "Status", "Select", options="Active\nSuspended\nCancelled", default="Active", in_list_view=1),
 		field("customer_type", "Customer Type", "Select", options="SME\nAgency\nEnterprise", default="SME"),
+		field("referral_code", "Referral Code", unique=1), field("referred_by", "Referred By", "Link", options="VerityAI Account"),
 		field("notes", "Notes", "Small Text"),
 	], "field:account_name")
 
@@ -345,8 +346,10 @@ def ensure_doctypes():
 
 	ensure_doctype("VerityAI Usage Wallet", [
 		field("workspace", "Workspace", "Link", options="VerityAI Workspace", reqd=1, unique=1, in_list_view=1), field("subscription", "Subscription", "Link", options="VerityAI Subscription", reqd=1),
-		field("period_start", "Period Start", "Date"), field("period_end", "Period End", "Date"), field("opening_token_allowance", "Opening Token Allowance", "Int"),
-		field("top_up_tokens", "Top-Up Tokens", "Int"), field("tokens_used", "Tokens Used", "Int"), field("tokens_remaining", "Tokens Remaining", "Int"),
+		field("period_start", "Period Start", "Date"), field("period_end", "Period End", "Date"), field("opening_token_allowance", "Plan AI Credits", "Int"),
+		field("top_up_tokens", "Purchased AI Credits", "Int"), field("promotional_credits", "Promotional AI Credits", "Int"),
+		field("promotional_credits_expire_on", "Promotional Credits Expire On", "Date"),
+		field("tokens_used", "AI Credits Used", "Int"), field("tokens_remaining", "AI Credits Remaining", "Int"),
 		field("web_conversations_used", "Web Conversations Used", "Int"), field("whatsapp_messages_used", "WhatsApp Messages Used", "Int"), field("email_sends_used", "Email Sends Used", "Int"),
 		field("estimated_ai_cost", "Estimated AI Cost", "Currency"), field("estimated_revenue", "Estimated Revenue", "Currency"), field("estimated_gross_margin", "Estimated Gross Margin", "Currency"),
 		field("status", "Status", "Select", options="Normal\nWarning\nExhausted\nSuspended", default="Normal"), field("last_synced_from_usage_logs", "Last Synced From Usage Logs", "Datetime"),
@@ -354,7 +357,7 @@ def ensure_doctypes():
 
 	ensure_doctype("VerityAI Usage Transaction", [
 		field("workspace", "Workspace", "Link", options="VerityAI Workspace", reqd=1, in_list_view=1), field("engine_tenant", "Engine Tenant", "Link", options="AI Tenant", reqd=1),
-		field("ai_usage_log", "AI Usage Log", "Link", options="AI Usage Log", unique=1), field("transaction_type", "Transaction Type", "Select", options="Usage\nBlocked\nTop-Up\nAdjustment\nRefund", reqd=1),
+		field("ai_usage_log", "AI Usage Log", "Link", options="AI Usage Log", unique=1), field("transaction_type", "Transaction Type", "Select", options="Usage\nBlocked\nTop-Up\nCredit\nAdjustment\nRefund", reqd=1),
 		field("platform", "Platform"), field("input_tokens", "Input Tokens", "Int"), field("output_tokens", "Output Tokens", "Int"), field("total_tokens", "Total Tokens", "Int"),
 		field("estimated_cost", "Estimated Cost", "Currency"), field("billable_amount", "Billable Amount", "Currency"), field("period", "Period"),
 	], "VUTX-.########")
@@ -364,10 +367,48 @@ def ensure_doctypes():
 		field("subscription", "Subscription", "Link", options="VerityAI Subscription"), field("event_type", "Event Type", "Select", options="Invoice\nPayment\nCredit\nAdjustment\nTop-Up\nRefund\nSubscription Activation", reqd=1),
 		field("amount", "Amount", "Currency"), field("currency", "Currency", "Link", options="Currency"), field("status", "Status", "Select", options="Pending\nCompleted\nFailed\nCancelled", default="Pending"),
 		field("provider", "Provider"), field("provider_reference", "Provider Reference"), field("period_start", "Period Start", "Date"), field("period_end", "Period End", "Date"),
-		field("target_plan", "Target Plan", "Link", options="VerityAI Plan"), field("billing_cycle", "Billing Cycle", "Select", options="Monthly\nAnnual\nManual"),
+		field("transaction_kind", "Transaction Kind", "Select", options="Subscription\nCredit Top-Up", default="Subscription"),
+		field("target_plan", "Target Plan", "Link", options="VerityAI Plan"), field("credit_pack", "Credit Pack", "Link", options="VerityAI Credit Pack"),
+		field("purchased_credits", "Purchased AI Credits", "Int"), field("gross_amount", "Gross Amount", "Currency"),
+		field("discount_amount", "Discount Amount", "Currency"), field("promotion", "Promotion", "Link", options="VerityAI Promotion"),
+		field("billing_cycle", "Billing Cycle", "Select", options="Monthly\nAnnual\nManual"),
 		field("gateway_reference", "Gateway Reference"), field("gateway_status", "Gateway Status"), field("checkout_url", "Checkout URL", "Small Text"), field("poll_url", "Poll URL", "Small Text"),
 		field("gateway_response_json", "Gateway Response", "Code", options="JSON"), field("usage_snapshot_json", "Usage Snapshot", "Code", options="JSON"), field("paid_on", "Paid On", "Datetime"),
 	], "VBE-.#####")
+
+	ensure_doctype("VerityAI Credit Pack", [
+		field("pack_name", "Pack Name", reqd=1, unique=1, in_list_view=1), field("pack_code", "Pack Code", reqd=1, unique=1, in_list_view=1),
+		field("active", "Active", "Check", default=1, in_list_view=1), field("credits", "AI Credits", "Int", reqd=1, in_list_view=1),
+		field("price", "Price", "Currency", reqd=1, in_list_view=1), field("currency", "Currency", "Link", options="Currency", default="USD"),
+		field("sort_order", "Sort Order", "Int", default=10),
+	], "field:pack_code")
+
+	ensure_doctype("VerityAI Promotion", [
+		field("promotion_name", "Promotion Name", reqd=1, in_list_view=1), field("code", "Code", reqd=1, unique=1, in_list_view=1),
+		field("active", "Active", "Check", default=1, in_list_view=1), field("discount_percent", "Discount Percent", "Percent"),
+		field("bonus_credits", "Bonus AI Credits", "Int"), field("valid_from", "Valid From", "Date"), field("valid_until", "Valid Until", "Date"),
+		field("max_redemptions", "Maximum Redemptions", "Int"), field("per_account_limit", "Per Account Limit", "Int", default=1),
+		field("minimum_plan", "Minimum Plan", "Link", options="VerityAI Plan"), field("notes", "Notes", "Small Text"),
+	], "VPROMO-.#####")
+
+	ensure_doctype("VerityAI Promotion Redemption", [
+		field("promotion", "Promotion", "Link", options="VerityAI Promotion", reqd=1, in_list_view=1),
+		field("account", "Account", "Link", options="VerityAI Account", reqd=1), field("workspace", "Workspace", "Link", options="VerityAI Workspace", reqd=1, in_list_view=1),
+		field("billing_event", "Billing Event", "Link", options="VerityAI Billing Event", reqd=1), field("status", "Status", "Select", options="Reserved\nGranted\nReversed", default="Reserved", in_list_view=1),
+		field("discount_amount", "Discount Amount", "Currency"), field("bonus_credits", "Bonus AI Credits", "Int"), field("redeemed_on", "Redeemed On", "Datetime"),
+	], "VPR-.########")
+
+	ensure_doctype("VerityAI Referral Reward", [
+		field("referrer_account", "Referrer Account", "Link", options="VerityAI Account", reqd=1, in_list_view=1),
+		field("referrer_workspace", "Referrer Workspace", "Link", options="VerityAI Workspace", reqd=1),
+		field("referred_account", "Referred Account", "Link", options="VerityAI Account", reqd=1),
+		field("referred_workspace", "Referred Workspace", "Link", options="VerityAI Workspace", reqd=1, in_list_view=1),
+		field("billing_event", "Qualifying Billing Event", "Link", options="VerityAI Billing Event", reqd=1, unique=1),
+		field("reward_credits", "Reward AI Credits", "Int", default=1000000),
+		field("status", "Status", "Select", options="Pending\nGranted\nReversed\nRejected", default="Pending", in_list_view=1),
+		field("eligible_on", "Eligible On", "Date"), field("granted_on", "Granted On", "Datetime"), field("expires_on", "Expires On", "Date"),
+		field("review_note", "Review Note", "Small Text"),
+	], "VRR-.########")
 
 	ensure_doctype("VerityAI Report Schedule", [
 		field("report_name", "Report Name", reqd=1, in_list_view=1), field("report_type", "Report Type", "Select", options="Operator Summary\nWorkspace Analytics", reqd=1, in_list_view=1),
@@ -447,11 +488,54 @@ def ensure_doctypes():
 
 
 def ensure_default_plan():
-	if frappe.db.exists("DocType", "VerityAI Plan") and not frappe.db.exists("VerityAI Plan", "TRIAL"):
-		frappe.get_doc({
-			"doctype": "VerityAI Plan", "plan_name": "Trial", "plan_code": "TRIAL", "active": 1,
-			"currency": "USD", "trial_days": 14, "monthly_token_limit": 100000, "max_tokens": 900,
-			"public_rate_limit_per_minute": 20, "max_public_message_chars": 4000,
-			"max_team_members": 3, "max_knowledge_sources": 10, "max_allowed_domains": 2,
-			"can_use_whatsapp_button": 1, "can_use_email_notifications": 1,
-		}).insert(ignore_permissions=True)
+	if not frappe.db.exists("DocType", "VerityAI Plan"):
+		return
+	plans = (
+		{"plan_name": "Trial", "plan_code": "TRIAL", "monthly_price": 0, "annual_price": 0, "trial_days": 14,
+		 "monthly_token_limit": 50000, "max_tokens": 500, "max_workspaces": 1, "max_assistants": 1, "max_team_members": 1,
+		 "monthly_web_conversations": 50, "monthly_whatsapp_messages": 0, "monthly_email_sends": 100,
+		 "max_knowledge_sources": 3, "max_allowed_domains": 1, "public_rate_limit_per_minute": 10,
+		 "max_public_message_chars": 2000, "can_use_whatsapp_button": 1, "can_use_email_notifications": 1, "support_level": "Community"},
+		{"plan_name": "Launch", "plan_code": "LAUNCH", "monthly_price": 12, "annual_price": 120, "trial_days": 0,
+		 "monthly_token_limit": 500000, "max_tokens": 700, "max_workspaces": 1, "max_assistants": 1, "max_team_members": 3,
+		 "monthly_web_conversations": 250, "monthly_whatsapp_messages": 0, "monthly_email_sends": 1000,
+		 "max_knowledge_sources": 15, "max_allowed_domains": 2, "public_rate_limit_per_minute": 30,
+		 "max_public_message_chars": 4000, "can_use_whatsapp_button": 1, "can_use_email_notifications": 1,
+		 "can_use_quotation_workflow": 1, "support_level": "Community"},
+		{"plan_name": "Growth", "plan_code": "GROWTH", "monthly_price": 24, "annual_price": 240, "trial_days": 0,
+		 "monthly_token_limit": 1500000, "max_tokens": 1000, "max_workspaces": 1, "max_assistants": 1, "max_team_members": 7,
+		 "monthly_web_conversations": 750, "monthly_whatsapp_messages": 250, "monthly_email_sends": 5000,
+		 "max_knowledge_sources": 60, "max_allowed_domains": 5, "public_rate_limit_per_minute": 60,
+		 "max_public_message_chars": 6000, "can_remove_branding": 1, "can_use_whatsapp_button": 1, "can_use_whatsapp_ai": 1,
+		 "can_use_email_notifications": 1, "can_use_custom_smtp": 1, "can_use_quotation_workflow": 1, "support_level": "Standard"},
+		{"plan_name": "Scale", "plan_code": "SCALE", "monthly_price": 60, "annual_price": 600, "trial_days": 0,
+		 "monthly_token_limit": 6000000, "max_tokens": 1400, "max_workspaces": 3, "max_assistants": 3, "max_team_members": 15,
+		 "monthly_web_conversations": 3000, "monthly_whatsapp_messages": 1500, "monthly_email_sends": 20000,
+		 "max_knowledge_sources": 200, "max_allowed_domains": 20, "public_rate_limit_per_minute": 120,
+		 "max_public_message_chars": 8000, "can_remove_branding": 1, "can_use_whatsapp_button": 1, "can_use_whatsapp_ai": 1,
+		 "can_use_email_notifications": 1, "can_use_custom_smtp": 1, "can_use_erpnext_integration": 1,
+		 "can_use_quotation_workflow": 1, "can_use_api_access": 1, "can_bring_own_ai_provider_key": 1, "support_level": "Priority"},
+		{"plan_name": "Enterprise", "plan_code": "ENTERPRISE", "monthly_price": 100, "annual_price": 1000, "trial_days": 0,
+		 "monthly_token_limit": 12000000, "max_tokens": 1800, "max_workspaces": 5, "max_assistants": 5, "max_team_members": 30,
+		 "monthly_web_conversations": 7500, "monthly_whatsapp_messages": 4000, "monthly_email_sends": 50000,
+		 "max_knowledge_sources": 500, "max_allowed_domains": 50, "public_rate_limit_per_minute": 240,
+		 "max_public_message_chars": 10000, "can_remove_branding": 1, "can_use_whatsapp_button": 1, "can_use_whatsapp_ai": 1,
+		 "can_use_email_notifications": 1, "can_use_custom_smtp": 1, "can_use_erpnext_integration": 1,
+		 "can_use_quotation_workflow": 1, "can_use_api_access": 1, "can_bring_own_ai_provider_key": 1, "support_level": "Priority"},
+	)
+	for values in plans:
+		name = frappe.db.get_value("VerityAI Plan", {"plan_code": values["plan_code"]}, "name")
+		doc = frappe.get_doc("VerityAI Plan", name) if name else frappe.get_doc({"doctype": "VerityAI Plan"})
+		doc.update({"active": 1, "currency": "USD", **values})
+		doc.save(ignore_permissions=True) if name else doc.insert(ignore_permissions=True)
+
+	if frappe.db.exists("DocType", "VerityAI Credit Pack"):
+		for values in (
+			{"pack_name": "1 Million AI Credits", "pack_code": "CREDITS-1M", "credits": 1000000, "price": 10, "sort_order": 10},
+			{"pack_name": "5 Million AI Credits", "pack_code": "CREDITS-5M", "credits": 5000000, "price": 35, "sort_order": 20},
+			{"pack_name": "15 Million AI Credits", "pack_code": "CREDITS-15M", "credits": 15000000, "price": 75, "sort_order": 30},
+		):
+			name = frappe.db.get_value("VerityAI Credit Pack", {"pack_code": values["pack_code"]}, "name")
+			doc = frappe.get_doc("VerityAI Credit Pack", name) if name else frappe.get_doc({"doctype": "VerityAI Credit Pack"})
+			doc.update({"active": 1, "currency": "USD", **values})
+			doc.save(ignore_permissions=True) if name else doc.insert(ignore_permissions=True)

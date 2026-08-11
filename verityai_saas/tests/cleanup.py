@@ -25,6 +25,7 @@ SAAS_WORKSPACE_DOCTYPES = (
 	"VerityAI Usage Wallet",
 	"VerityAI Subscription",
 	"VerityAI Workspace Member",
+	"VerityAI Promotion Redemption",
 )
 
 ENGINE_TENANT_DOCTYPES = (
@@ -57,6 +58,9 @@ def cleanup_test_workspace(workspace_name, users=None, commit=True, engine_tenan
 		for doctype in SAAS_WORKSPACE_DOCTYPES:
 			if frappe.db.exists("DocType", doctype):
 				frappe.db.delete(doctype, {"workspace": workspace_name})
+		if frappe.db.exists("DocType", "VerityAI Referral Reward"):
+			frappe.db.delete("VerityAI Referral Reward", {"referrer_workspace": workspace_name})
+			frappe.db.delete("VerityAI Referral Reward", {"referred_workspace": workspace_name})
 		frappe.db.delete("VerityAI Workspace", {"name": workspace_name})
 	if engine_tenant:
 		frappe.db.delete("AI Allowed Domain", {"parent": engine_tenant})

@@ -5,6 +5,7 @@ import frappe
 
 from verityai_saas.api._response import endpoint
 from verityai_saas.services import billing, billing_documents, paynow
+from verityai_saas.services.commercial import ensure_account_referral_code
 from verityai_saas.services.admin_reauth import require_admin_reauthentication
 from verityai_saas.services.permissions import check_workspace_access
 
@@ -12,12 +13,15 @@ from verityai_saas.services.permissions import check_workspace_access
 @frappe.whitelist()
 @endpoint
 def get(workspace):
-	check_workspace_access(workspace)
+	workspace_doc = check_workspace_access(workspace)
+	referral_code = ensure_account_referral_code(workspace_doc.account)
 	return {
 		"subscription": frappe.get_all("VerityAI Subscription", filters={"workspace": workspace}, fields=["name", "plan", "status", "billing_cycle", "trial_end", "current_period_end", "next_billing_date", "amount", "currency"], order_by="creation desc", limit=1),
-		"wallet": frappe.db.get_value("VerityAI Usage Wallet", {"workspace": workspace}, ["tokens_used", "tokens_remaining", "status", "estimated_ai_cost"], as_dict=True),
-		"events": frappe.get_all("VerityAI Billing Event", filters={"workspace": workspace}, fields=["name", "event_type", "amount", "currency", "status", "provider", "gateway_status", "gateway_reference", "creation", "paid_on"], order_by="creation desc", limit=50),
-		"plans": frappe.get_all("VerityAI Plan", filters={"active": 1}, fields=["name", "plan_name", "plan_code", "monthly_price", "annual_price", "currency", "monthly_token_limit"], order_by="monthly_price asc"),
+		"wallet": frappe.db.get_value("VerityAI Usage Wallet", {"workspace": workspace}, ["opening_token_allowance", "top_up_tokens", "promotional_credits", "promotional_credits_expire_on", "tokens_used", "tokens_remaining", "status", "estimated_ai_cost"], as_dict=True),
+		"events": frappe.get_all("VerityAI Billing Event", filters={"workspace": workspace}, fields=["name", "event_type", "transaction_kind", "amount", "gross_amount", "discount_amount", "purchased_credits", "currency", "status", "provider", "gateway_status", "gateway_reference", "creation", "paid_on"], order_by="creation desc", limit=50),
+		"plans": frappe.get_all("VerityAI Plan", filters={"active": 1}, fields=["name", "plan_name", "plan_code", "monthly_price", "annual_price", "currency", "monthly_token_limit", "max_team_members", "monthly_web_conversations", "monthly_whatsapp_messages", "max_knowledge_sources", "max_allowed_domains", "can_remove_branding", "can_use_whatsapp_ai", "can_use_custom_smtp", "can_use_erpnext_integration", "can_use_api_access", "support_level"], order_by="monthly_price asc"),
+		"credit_packs": frappe.get_all("VerityAI Credit Pack", filters={"active": 1}, fields=["name", "pack_name", "pack_code", "credits", "price", "currency"], order_by="sort_order asc"),
+		"referral": {"code": referral_code, "reward_credits": 1000000, "referred_discount_percent": 25},
 		"documents": billing_documents.list_documents(workspace),
 		"paynow_configured": paynow.is_configured(),
 	}

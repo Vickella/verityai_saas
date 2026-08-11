@@ -110,7 +110,7 @@ def dashboard():
 	wallets = _latest_by_workspace(
 		"VerityAI Usage Wallet",
 		workspace_names,
-		["name", "workspace", "opening_token_allowance", "top_up_tokens", "tokens_used", "tokens_remaining", "status", "period_start", "period_end"],
+		["name", "workspace", "opening_token_allowance", "top_up_tokens", "promotional_credits", "tokens_used", "tokens_remaining", "status", "period_start", "period_end"],
 	) if workspace_names else {}
 	lead_counts = _counts_by_tenant("AI Lead", tenants, {"status": "New"})
 	alert_counts = _counts_by_tenant("AI Monitoring Alert", tenants, {"status": ["in", ["Open", "Acknowledged"]]})
@@ -128,7 +128,7 @@ def dashboard():
 			trial_expiring.append({"workspace": workspace.name, "business_name": workspace.business_name, "trial_end": subscription.trial_end})
 		wallet = workspace.wallet
 		if wallet:
-			allowance = int(wallet.opening_token_allowance or 0) + int(wallet.top_up_tokens or 0)
+			allowance = int(wallet.opening_token_allowance or 0) + int(wallet.top_up_tokens or 0) + int(wallet.promotional_credits or 0)
 			usage_percent = round((int(wallet.tokens_used or 0) / max(allowance, 1)) * 100, 1)
 			workspace["usage_percent"] = usage_percent
 			if usage_percent >= 80:
@@ -148,6 +148,22 @@ def dashboard():
 	]
 	for row in provider_failures:
 		row.pop("tenant", None)
+
+	active_paid = [row for row in subscriptions.values() if row.status == "Active"]
+	mrr = sum(flt(row.amount) / 12 if row.billing_cycle == "Annual" else flt(row.amount) for row in active_paid)
+	paid_accounts = len(set(frappe.get_all(
+		"VerityAI Billing Event", filters={"event_type": "Payment", "status": "Completed"},
+		pluck="account",
+	)))
+	account_count = frappe.db.count("VerityAI Account")
+	commercial_metrics = {
+		"mrr": round(mrr, 2),
+		"active_paid": len(active_paid),
+		"trial_conversion_rate": round((paid_accounts / max(account_count, 1)) * 100, 1),
+		"referrals_pending": frappe.db.count("VerityAI Referral Reward", {"status": "Pending"}),
+		"referrals_granted": frappe.db.count("VerityAI Referral Reward", {"status": "Granted"}),
+		"promotion_redemptions": frappe.db.count("VerityAI Promotion Redemption", {"status": "Granted"}),
+	}
 
 	return {
 		"can_configure_platform": is_platform_admin(),
@@ -178,6 +194,7 @@ def dashboard():
 		"provider_failures": provider_failures,
 		"paynow": paynow.configuration_status(),
 		"paynow_configured": paynow.is_configured(),
+		"commercial_metrics": commercial_metrics,
 	}
 
 

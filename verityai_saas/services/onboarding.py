@@ -27,9 +27,15 @@ def slug_name(value):
 def ensure_account(owner_user, account_name, billing_email=None, values=None):
 	existing = frappe.db.get_value("VerityAI Account", {"owner_user": owner_user, "account_name": account_name}, "name")
 	if existing:
+		from verityai_saas.services.commercial import ensure_account_referral_code
+		ensure_account_referral_code(existing)
 		return existing
 	values = values or {}
-	return frappe.get_doc({"doctype": "VerityAI Account", "account_name": account_name, "owner_user": owner_user, "billing_email": billing_email or owner_user, "phone": values.get("phone"), "country": values.get("country"), "currency": values.get("currency") or "USD", "status": "Active", "customer_type": values.get("customer_type") or "SME"}).insert(ignore_permissions=True).name
+	from verityai_saas.services.commercial import ensure_account_referral_code, resolve_referrer
+	referrer = resolve_referrer(values.get("referral_code"), owner_user)
+	account = frappe.get_doc({"doctype": "VerityAI Account", "account_name": account_name, "owner_user": owner_user, "billing_email": billing_email or owner_user, "phone": values.get("phone"), "country": values.get("country"), "currency": values.get("currency") or "USD", "status": "Active", "customer_type": values.get("customer_type") or "SME", "referred_by": referrer}).insert(ignore_permissions=True).name
+	ensure_account_referral_code(account)
+	return account
 
 
 def create_workspace(owner_user, account_name, workspace_name, business_name=None, plan_name=None, values=None):

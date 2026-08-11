@@ -4,7 +4,7 @@ import smtplib
 import ssl
 
 import frappe
-from frappe.utils import now_datetime
+from frappe.utils import cint, now_datetime
 
 from verityai_saas.services.entitlements import email_delivery_allowance, feature_allowed, workspace_context
 
@@ -135,10 +135,28 @@ def send_provider_failure_notification(doc, method=None):
 
 
 def send_usage_warning(workspace_name):
-	wallet = frappe.db.get_value("VerityAI Usage Wallet", {"workspace": workspace_name}, ["name", "tokens_used", "tokens_remaining", "status"], as_dict=True)
-	if not wallet or wallet.status not in {"Warning", "Exhausted"}:
+	wallet = frappe.db.get_value(
+		"VerityAI Usage Wallet", {"workspace": workspace_name},
+		["name", "opening_token_allowance", "top_up_tokens", "promotional_credits", "tokens_used", "tokens_remaining", "status", "period_start"],
+		as_dict=True,
+	)
+	if not wallet:
 		return []
-	return send_notification(workspace_name, "Usage Warning", "VerityAI usage warning", f"Tokens used: {wallet.tokens_used}. Tokens remaining: {wallet.tokens_remaining}.", "VerityAI Usage Wallet", wallet.name)
+	total = cint(wallet.opening_token_allowance) + cint(wallet.top_up_tokens) + cint(wallet.promotional_credits)
+	percent = round((cint(wallet.tokens_used) / max(total, 1)) * 100)
+	threshold = 100 if percent >= 100 else 85 if percent >= 85 else 70 if percent >= 70 else 0
+	if not threshold:
+		return []
+	reference = f"{wallet.name}:{wallet.period_start}:{threshold}"
+	notification_type = f"AI Credits {threshold}%"
+	if frappe.db.exists("VerityAI Email Delivery Log", {"workspace": workspace_name, "notification_type": notification_type, "reference_name": reference}):
+		return []
+	subject = "Your VerityAI assistant is paused" if threshold == 100 else f"You have used {threshold}% of your AI credits"
+	message = (
+		f"AI credits used: {cint(wallet.tokens_used):,}. AI credits remaining: {cint(wallet.tokens_remaining):,}. "
+		+ ("Purchase a plan or additional credits to resume AI responses." if threshold == 100 else "Review usage or add prepaid credits before service is interrupted.")
+	)
+	return send_notification(workspace_name, notification_type, subject, message, "VerityAI Usage Wallet", reference)
 
 
 def send_usage_warnings():

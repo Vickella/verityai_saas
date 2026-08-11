@@ -149,6 +149,49 @@ class TestPaynowBilling(FrappeTestCase):
 		self.assertEqual(payment.provider, "Paynow")
 		self.assertEqual(payment.poll_url, response_values["PollUrl"])
 
+	def test_customer_credit_pack_checkout_records_fulfilment_metadata(self):
+		billing.assign_plan(self.workspace, self.plan, "Active", "Monthly")
+		pack = frappe.db.get_value("VerityAI Credit Pack", {"pack_code": "CREDITS-1M"}, "name")
+		response_values = {
+			"Status": "Ok", "BrowserUrl": "https://www.paynow.co.zw/Payment/ConfirmPayment/topup",
+			"PollUrl": "https://www.paynow.co.zw/Interface/CheckPayment/?guid=topup",
+		}
+		with (
+			patch.object(paynow, "_credentials", return_value=("1201", self.integration_key)),
+			patch.object(paynow, "get_url", return_value="https://app.example.com"),
+			patch.object(paynow.requests, "post", return_value=FakeResponse(self.signed_message(response_values))),
+		):
+			result = paynow.initiate_credit_checkout(self.workspace, pack)
+		event = frappe.get_doc("VerityAI Billing Event", result["payment"])
+		self.assertEqual(event.transaction_kind, "Credit Top-Up")
+		self.assertEqual(event.purchased_credits, 1_000_000)
+		self.assertEqual(float(event.amount), 10)
+
+	def test_promotion_discount_is_reserved_against_the_payment(self):
+		promotion = frappe.get_doc({
+			"doctype": "VerityAI Promotion", "promotion_name": f"Launch {self.workspace}",
+			"code": f"SAVE-{frappe.generate_hash(length=6).upper()}", "active": 1,
+			"discount_percent": 20, "bonus_credits": 100_000, "per_account_limit": 1,
+		}).insert(ignore_permissions=True)
+		response_values = {
+			"Status": "Ok", "BrowserUrl": "https://www.paynow.co.zw/Payment/ConfirmPayment/promo",
+			"PollUrl": "https://www.paynow.co.zw/Interface/CheckPayment/?guid=promo",
+		}
+		try:
+			with (
+				patch.object(paynow, "_credentials", return_value=("1201", self.integration_key)),
+				patch.object(paynow, "get_url", return_value="https://app.example.com"),
+				patch.object(paynow.requests, "post", return_value=FakeResponse(self.signed_message(response_values))),
+			):
+				result = paynow.initiate_checkout(self.workspace, self.plan, promotion_code=promotion.code)
+			event = frappe.get_doc("VerityAI Billing Event", result["payment"])
+			self.assertEqual(float(event.amount), 20)
+			self.assertEqual(float(event.discount_amount), 5)
+			self.assertTrue(frappe.db.exists("VerityAI Promotion Redemption", {"billing_event": event.name, "status": "Reserved"}))
+		finally:
+			frappe.db.delete("VerityAI Promotion Redemption", {"promotion": promotion.name})
+			frappe.delete_doc("VerityAI Promotion", promotion.name, ignore_permissions=True, force=True)
+
 	def test_invalid_initiation_signature_never_returns_checkout_url(self):
 		response = FakeResponse(
 			urlencode({
@@ -242,10 +285,37 @@ class TestPaynowBilling(FrappeTestCase):
 		billing.roll_usage_periods()
 		wallet.reload()
 		self.assertGreaterEqual(frappe.utils.getdate(wallet.period_end), frappe.utils.getdate(frappe.utils.today()))
-		self.assertEqual(wallet.top_up_tokens, 0)
+		self.assertEqual(wallet.top_up_tokens, 5000)
 		self.assertEqual(wallet.tokens_used, 0)
-		self.assertEqual(wallet.tokens_remaining, 250000)
+		self.assertEqual(wallet.tokens_remaining, 255000)
 		self.assertEqual(wallet.status, "Normal")
+
+	def test_plan_renewal_never_restores_consumed_purchased_credits(self):
+		billing.assign_plan(self.workspace, self.plan, "Active", "Monthly")
+		billing.add_top_up(self.workspace, 5000)
+		wallet_name = frappe.db.get_value("VerityAI Usage Wallet", {"workspace": self.workspace}, "name")
+		frappe.db.set_value("VerityAI Usage Wallet", wallet_name, {"tokens_used": 252000, "tokens_remaining": 3000})
+		billing.assign_plan(self.workspace, self.plan, "Active", "Monthly")
+		wallet = frappe.db.get_value("VerityAI Usage Wallet", wallet_name, ["top_up_tokens", "tokens_used", "tokens_remaining"], as_dict=True)
+		self.assertEqual(wallet.top_up_tokens, 3000)
+		self.assertEqual(wallet.tokens_used, 0)
+		self.assertEqual(wallet.tokens_remaining, 253000)
+
+	def test_credit_top_up_is_fulfilled_once_and_refund_does_not_suspend_plan(self):
+		billing.assign_plan(self.workspace, self.plan, "Active", "Monthly")
+		payment = billing.create_billing_event(self.workspace, "Top-Up", 10, "Pending", provider="Paynow")
+		frappe.db.set_value("VerityAI Billing Event", payment, {
+			"transaction_kind": "Credit Top-Up", "purchased_credits": 1_000_000,
+		})
+		paid = {"reference": payment, "paynowreference": "PN-TOPUP", "amount": "10.00", "status": "Paid"}
+		paynow.apply_status(payment, paid)
+		paynow.apply_status(payment, paid)
+		wallet = frappe.db.get_value("VerityAI Usage Wallet", {"workspace": self.workspace}, ["top_up_tokens", "tokens_remaining"], as_dict=True)
+		self.assertEqual(wallet.top_up_tokens, 1_000_000)
+		self.assertEqual(wallet.tokens_remaining, 1_250_000)
+		paynow.apply_status(payment, {**paid, "status": "Refunded"})
+		self.assertEqual(frappe.db.get_value("VerityAI Subscription", {"workspace": self.workspace}, "status"), "Active")
+		self.assertEqual(frappe.db.get_value("VerityAI Usage Wallet", {"workspace": self.workspace}, "top_up_tokens"), 0)
 
 	def test_tampered_callback_and_customer_manual_event_are_rejected(self):
 		payment = self.create_payment()

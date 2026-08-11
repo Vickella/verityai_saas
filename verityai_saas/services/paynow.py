@@ -7,7 +7,7 @@ from urllib.parse import parse_qsl, urlencode, urlparse
 
 import frappe
 import requests
-from frappe.utils import add_to_date, flt, get_url, now_datetime
+from frappe.utils import add_to_date, cint, flt, get_url, now_datetime
 
 from verityai_saas.services import billing
 
@@ -125,8 +125,40 @@ def _response_snapshot(values):
 	return json.dumps({key: value for key, value in values.items() if key != "hash"}, sort_keys=True)
 
 
-def initiate_checkout(workspace_name, plan_name, billing_cycle="Monthly"):
+def _initiate_gateway_event(workspace_name, event_type, amount, additional_info, metadata=None):
 	integration_id, integration_key = _credentials()
+	payment = billing.create_billing_event(workspace_name, event_type, amount, "Pending", provider="Paynow")
+	frappe.db.set_value("VerityAI Billing Event", payment, {"gateway_status": "Created", **(metadata or {})})
+	return_url, result_url = _public_urls(payment, workspace_name)
+	payload = {
+		"id": integration_id, "reference": payment, "amount": f"{amount:.2f}", "additionalinfo": additional_info,
+		"returnurl": return_url, "resulturl": result_url, "merchanttrace": payment[:32], "status": "Message",
+	}
+	payload["hash"] = generate_hash(payload.values(), integration_key)
+	try:
+		response = requests.post(INITIATE_URL, data=payload, timeout=20, allow_redirects=False)
+		response.raise_for_status()
+	except requests.RequestException:
+		frappe.db.set_value("VerityAI Billing Event", payment, {"status": "Failed", "gateway_status": "Connection Error"})
+		frappe.throw("Paynow could not be reached. Please try again.", frappe.ValidationError)
+	_, unsigned_values = parse_message(response.text)
+	if unsigned_values.get("status", "").lower() != "ok":
+		frappe.db.set_value("VerityAI Billing Event", payment, {"status": "Failed", "gateway_status": "Error", "gateway_response_json": _response_snapshot(unsigned_values)})
+		frappe.throw("Paynow could not start the transaction.", frappe.ValidationError)
+	try:
+		values = verify_message(response.text, integration_key)
+	except frappe.PermissionError:
+		frappe.db.set_value("VerityAI Billing Event", payment, {"status": "Failed", "gateway_status": "Invalid Signature"})
+		raise
+	checkout_url = _safe_paynow_url(values.get("browserurl"), "checkout")
+	poll_url = _safe_paynow_url(values.get("pollurl"), "poll")
+	frappe.db.set_value("VerityAI Billing Event", payment, {"checkout_url": checkout_url, "poll_url": poll_url, "gateway_status": values.get("status"), "gateway_response_json": _response_snapshot(values)})
+	from verityai_saas.services.billing_documents import ensure_invoice_for_payment
+	ensure_invoice_for_payment(payment)
+	return {"payment": payment, "checkout_url": checkout_url, "status": "Pending"}
+
+
+def initiate_checkout(workspace_name, plan_name, billing_cycle="Monthly", promotion_code=None):
 	plan = frappe.get_doc("VerityAI Plan", plan_name)
 	if not plan.active or plan.plan_code == "TRIAL":
 		frappe.throw("Select an active paid plan.", frappe.ValidationError)
@@ -134,9 +166,18 @@ def initiate_checkout(workspace_name, plan_name, billing_cycle="Monthly"):
 		frappe.throw("Paynow checkout supports monthly or annual billing.", frappe.ValidationError)
 	if (plan.currency or "USD").upper() != "USD":
 		frappe.throw("This Paynow checkout currently supports USD plans only.", frappe.ValidationError)
-	amount = flt(plan.annual_price if billing_cycle == "Annual" else plan.monthly_price, 2)
-	if amount <= 0:
+	gross_amount = flt(plan.annual_price if billing_cycle == "Annual" else plan.monthly_price, 2)
+	if gross_amount <= 0:
 		frappe.throw("The selected plan does not have a valid checkout price.", frappe.ValidationError)
+	from verityai_saas.services import commercial
+	promotion = commercial.promotion_quote(workspace_name, plan.name, promotion_code, gross_amount)
+	referral_discount_percent = commercial.referral_first_payment_discount(workspace_name, billing_cycle)
+	if promotion.get("promotion") and referral_discount_percent:
+		frappe.throw("Referral and promotion discounts cannot be combined.", frappe.ValidationError)
+	discount_amount = promotion.get("discount_amount") or round(gross_amount * referral_discount_percent / 100, 2)
+	amount = round(gross_amount - discount_amount, 2)
+	if amount <= 0:
+		frappe.throw("The checkout total must be greater than zero.", frappe.ValidationError)
 	pending = frappe.get_all(
 		"VerityAI Billing Event",
 		filters={
@@ -152,69 +193,31 @@ def initiate_checkout(workspace_name, plan_name, billing_cycle="Monthly"):
 		order_by="creation desc",
 		limit=1,
 	)
-	if pending:
+	if pending and not promotion_code and not referral_discount_percent:
 		return {
 			"payment": pending[0].name,
 			"checkout_url": _safe_paynow_url(pending[0].checkout_url, "checkout"),
 			"status": "Pending",
 		}
 
-	payment = billing.create_billing_event(
-		workspace_name,
-		"Payment",
-		amount,
-		"Pending",
-		provider="Paynow",
-	)
-	frappe.db.set_value("VerityAI Billing Event", payment, {
-		"target_plan": plan.name,
-		"billing_cycle": billing_cycle,
-		"gateway_status": "Created",
+	result = _initiate_gateway_event(workspace_name, "Payment", amount, f"VerityAI {plan.plan_name} plan", {
+		"transaction_kind": "Subscription", "target_plan": plan.name, "billing_cycle": billing_cycle,
+		"gross_amount": gross_amount, "discount_amount": discount_amount, "promotion": promotion.get("promotion"),
 	})
-	return_url, result_url = _public_urls(payment, workspace_name)
-	payload = {
-		"id": integration_id,
-		"reference": payment,
-		"amount": f"{amount:.2f}",
-		"additionalinfo": f"VerityAI {plan.plan_name} plan",
-		"returnurl": return_url,
-		"resulturl": result_url,
-		"merchanttrace": payment[:32],
-		"status": "Message",
-	}
-	payload["hash"] = generate_hash(payload.values(), integration_key)
+	commercial.reserve_promotion(workspace_name, result["payment"], promotion)
+	return result
 
-	try:
-		response = requests.post(INITIATE_URL, data=payload, timeout=20, allow_redirects=False)
-		response.raise_for_status()
-	except requests.RequestException:
-		frappe.db.set_value("VerityAI Billing Event", payment, {"status": "Failed", "gateway_status": "Connection Error"})
-		frappe.throw("Paynow could not be reached. Please try again.", frappe.ValidationError)
 
-	_, unsigned_values = parse_message(response.text)
-	if unsigned_values.get("status", "").lower() != "ok":
-		frappe.db.set_value("VerityAI Billing Event", payment, {
-			"status": "Failed",
-			"gateway_status": "Error",
-			"gateway_response_json": _response_snapshot(unsigned_values),
-		})
-		frappe.throw("Paynow could not start the transaction.", frappe.ValidationError)
-	try:
-		values = verify_message(response.text, integration_key)
-	except frappe.PermissionError:
-		frappe.db.set_value("VerityAI Billing Event", payment, {"status": "Failed", "gateway_status": "Invalid Signature"})
-		raise
-	checkout_url = _safe_paynow_url(values.get("browserurl"), "checkout")
-	poll_url = _safe_paynow_url(values.get("pollurl"), "poll")
-	frappe.db.set_value("VerityAI Billing Event", payment, {
-		"checkout_url": checkout_url,
-		"poll_url": poll_url,
-		"gateway_status": values.get("status"),
-		"gateway_response_json": _response_snapshot(values),
+def initiate_credit_checkout(workspace_name, credit_pack):
+	subscription = frappe.db.get_value("VerityAI Subscription", {"workspace": workspace_name}, ["status"], as_dict=True, order_by="creation desc")
+	if not subscription or subscription.status != "Active":
+		frappe.throw("Choose a paid plan before purchasing additional AI credits.", frappe.PermissionError)
+	pack = frappe.get_doc("VerityAI Credit Pack", credit_pack)
+	if not pack.active or cint(pack.credits) <= 0 or flt(pack.price) <= 0 or (pack.currency or "USD") != "USD":
+		frappe.throw("This AI credit pack is unavailable.", frappe.ValidationError)
+	return _initiate_gateway_event(workspace_name, "Top-Up", flt(pack.price, 2), f"VerityAI {pack.pack_name}", {
+		"transaction_kind": "Credit Top-Up", "credit_pack": pack.name, "purchased_credits": cint(pack.credits), "gross_amount": flt(pack.price, 2),
 	})
-	from verityai_saas.services.billing_documents import ensure_invoice_for_payment
-	ensure_invoice_for_payment(payment)
-	return {"payment": payment, "checkout_url": checkout_url, "status": "Pending"}
 
 
 def _decimal(value):
@@ -242,13 +245,13 @@ def apply_status(payment_name, values):
 	if status_key in PAID_STATUSES and payment.status not in {"Completed", "Cancelled"}:
 		updates.update({"status": "Completed", "paid_on": frappe.utils.now_datetime()})
 		frappe.db.set_value("VerityAI Billing Event", payment.name, updates)
-		billing.assign_plan(payment.workspace, payment.target_plan, "Active", payment.billing_cycle)
-		frappe.db.set_value(
-			"VerityAI Subscription",
-			{"workspace": payment.workspace},
-			"last_payment_reference",
-			values.get("paynowreference"),
-		)
+		if payment.transaction_kind == "Credit Top-Up":
+			billing.add_top_up(payment.workspace, payment.purchased_credits, payment.amount, values.get("paynowreference"), billing_event=payment.name)
+		else:
+			billing.assign_plan(payment.workspace, payment.target_plan, "Active", payment.billing_cycle)
+			frappe.db.set_value("VerityAI Subscription", {"workspace": payment.workspace}, "last_payment_reference", values.get("paynowreference"))
+			from verityai_saas.services.commercial import finalize_payment_rewards
+			finalize_payment_rewards(payment.name)
 		from verityai_saas.services.billing_documents import ensure_receipt_for_payment
 		ensure_receipt_for_payment(payment.name)
 	elif status_key in FINAL_FAILED_STATUSES:
@@ -258,8 +261,6 @@ def apply_status(payment_name, values):
 			billing.complete_refund(refund["refund"], values.get("paynowreference"))
 		updates["status"] = "Cancelled"
 		frappe.db.set_value("VerityAI Billing Event", payment.name, updates)
-		if status_key == "refunded" and was_completed:
-			billing.set_subscription_status(payment.workspace, "Suspended", "Paynow payment refunded")
 	elif status_key in RISK_STATUSES:
 		updates["status"] = "Pending"
 		frappe.db.set_value("VerityAI Billing Event", payment.name, updates)
@@ -267,7 +268,7 @@ def apply_status(payment_name, values):
 			billing.set_subscription_status(payment.workspace, "Past Due", "Paynow payment disputed")
 	else:
 		frappe.db.set_value("VerityAI Billing Event", payment.name, updates)
-	return {"payment": payment.name, "status": updates.get("status", payment.status), "gateway_status": status}
+	return {"payment": payment.name, "status": updates.get("status", payment.status), "gateway_status": status, "transaction_kind": payment.transaction_kind or "Subscription"}
 
 
 def poll_payment(payment_name):

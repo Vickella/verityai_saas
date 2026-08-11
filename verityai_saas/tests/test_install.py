@@ -7,10 +7,24 @@ from verity_ai.engine.tools import get_lead_capture_schema
 
 from verityai_saas.install import REQUIRED_ENGINE_DOCTYPES, validate_engine_installation
 from verityai_saas.services.business_natures import BUSINESS_NATURES, seed_business_natures
-from verityai_saas.setup_doctypes import ensure_workspace
+from verityai_saas.setup_doctypes import ensure_default_plan, ensure_workspace
 
 
 class TestStandaloneInstallation(FrappeTestCase):
+	def test_public_plans_and_credit_packs_match_commercial_baseline(self):
+		ensure_default_plan()
+		expected = {
+			"TRIAL": (0, 50_000), "LAUNCH": (12, 500_000), "GROWTH": (24, 1_500_000),
+			"SCALE": (60, 6_000_000), "ENTERPRISE": (100, 12_000_000),
+		}
+		for code, (price, credits) in expected.items():
+			plan = frappe.db.get_value("VerityAI Plan", {"plan_code": code}, ["monthly_price", "monthly_token_limit", "active"], as_dict=True)
+			self.assertIsNotNone(plan)
+			self.assertEqual(float(plan.monthly_price), price)
+			self.assertEqual(plan.monthly_token_limit, credits)
+			self.assertTrue(plan.active)
+		self.assertEqual(frappe.db.count("VerityAI Credit Pack", {"active": 1}), 3)
+
 	def test_business_natures_are_comprehensive_and_idempotent(self):
 		seed_business_natures()
 		seed_business_natures()

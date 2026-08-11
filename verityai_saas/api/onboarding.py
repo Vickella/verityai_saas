@@ -14,6 +14,7 @@ def create(
 	business_nature=None,
 	owner_user=None,
 	plan=None,
+	referral_code=None,
 	values=None,
 	account=None,
 ):
@@ -21,6 +22,8 @@ def create(
 	values = json_value(values, {})
 	if business_nature:
 		values["business_nature"] = business_nature
+	if referral_code:
+		values["referral_code"] = referral_code
 	owner = owner_user if owner_user and is_operator(user) else user
 	if account:
 		account_doc = frappe.get_doc("VerityAI Account", account)

@@ -60,19 +60,45 @@ def assign_plan(workspace_name, plan_name, status="Active", billing_cycle="Month
 	if wallet_name:
 		wallet = frappe.get_doc("VerityAI Usage Wallet", wallet_name)
 		wallet_period_end = period_end if status == "Trial" else add_days(add_months(period_start, 1), -1)
+		paid_remaining, promotional_remaining = _remaining_add_on_credits(wallet, period_start)
+		total_credits = cint(plan.monthly_token_limit) + paid_remaining + promotional_remaining
 		wallet.update({
 			"subscription": subscription.name,
 			"period_start": period_start,
 			"period_end": wallet_period_end,
 			"opening_token_allowance": cint(plan.monthly_token_limit),
-			"tokens_remaining": max(cint(plan.monthly_token_limit) + cint(wallet.top_up_tokens) - cint(wallet.tokens_used), 0),
+			"top_up_tokens": paid_remaining,
+			"promotional_credits": promotional_remaining,
+			"promotional_credits_expire_on": wallet.promotional_credits_expire_on if promotional_remaining else None,
+			"tokens_used": 0,
+			"tokens_remaining": total_credits,
 			"status": "Normal" if status in {"Trial", "Active"} else "Suspended",
 		})
 		wallet.save(ignore_permissions=True)
 	engine.apply_plan_limits(workspace_name, plan.name)
+	if wallet_name:
+		config_name = frappe.db.get_value("AI Configuration", {"tenant": workspace.engine_tenant}, "name")
+		if config_name:
+			frappe.db.set_value("AI Configuration", config_name, "monthly_token_limit", total_credits)
 	engine.set_engine_active(workspace_name, status in {"Trial", "Active"})
 	frappe.db.set_value("VerityAI Workspace", workspace_name, "status", "Trial" if status == "Trial" else "Active" if status == "Active" else "Suspended")
 	return subscription.name
+
+
+def _remaining_add_on_credits(wallet, next_period_start=None):
+	"""Allocate recorded usage before resetting a wallet for a new plan period."""
+	used = cint(wallet.tokens_used)
+	promotional = cint(wallet.promotional_credits)
+	paid = cint(wallet.top_up_tokens)
+	paid_consumed = max(used - promotional - cint(wallet.opening_token_allowance), 0)
+	paid_remaining = max(paid - paid_consumed, 0)
+	promotional_remaining = max(promotional - used, 0)
+	if (
+		promotional_remaining and wallet.promotional_credits_expire_on and next_period_start
+		and getdate(wallet.promotional_credits_expire_on) < getdate(next_period_start)
+	):
+		promotional_remaining = 0
+	return paid_remaining, promotional_remaining
 
 
 def set_subscription_status(workspace_name, status, reason=None):
@@ -115,16 +141,18 @@ def create_billing_event(workspace_name, event_type, amount=0, status="Pending",
 	return event.name
 
 
-def add_top_up(workspace_name, tokens, amount=0, provider_reference=None):
+def add_top_up(workspace_name, tokens, amount=0, provider_reference=None, billing_event=None):
 	tokens = cint(tokens)
 	if tokens <= 0:
-		frappe.throw("Top-up tokens must be greater than zero.", frappe.ValidationError)
+		frappe.throw("Top-up AI credits must be greater than zero.", frappe.ValidationError)
 	wallet_name = frappe.db.get_value("VerityAI Usage Wallet", {"workspace": workspace_name}, "name")
 	if not wallet_name:
 		frappe.throw("Usage wallet was not found.", frappe.DoesNotExistError)
 	workspace = frappe.get_doc("VerityAI Workspace", workspace_name)
 	wallet = frappe.get_doc("VerityAI Usage Wallet", wallet_name)
-	event = create_billing_event(workspace_name, "Top-Up", amount, "Completed", provider_reference=provider_reference)
+	event = billing_event or create_billing_event(workspace_name, "Top-Up", amount, "Completed", provider_reference=provider_reference)
+	if billing_event:
+		frappe.db.set_value("VerityAI Billing Event", billing_event, {"status": "Completed", "paid_on": now_datetime(), "gateway_reference": provider_reference})
 	from verityai_saas.services.billing_documents import ensure_document
 	ensure_document(event, "Receipt", status="Paid")
 	transaction = frappe.get_doc({
@@ -141,7 +169,72 @@ def add_top_up(workspace_name, tokens, amount=0, provider_reference=None):
 	if wallet.status in {"Warning", "Exhausted"} and wallet.tokens_remaining > 0:
 		wallet.status = "Normal"
 	wallet.save(ignore_permissions=True)
+	config_name = frappe.db.get_value("AI Configuration", {"tenant": workspace.engine_tenant}, "name")
+	if config_name:
+		frappe.db.set_value(
+			"AI Configuration", config_name, "monthly_token_limit",
+			cint(wallet.opening_token_allowance) + cint(wallet.top_up_tokens) + cint(wallet.promotional_credits),
+		)
 	return {"event": event, "transaction": transaction.name, "wallet": wallet.name}
+
+
+def reverse_top_up(workspace_name, credits, source_reference=None):
+	"""Remove only unspent purchased credits after a top-up refund."""
+	credits = cint(credits)
+	wallet_name = frappe.db.get_value("VerityAI Usage Wallet", {"workspace": workspace_name}, "name")
+	if credits <= 0 or not wallet_name:
+		return {"reversed": 0}
+	wallet = frappe.get_doc("VerityAI Usage Wallet", wallet_name)
+	reversed_credits = min(cint(wallet.top_up_tokens), cint(wallet.tokens_remaining), credits)
+	wallet.top_up_tokens = max(cint(wallet.top_up_tokens) - reversed_credits, 0)
+	wallet.tokens_remaining = max(cint(wallet.tokens_remaining) - reversed_credits, 0)
+	if wallet.tokens_remaining <= 0:
+		wallet.status = "Exhausted"
+	wallet.save(ignore_permissions=True)
+	workspace = frappe.get_doc("VerityAI Workspace", workspace_name)
+	frappe.get_doc({
+		"doctype": "VerityAI Usage Transaction", "workspace": workspace_name,
+		"engine_tenant": workspace.engine_tenant, "transaction_type": "Refund",
+		"total_tokens": -reversed_credits, "period": getdate(today()).strftime("%Y-%m"),
+	}).insert(ignore_permissions=True)
+	_sync_engine_credit_limit(workspace, wallet)
+	return {"reversed": reversed_credits, "unrecoverable": max(credits - reversed_credits, 0), "source_reference": source_reference}
+
+
+def add_promotional_credits(workspace_name, credits, expires_on, source_reference=None):
+	credits = cint(credits)
+	if credits <= 0:
+		return None
+	wallet_name = frappe.db.get_value("VerityAI Usage Wallet", {"workspace": workspace_name}, "name")
+	if not wallet_name:
+		frappe.throw("Usage wallet was not found.", frappe.DoesNotExistError)
+	wallet = frappe.get_doc("VerityAI Usage Wallet", wallet_name)
+	wallet.promotional_credits = cint(wallet.promotional_credits) + credits
+	wallet.promotional_credits_expire_on = max(
+		filter(None, [getdate(wallet.promotional_credits_expire_on) if wallet.promotional_credits_expire_on else None, getdate(expires_on)])
+	)
+	wallet.tokens_remaining = cint(wallet.tokens_remaining) + credits
+	if wallet.status in {"Warning", "Exhausted"}:
+		wallet.status = "Normal"
+	wallet.save(ignore_permissions=True)
+	workspace = frappe.get_doc("VerityAI Workspace", workspace_name)
+	transaction = frappe.get_doc({
+		"doctype": "VerityAI Usage Transaction", "workspace": workspace_name, "engine_tenant": workspace.engine_tenant,
+		"transaction_type": "Credit", "total_tokens": credits, "period": getdate(today()).strftime("%Y-%m"),
+	}).insert(ignore_permissions=True)
+	config_name = frappe.db.get_value("AI Configuration", {"tenant": workspace.engine_tenant}, "name")
+	if config_name:
+		frappe.db.set_value("AI Configuration", config_name, "monthly_token_limit", cint(wallet.opening_token_allowance) + cint(wallet.top_up_tokens) + cint(wallet.promotional_credits))
+	return {"transaction": transaction.name, "source_reference": source_reference}
+
+
+def _sync_engine_credit_limit(workspace, wallet):
+	config_name = frappe.db.get_value("AI Configuration", {"tenant": workspace.engine_tenant}, "name")
+	if config_name:
+		frappe.db.set_value(
+			"AI Configuration", config_name, "monthly_token_limit",
+			cint(wallet.opening_token_allowance) + cint(wallet.top_up_tokens) + cint(wallet.promotional_credits),
+		)
 
 
 def roll_usage_periods():
@@ -151,7 +244,7 @@ def roll_usage_periods():
 	for row in frappe.get_all(
 		"VerityAI Usage Wallet",
 		filters={"period_end": ["<", current_date]},
-		fields=["name", "workspace", "period_end"],
+		fields=["name", "workspace", "period_end", "opening_token_allowance", "top_up_tokens", "promotional_credits", "promotional_credits_expire_on", "tokens_used"],
 	):
 		plan_name = frappe.db.get_value(
 			"VerityAI Subscription",
@@ -167,15 +260,22 @@ def roll_usage_periods():
 		while period_end < current_date:
 			period_start = add_days(period_end, 1)
 			period_end = add_days(add_months(period_start, 1), -1)
+		paid_remaining, promotional_remaining = _remaining_add_on_credits(row, period_start)
 		frappe.db.set_value("VerityAI Usage Wallet", row.name, {
 			"period_start": period_start,
 			"period_end": period_end,
 			"opening_token_allowance": allowance,
-			"top_up_tokens": 0,
+			"top_up_tokens": paid_remaining,
+			"promotional_credits": promotional_remaining,
+			"promotional_credits_expire_on": row.promotional_credits_expire_on if promotional_remaining else None,
 			"tokens_used": 0,
-			"tokens_remaining": allowance,
+			"tokens_remaining": allowance + paid_remaining + promotional_remaining,
 			"status": "Normal",
 		})
+		workspace = frappe.get_doc("VerityAI Workspace", row.workspace)
+		config_name = frappe.db.get_value("AI Configuration", {"tenant": workspace.engine_tenant}, "name")
+		if config_name:
+			frappe.db.set_value("AI Configuration", config_name, "monthly_token_limit", allowance + paid_remaining + promotional_remaining)
 	frappe.db.commit()
 
 def check_trial_expiry():
@@ -221,8 +321,8 @@ def send_payment_reminders():
 
 
 def initiate_refund(workspace_name, payment_event, amount=None, reason=None):
-	if not frappe.db.exists("VerityAI Billing Event", {"name": payment_event, "workspace": workspace_name, "event_type": "Payment", "status": "Completed"}):
-		frappe.throw("Completed payment was not found.", frappe.DoesNotExistError)
+	if not frappe.db.exists("VerityAI Billing Event", {"name": payment_event, "workspace": workspace_name, "event_type": ["in", ["Payment", "Top-Up"]], "status": "Completed"}):
+		frappe.throw("Completed payment or credit top-up was not found.", frappe.DoesNotExistError)
 	payment = frappe.get_doc("VerityAI Billing Event", payment_event)
 	amount = flt(amount if amount not in (None, "") else payment.amount)
 	completed = frappe.get_all("VerityAI Billing Event", filters={"workspace": workspace_name, "event_type": "Refund", "gateway_reference": payment.name, "status": ["in", ["Pending", "Completed"]]}, pluck="amount")
@@ -239,6 +339,20 @@ def complete_refund(refund_event, provider_reference=None):
 		frappe.throw("Pending refund was not found.", frappe.DoesNotExistError)
 	refund = frappe.get_doc("VerityAI Billing Event", refund_event)
 	frappe.db.set_value("VerityAI Billing Event", refund.name, {"status": "Completed", "gateway_status": "Refunded", "paid_on": now_datetime(), "provider_reference": provider_reference or refund.provider_reference})
+	source = frappe.get_doc("VerityAI Billing Event", refund.gateway_reference) if refund.gateway_reference and frappe.db.exists("VerityAI Billing Event", refund.gateway_reference) else None
+	if source and source.transaction_kind == "Credit Top-Up":
+		credits = round(cint(source.purchased_credits) * min(flt(refund.amount) / max(flt(source.amount), 0.01), 1))
+		reverse_top_up(source.workspace, credits, refund.name)
+	elif source:
+		from verityai_saas.services.commercial import reverse_payment_rewards
+		reverse_payment_rewards(source.name)
+		completed_total = sum(flt(value) for value in frappe.get_all(
+			"VerityAI Billing Event",
+			filters={"event_type": "Refund", "gateway_reference": source.name, "status": "Completed"},
+			pluck="amount",
+		))
+		if completed_total >= flt(source.amount):
+			set_subscription_status(source.workspace, "Suspended", "Subscription payment fully refunded")
 	from verityai_saas.services.billing_documents import ensure_refund_confirmation
 	ensure_refund_confirmation(refund.name)
 	return {"refund": refund.name, "status": "Completed"}

@@ -20,6 +20,13 @@ CONFIG_SAFE_FIELDS = [
 	"whatsapp_phone_id", "webhook_callback_url", "enable_erpnext_integration",
 ]
 
+# USD per 1,000 tokens. Kept server-side so cost analytics never depend on a
+# customer-provided value. Update this table when provider pricing changes.
+MODEL_COSTS_PER_1K = {
+	"gpt-4o-mini": (0.00015, 0.00060),
+	"gpt-4.1-mini": (0.00040, 0.00160),
+}
+
 QUOTE_SAFE_FIELDS = [
 	"name", "customer_name", "client_email", "client_whatsapp_number", "status",
 	"erpnext_quotation_id", "estimated_total", "sent_file_url", "approval_notes",
@@ -66,8 +73,10 @@ def ensure_engine_configuration(workspace_name):
 	if name:
 		return name
 	config = frappe.get_doc({
-		"doctype": "AI Configuration", "tenant": tenant, "max_tokens": 900,
+		"doctype": "AI Configuration", "tenant": tenant, "model_name": "gpt-4o-mini", "max_tokens": 900,
 		"public_rate_limit_per_minute": 20, "max_public_message_chars": 4000,
+		"prompt_cost_per_1k": MODEL_COSTS_PER_1K["gpt-4o-mini"][0],
+		"completion_cost_per_1k": MODEL_COSTS_PER_1K["gpt-4o-mini"][1],
 		"enable_monitoring_alerts": 1, "verify_meta_signature": 0,
 	}).insert(ignore_permissions=True)
 	return config.name
@@ -298,6 +307,9 @@ def apply_plan_limits(workspace_name, plan_name):
 	plan = frappe.get_doc("VerityAI Plan", plan_name); config = get_engine_configuration(workspace_name)
 	for key in ("monthly_token_limit", "max_tokens", "public_rate_limit_per_minute", "max_public_message_chars"):
 		setattr(config, key, plan.get(key) or 0)
+	model = config.model_name or "gpt-4o-mini"
+	if model in MODEL_COSTS_PER_1K:
+		config.prompt_cost_per_1k, config.completion_cost_per_1k = MODEL_COSTS_PER_1K[model]
 	if not plan.can_use_erpnext_integration: config.enable_erpnext_integration = 0
 	if frappe.get_meta("AI Tenant").has_field("show_branding"):
 		frappe.db.set_value("AI Tenant", get_workspace_engine_tenant(workspace_name), "show_branding", 0 if plan.can_remove_branding else 1)

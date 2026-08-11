@@ -4,6 +4,7 @@ from frappe.tests.utils import FrappeTestCase
 from verityai_saas import setup_doctypes
 from verityai_saas.api import workspace as workspace_api
 from verityai_saas.services.onboarding import create_workspace
+from verityai_saas.services.billing import assign_plan
 from verityai_saas.services.workspace import add_member, remove_member, update_member
 from verityai_saas.tests.cleanup import cleanup_all_test_fixtures, cleanup_test_workspace
 
@@ -34,6 +35,8 @@ class TestWorkspaceTeamManagement(FrappeTestCase):
 		)
 		self.workspace = self.created["workspace"]
 		self.tenant = self.created["engine_tenant"]
+		launch_plan = frappe.db.get_value("VerityAI Plan", {"plan_code": "LAUNCH"}, "name")
+		assign_plan(self.workspace, launch_plan, "Active", "Monthly")
 
 	def tearDown(self):
 		super().tearDown()

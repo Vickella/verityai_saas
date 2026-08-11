@@ -7,9 +7,16 @@ from verityai_saas.services.permissions import require_workspace_permission
 
 @frappe.whitelist(methods=["POST"])
 @endpoint
-def start(workspace, plan, billing_cycle="Monthly"):
+def start(workspace, plan, billing_cycle="Monthly", promotion_code=None):
 	require_workspace_permission(workspace, "manage_billing")
-	return paynow.initiate_checkout(workspace, plan, billing_cycle)
+	return paynow.initiate_checkout(workspace, plan, billing_cycle, promotion_code)
+
+
+@frappe.whitelist(methods=["POST"])
+@endpoint
+def start_credit_top_up(workspace, credit_pack):
+	require_workspace_permission(workspace, "manage_billing")
+	return paynow.initiate_credit_checkout(workspace, credit_pack)
 
 
 @frappe.whitelist(methods=["POST"])

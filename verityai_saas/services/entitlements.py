@@ -42,6 +42,9 @@ def _denied(message, code):
 def subscription_entitled(context):
 	if not context or not context.subscription:
 		return False
+	if context.subscription.status == "Trial" and context.subscription.trial_end:
+		if frappe.utils.getdate(context.subscription.trial_end) < frappe.utils.getdate(frappe.utils.today()):
+			return False
 	if context.subscription.status in ACTIVE_SUBSCRIPTION_STATUSES:
 		return True
 	return bool(
@@ -89,12 +92,19 @@ def check_engine_request(tenant, platform, user_identifier=None):
 		return {"allowed": True}
 	if platform == "Desk":
 		return {"allowed": True}
+	if context.subscription and context.subscription.status == "Trial" and not subscription_entitled(context):
+		# Enforce expiry in the request path as well as the daily scheduler. This
+		# closes the window where an expired trial could continue using AI.
+		from verityai_saas.services.billing import set_subscription_status
+		set_subscription_status(context.workspace.name, "Expired", "Trial expired")
+		return _denied("This trial has ended. Choose a paid plan to continue using AI.", "TRIAL_EXPIRED")
 	if not context.subscription or not subscription_entitled(context):
 		return _denied("This assistant is unavailable because its subscription is inactive.", "SUBSCRIPTION_INACTIVE")
 	if context.workspace.status not in {"Trial", "Active"}:
 		return _denied("This assistant is temporarily suspended.", "WORKSPACE_SUSPENDED")
 	if not context.wallet or context.wallet.status in {"Exhausted", "Suspended"} or cint(context.wallet.tokens_remaining) <= 0:
-		return _denied("This assistant has reached its current usage allowance.", "WALLET_EXHAUSTED")
+		message = "Your trial AI credits are exhausted. Choose a paid plan to continue." if context.subscription.status == "Trial" else "This assistant has reached its current AI credit allowance."
+		return _denied(message, "WALLET_EXHAUSTED")
 	if platform == "WhatsApp" and not feature_allowed(context, "can_use_whatsapp_ai"):
 		return _denied("WhatsApp AI is not included in this workspace plan.", "CHANNEL_NOT_INCLUDED")
 	limit_field = "monthly_web_conversations" if platform == "Web" else "monthly_whatsapp_messages" if platform == "WhatsApp" else None

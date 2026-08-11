@@ -1,5 +1,5 @@
 import frappe
-from frappe.utils import now_datetime
+from frappe.utils import getdate, now_datetime, today
 
 from verityai_saas.services.engine import get_workspace_engine_tenant
 
@@ -16,9 +16,13 @@ def sync_workspace_usage(workspace_name):
 	wallet_name = frappe.db.get_value("VerityAI Usage Wallet", {"workspace": workspace_name}, "name")
 	if wallet_name:
 		wallet = frappe.get_doc("VerityAI Usage Wallet", wallet_name)
+		if wallet.promotional_credits_expire_on and getdate(wallet.promotional_credits_expire_on) < getdate(today()):
+			wallet.promotional_credits = 0
+			wallet.promotional_credits_expire_on = None
 		totals = frappe.db.sql("""select coalesce(sum(total_tokens),0), coalesce(sum(estimated_cost),0) from `tabVerityAI Usage Transaction` where workspace=%s and transaction_type='Usage' and creation between %s and %s""", (workspace_name, wallet.period_start, f"{wallet.period_end} 23:59:59"))[0]
 		wallet.tokens_used = int(totals[0] or 0)
-		wallet.tokens_remaining = max(int(wallet.opening_token_allowance or 0) + int(wallet.top_up_tokens or 0) - wallet.tokens_used, 0)
+		total_credits = int(wallet.opening_token_allowance or 0) + int(wallet.top_up_tokens or 0) + int(wallet.promotional_credits or 0)
+		wallet.tokens_remaining = max(total_credits - wallet.tokens_used, 0)
 		wallet.estimated_ai_cost = totals[1] or 0
 		period_filters = {
 			"tenant": tenant,
@@ -42,10 +46,13 @@ def sync_workspace_usage(workspace_name):
 				"creation": ["between", [wallet.period_start, f"{wallet.period_end} 23:59:59"]],
 			},
 		)
-		percent = (wallet.tokens_used / max(int(wallet.opening_token_allowance or 0) + int(wallet.top_up_tokens or 0), 1)) * 100
+		percent = (wallet.tokens_used / max(total_credits, 1)) * 100
 		wallet.status = "Exhausted" if wallet.tokens_remaining <= 0 else "Warning" if percent >= 80 else "Normal"
 		wallet.last_synced_from_usage_logs = now_datetime()
 		wallet.save(ignore_permissions=True)
+		config_name = frappe.db.get_value("AI Configuration", {"tenant": tenant}, "name")
+		if config_name:
+			frappe.db.set_value("AI Configuration", config_name, "monthly_token_limit", total_credits)
 	return {"created": created, "wallet": wallet_name}
 
 
@@ -58,4 +65,3 @@ def sync_all_usage():
 		except Exception:
 			frappe.log_error(title=f"VerityAI Usage Sync: {workspace}", message=frappe.get_traceback())
 	frappe.db.commit()
-
