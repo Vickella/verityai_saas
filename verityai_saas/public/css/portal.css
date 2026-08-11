@@ -923,6 +923,129 @@ main { max-width: 1420px; padding: 26px clamp(22px, 3vw, 42px) 52px; }
   .va-shell { grid-template-columns: 210px minmax(0, 1fr); }
 }
 
+/* Operations suite */
+.va-filter-bar,
+.va-invite-bar,
+.va-status-strip,
+.va-plan-hero,
+.va-account-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 17px 18px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: var(--shadow-sm);
+}
+.va-filter-fields,
+.va-invite-fields { display: flex; align-items: end; gap: 10px; }
+.va-filter-fields .va-field { width: 150px; }
+.va-filter-bar > div:first-child strong,
+.va-invite-bar > div:first-child strong { display: block; font-size: 14px; }
+.va-invite-bar > div:first-child span { display: block; margin-top: 2px; color: var(--ink-500); font-size: 11px; }
+.va-invite-fields .va-field:first-child { width: min(280px, 28vw); }
+.va-invite-fields .va-field:nth-child(2) { width: 160px; }
+
+.va-chart-grid { padding: 16px; }
+.va-chart-grid .va-card { padding: 16px; border-radius: 11px; box-shadow: none; }
+.va-chart-grid .va-card h2 { font-size: 14px; }
+.va-chart-grid .va-bar-chart { height: 180px; }
+.va-breakdown { display: grid; }
+.va-breakdown > div,
+.va-security-list > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 44px;
+  padding: 10px 17px;
+  border-bottom: 1px solid var(--line);
+}
+.va-breakdown > div:last-child,
+.va-security-list > div:last-child { border-bottom: 0; }
+.va-breakdown span,
+.va-security-list span { color: var(--ink-700); font-size: 12px; }
+.va-breakdown strong { font-size: 14px; }
+
+.va-plan-hero,
+.va-account-hero {
+  color: #fff;
+  border: 0;
+  background: linear-gradient(120deg, #0b2038 0%, #123b6b 58%, #1f6feb 140%);
+  box-shadow: 0 14px 35px rgba(10, 35, 65, .14);
+}
+.va-plan-hero .eyebrow,
+.va-account-hero .eyebrow { color: #8dbbff; }
+.va-plan-hero h2,
+.va-account-hero h2 { margin: 1px 0 6px; color: #fff; font-size: 23px; letter-spacing: -.03em; }
+.va-plan-hero .muted,
+.va-account-hero p { color: #b9cce1; }
+.va-plan-usage { display: flex; gap: 34px; padding-left: 28px; border-left: 1px solid rgba(255,255,255,.16); }
+.va-plan-usage div,
+.va-account-hero > div:last-child { display: grid; gap: 1px; }
+.va-plan-usage span,
+.va-account-hero > div:last-child span { color: #9fb7d1; font-size: 10px; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
+.va-plan-usage strong,
+.va-account-hero > div:last-child strong { color: #fff; font-size: 20px; }
+.va-plan-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 13px; padding: 16px; }
+.va-plan-card { display: grid; gap: 15px; padding: 18px; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
+.va-plan-card:hover { border-color: #b9cdec; box-shadow: 0 8px 24px rgba(22,55,95,.07); }
+.va-plan-card h3 { margin: 3px 0; font-size: 18px; }
+.va-plan-card p { margin: 0; color: var(--ink-500); font-size: 11px; }
+.va-plan-card p strong { color: var(--ink-950); font-size: 16px; }
+.va-plan-label { color: var(--blue-600); font-size: 9px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; }
+.va-callout { display: flex; align-items: center; gap: 10px; padding: 13px 16px; border-radius: 11px; font-size: 12px; }
+.va-callout strong { white-space: nowrap; }
+.va-callout.warning { color: #7a4d00; border: 1px solid #f0d79c; background: #fff9e9; }
+
+.va-status-strip > div:first-child { display: flex; align-items: center; gap: 11px; }
+.va-status-strip strong { display: block; font-size: 13px; }
+.va-status-strip p { margin: 1px 0 0; color: var(--ink-500); font-size: 11px; }
+.va-status-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--ink-400); box-shadow: 0 0 0 5px #eef1f5; }
+.va-status-dot.good { background: #12a673; box-shadow: 0 0 0 5px #e4f7f0; }
+.va-form-section { overflow: hidden; gap: 0; }
+.va-settings-block { display: grid; gap: 13px; padding: 18px; border-bottom: 1px solid var(--line); }
+.va-settings-block h3 { margin: 0; font-size: 13px; }
+.va-settings-block > p { margin: -8px 0 0; color: var(--ink-500); font-size: 11px; }
+.va-form-section > .va-form-actions { margin: 0; padding: 14px 18px; background: #fafbfc; }
+.va-check-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; }
+.va-check-grid label { display: flex; align-items: center; gap: 8px; min-height: 38px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 9px; color: var(--ink-700); background: #fff; font-size: 11px; font-weight: 650; }
+.va-operations-grid { display: grid; grid-template-columns: minmax(0,1.35fr) minmax(300px,.65fr); align-items: start; gap: 16px; }
+.va-secret-panel { margin: 18px; border: 1px solid var(--line); border-radius: 10px; background: #fbfcfe; }
+.va-secret-panel summary { display: flex; justify-content: space-between; gap: 12px; padding: 12px 14px; color: var(--ink-700); font-size: 12px; font-weight: 750; cursor: pointer; }
+.va-secret-panel summary span { color: var(--ink-500); font-size: 10px; font-weight: 600; }
+.va-secret-panel[open] summary { border-bottom: 1px solid var(--line); }
+.va-secret-panel .va-fields { padding: 14px; }
+.va-form-section > .va-check { margin: 0 18px 18px; }
+.va-callback-card pre.va-code { max-height: 150px; font-size: 11px; }
+.va-callback-card .va-settings-block { justify-items: start; }
+
+.va-member-list { display: grid; }
+.va-member-row { min-width: 0; border-bottom: 1px solid var(--line); background: #fff; }
+.va-member-row:last-child { border-bottom: 0; }
+article.va-member-row,
+.va-member-row summary { display: flex; align-items: center; gap: 12px; padding: 13px 17px; list-style: none; cursor: pointer; }
+.va-member-row summary::-webkit-details-marker { display: none; }
+.va-member-avatar { flex: 0 0 auto; width: 34px; height: 34px; display: grid; place-items: center; border-radius: 10px; color: #245a9e; background: #eaf2ff; font-size: 12px; font-weight: 850; }
+.va-member-identity { min-width: 0; flex: 1; display: grid; }
+.va-member-identity strong { overflow: hidden; color: var(--ink-950); font-size: 12px; text-overflow: ellipsis; }
+.va-member-identity span { color: var(--ink-500); font-size: 10px; }
+.va-chevron { color: var(--ink-400); font-size: 16px; transition: transform 150ms ease; }
+.va-member-row details[open] .va-chevron { transform: rotate(180deg); }
+.va-member-access { display: grid; gap: 15px; padding: 17px; border-top: 1px solid var(--line); background: #fafbfc; }
+.va-member-access h4 { margin: 0 0 8px; font-size: 11px; }
+.va-member-access > .va-field { max-width: 280px; }
+.va-member-access .va-form-actions { justify-content: flex-start; padding-top: 12px; }
+
+@media (max-width: 1050px) {
+  .va-plan-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .va-operations-grid { grid-template-columns: 1fr; }
+  .va-filter-bar, .va-invite-bar { align-items: flex-start; flex-direction: column; }
+  .va-filter-fields, .va-invite-fields { width: 100%; }
+}
+
 @media (max-width: 760px) {
   main { padding: 20px 13px 38px; }
   .va-command-bar, .va-section-heading, .va-subsection-heading { align-items: flex-start; flex-direction: column; }
@@ -942,4 +1065,13 @@ main { max-width: 1420px; padding: 26px clamp(22px, 3vw, 42px) 52px; }
   .va-table td { display: grid; grid-template-columns: minmax(90px, .7fr) minmax(0, 1.3fr); gap: 10px; padding: 5px 0; border: 0; text-align: right; }
   .va-table td::before { content: attr(data-label); color: var(--ink-500); font-size: 9px; font-weight: 800; letter-spacing: .07em; text-align: left; text-transform: uppercase; }
   .va-table td .va-actions { justify-content: flex-end; }
+  .va-filter-fields, .va-invite-fields { align-items: stretch; flex-direction: column; }
+  .va-filter-fields .va-field,
+  .va-invite-fields .va-field:first-child,
+  .va-invite-fields .va-field:nth-child(2) { width: 100%; }
+  .va-status-strip, .va-plan-hero, .va-account-hero { align-items: flex-start; flex-direction: column; }
+  .va-plan-usage { width: 100%; padding: 14px 0 0; border-top: 1px solid rgba(255,255,255,.16); border-left: 0; }
+  .va-plan-grid { grid-template-columns: 1fr; }
+  .va-check-grid { grid-template-columns: 1fr; }
+  .va-callout { align-items: flex-start; flex-direction: column; }
 }

@@ -4,4 +4,6 @@ from verityai_saas.www.verityai._common import portal_context
 
 def get_context(context):
 	require_operator()
-	return portal_context(context, "admin")
+	portal_context(context, "admin")
+	context.title = "VerityAI Operator Dashboard"
+	return context
