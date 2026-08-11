@@ -5,6 +5,7 @@ from frappe.tests.utils import FrappeTestCase
 
 from verityai_saas import setup_doctypes
 from verityai_saas.api._response import RateLimitExceeded, endpoint
+from verityai_saas.api import admin as admin_api
 from verityai_saas.api import assistant as assistant_api
 from verityai_saas.api import integrations as integrations_api
 from verityai_saas.services import engine, integrations, notifications, onboarding, paynow
@@ -69,11 +70,16 @@ class TestSecureIntegrations(FrappeTestCase):
 		self.assertEqual(config.get_password("erpnext_api_secret"), "erp-secret")
 
 	def test_paynow_credentials_are_encrypted_and_write_only(self):
-		status = paynow.configure({"integration_id": "test-integration", "integration_key": "paynow-secret"})
+		response = admin_api.configure_paynow({"integration_id": "test-integration", "integration_key": "paynow-secret"})
+		self.assertTrue(response["success"])
+		status = response["data"]
 		self.assertTrue(status["configured"])
 		self.assertNotIn("paynow-secret", str(status))
 		settings = frappe.get_single("VerityAI Platform Settings")
 		self.assertEqual(settings.get_password("paynow_integration_key"), "paynow-secret")
+		dashboard = admin_api.dashboard()["data"]
+		self.assertEqual(dashboard["paynow"]["integration_id"], "test-integration")
+		self.assertNotIn("paynow-secret", frappe.as_json(dashboard))
 
 	def test_plan_gate_blocks_disabled_integrations(self):
 		frappe.db.set_value("VerityAI Plan", self.plan, "can_use_api_access", 0)

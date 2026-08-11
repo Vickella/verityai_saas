@@ -94,6 +94,7 @@ class TestOperatorBillingConsole(FrappeTestCase):
 		responses = [
 			admin_api.dashboard(),
 			admin_api.create_plan({"plan_name": "Nope", "plan_code": "NOPE"}),
+			admin_api.configure_paynow({"integration_id": "blocked", "integration_key": "blocked"}),
 			billing_api.assign_plan(self.workspace, self.plan),
 			billing_api.set_status(self.workspace, "Suspended", "Not allowed"),
 			billing_api.manual_event(self.workspace, "Payment", 40, "Completed", "NOPE"),

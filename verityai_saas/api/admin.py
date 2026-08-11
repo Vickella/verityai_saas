@@ -6,7 +6,7 @@ from frappe.utils import add_days, cint, flt, getdate, today
 from verityai_saas.api._response import endpoint, json_value
 from verityai_saas.services import paynow
 from verityai_saas.services.admin_reauth import require_admin_reauthentication
-from verityai_saas.services.permissions import is_platform_admin
+from verityai_saas.services.permissions import is_platform_admin, require_platform_admin
 
 
 
@@ -176,9 +176,18 @@ def dashboard():
 			limit=100,
 		),
 		"provider_failures": provider_failures,
-
+		"paynow": paynow.configuration_status(),
 		"paynow_configured": paynow.is_configured(),
 	}
+
+
+@frappe.whitelist(methods=["POST"])
+@endpoint
+def configure_paynow(values):
+	"""Update the platform-wide Paynow gateway from the secured operator console."""
+	require_platform_admin()
+	require_admin_reauthentication()
+	return paynow.configure(json_value(values, {}))
 
 @frappe.whitelist(methods=["POST"])
 @endpoint
