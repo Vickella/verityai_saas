@@ -217,6 +217,19 @@ class TestPaynowBilling(FrappeTestCase):
 			"Failed",
 		)
 
+	def test_paynow_testing_home_page_is_rejected_as_checkout(self):
+		response_values = {
+			"Status": "Ok", "BrowserUrl": "https://www.paynow.co.zw/Home/Home",
+			"PollUrl": "https://www.paynow.co.zw/Interface/CheckPayment/?guid=testing",
+		}
+		with (
+			patch.object(paynow, "_credentials", return_value=("1201", self.integration_key)),
+			patch.object(paynow, "get_url", return_value="https://app.example.com"),
+			patch.object(paynow.requests, "post", return_value=FakeResponse(self.signed_message(response_values))),
+			self.assertRaisesRegex(frappe.ValidationError, "merchant account is still in testing"),
+		):
+			paynow.initiate_checkout(self.workspace, self.plan)
+
 	def test_callback_is_polled_then_activates_plan_idempotently(self):
 		payment = self.create_payment()
 		values = {

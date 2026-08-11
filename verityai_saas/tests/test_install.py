@@ -22,7 +22,7 @@ class TestStandaloneInstallation(FrappeTestCase):
 			self.assertIsNotNone(plan)
 			self.assertEqual(float(plan.monthly_price), price)
 			self.assertEqual(plan.monthly_token_limit, credits)
-			self.assertTrue(plan.active)
+			self.assertEqual(bool(plan.active), code != "ENTERPRISE")
 		self.assertEqual(frappe.db.count("VerityAI Credit Pack", {"active": 1}), 3)
 
 	def test_business_natures_are_comprehensive_and_idempotent(self):

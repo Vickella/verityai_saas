@@ -515,7 +515,7 @@ def ensure_default_plan():
 		 "max_public_message_chars": 8000, "can_remove_branding": 1, "can_use_whatsapp_button": 1, "can_use_whatsapp_ai": 1,
 		 "can_use_email_notifications": 1, "can_use_custom_smtp": 1, "can_use_erpnext_integration": 1,
 		 "can_use_quotation_workflow": 1, "can_use_api_access": 1, "can_bring_own_ai_provider_key": 1, "support_level": "Priority"},
-		{"plan_name": "Enterprise", "plan_code": "ENTERPRISE", "monthly_price": 100, "annual_price": 1000, "trial_days": 0,
+		{"plan_name": "Enterprise", "plan_code": "ENTERPRISE", "active": 0, "monthly_price": 100, "annual_price": 1000, "trial_days": 0,
 		 "monthly_token_limit": 12000000, "max_tokens": 1800, "max_workspaces": 5, "max_assistants": 5, "max_team_members": 30,
 		 "monthly_web_conversations": 7500, "monthly_whatsapp_messages": 4000, "monthly_email_sends": 50000,
 		 "max_knowledge_sources": 500, "max_allowed_domains": 50, "public_rate_limit_per_minute": 240,

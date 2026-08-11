@@ -108,6 +108,12 @@ def _safe_paynow_url(url, label):
 	parsed = urlparse(url or "")
 	if parsed.scheme != "https" or (parsed.hostname or "").lower() not in PAYNOW_HOSTS:
 		frappe.throw(f"Paynow returned an invalid {label} URL.", frappe.ValidationError)
+	if label == "checkout" and parsed.path.lower().rstrip("/") in {"", "/home", "/home/home"}:
+		frappe.throw(
+			"Paynow accepted the request but this merchant account is still in testing and cannot take payments. "
+			"Ask Paynow to activate the integration before accepting customer orders.",
+			frappe.ValidationError,
+		)
 	return url
 
 
