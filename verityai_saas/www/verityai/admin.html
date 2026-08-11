@@ -6,14 +6,14 @@
 	<title>{{ title }}</title>
 	<link rel="stylesheet" href="/assets/verityai_saas/css/portal.css?v={{ asset_version }}">
 </head>
-<body>
-	<main>
+<body class="va-admin-page">
+	<main class="va-admin-main">
 		<header class="va-topbar">
-			<div><p class="eyebrow">VerityCore Operations</p><h1>Operator dashboard</h1></div>
-			<a class="va-button" href="/verityai">Customer portal</a>
+			<div><p class="eyebrow">VerityCore Operations</p><h1>Operator console</h1><p class="va-page-description">Monitor tenants, resolve operational risk and control commercial access.</p></div>
+			<a class="va-button secondary" href="/verityai">Open customer portal</a>
 		</header>
 		<div id="va-admin-notice" class="va-notice" hidden></div>
-		<div id="va-admin-content" class="va-content"><div class="va-card va-loading">Loading operations data...</div></div>
+		<div id="va-admin-content" class="va-content"><div class="va-loading" aria-live="polite"><span class="va-spinner" aria-hidden="true"></span><strong>Preparing operator console</strong><small>Loading secure platform data…</small></div></div>
 	</main>
 	<script>window.csrf_token={{ (csrf_token or '') | tojson }};</script>
 	<script src="/assets/verityai_saas/js/admin.js?v={{ asset_version }}"></script>

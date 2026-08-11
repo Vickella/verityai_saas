@@ -1046,6 +1046,74 @@ article.va-member-row,
   .va-filter-fields, .va-invite-fields { width: 100%; }
 }
 
+/* Operator console */
+.va-admin-page { min-height: 100vh; }
+.va-admin-main { max-width: 1500px; }
+.va-admin-tabs {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  gap: 3px;
+  overflow-x: auto;
+  padding: 5px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255,255,255,.94);
+  box-shadow: 0 5px 18px rgba(16,24,40,.05);
+  backdrop-filter: blur(12px);
+}
+.va-admin-tabs button {
+  min-height: 34px;
+  padding: 7px 14px;
+  border: 0;
+  border-radius: 8px;
+  color: var(--ink-500);
+  background: transparent;
+  font-size: 12px;
+  font-weight: 750;
+  cursor: pointer;
+}
+.va-admin-tabs button:hover { color: var(--ink-950); background: #f4f7fb; }
+.va-admin-tabs button.active { color: #fff; background: #173b67; box-shadow: 0 4px 10px rgba(20,58,102,.18); }
+.va-admin-view { display: grid; gap: 16px; }
+.va-admin-attention { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 10px; }
+.va-admin-attention > div { display: grid; gap: 2px; min-height: 92px; padding: 15px 16px; border: 1px solid var(--line); border-radius: 12px; background: #fff; box-shadow: var(--shadow-sm); }
+.va-admin-attention span { color: var(--ink-500); font-size: 10px; font-weight: 750; letter-spacing: .04em; text-transform: uppercase; }
+.va-admin-attention strong { font-size: 25px; line-height: 1.2; }
+.va-admin-attention small { color: var(--ink-500); font-size: 10px; }
+.va-admin-search { display: flex; align-items: end; justify-content: space-between; gap: 20px; padding: 15px 17px; border: 1px solid var(--line); border-radius: 13px; background: #fff; }
+.va-admin-search strong { display: block; font-size: 13px; }
+.va-admin-search > .va-field { width: min(390px,45vw); }
+
+.va-admin-editor-list { display: grid; }
+.va-admin-editor { border-bottom: 1px solid var(--line); background: #fff; }
+.va-admin-editor:last-child { border-bottom: 0; }
+.va-admin-editor summary { display: flex; align-items: center; justify-content: space-between; gap: 18px; min-height: 68px; padding: 13px 18px; list-style: none; cursor: pointer; }
+.va-admin-editor summary::-webkit-details-marker { display: none; }
+.va-admin-editor summary:hover { background: #fafcff; }
+.va-admin-editor summary > div:first-child { display: grid; min-width: 0; }
+.va-admin-editor summary strong { color: var(--ink-950); font-size: 13px; }
+.va-admin-editor summary small { overflow: hidden; color: var(--ink-500); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.va-admin-editor details[open] > summary { background: #f7faff; border-bottom: 1px solid var(--line); }
+.va-admin-editor details[open] .va-chevron { transform: rotate(180deg); }
+.va-admin-editor-body { background: #fbfcfe; }
+.va-admin-editor-body .va-settings-block { background: #fbfcfe; }
+.va-admin-editor-body > .va-form-actions { margin: 0; padding: 14px 18px; background: #f5f7fa; }
+
+.va-admin-drawer-backdrop { z-index: 1100; }
+.va-admin-drawer { width: min(780px,100%); height: 100%; overflow-y: auto; padding: 22px; background: #f5f7fb; box-shadow: -20px 0 50px rgba(10,28,50,.2); animation: va-slide-in 180ms ease-out; }
+.va-admin-drawer .va-drawer-heading { padding: 3px 2px 18px; }
+.va-admin-drawer-tools { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 15px 0; padding: 11px 13px; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+.va-admin-action-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); align-items: start; gap: 12px; }
+.va-admin-action-card { display: grid; gap: 13px; padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: #fff; box-shadow: var(--shadow-sm); }
+.va-admin-action-card h3 { margin: 0 0 2px; font-size: 14px; }
+.va-admin-action-card textarea { min-height: 74px; }
+
+@media (max-width: 950px) {
+  .va-admin-attention { grid-template-columns: repeat(2,minmax(0,1fr)); }
+}
+
 @media (max-width: 760px) {
   main { padding: 20px 13px 38px; }
   .va-command-bar, .va-section-heading, .va-subsection-heading { align-items: flex-start; flex-direction: column; }
@@ -1074,4 +1142,13 @@ article.va-member-row,
   .va-plan-grid { grid-template-columns: 1fr; }
   .va-check-grid { grid-template-columns: 1fr; }
   .va-callout { align-items: flex-start; flex-direction: column; }
+  .va-admin-main { padding-inline: 13px; }
+  .va-admin-tabs { margin-inline: -2px; }
+  .va-admin-attention { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .va-admin-search { align-items: stretch; flex-direction: column; }
+  .va-admin-search > .va-field { width: 100%; }
+  .va-admin-editor summary { min-height: 62px; padding: 11px 13px; }
+  .va-admin-action-grid { grid-template-columns: 1fr; }
+  .va-admin-drawer { padding: 16px 13px; }
+  .va-admin-drawer-tools { align-items: flex-start; flex-direction: column; }
 }
