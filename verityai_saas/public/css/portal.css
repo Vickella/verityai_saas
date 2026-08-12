@@ -240,6 +240,7 @@ body > main { max-width: 1680px; }
 }
 
 .va-grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.va-grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 
 .va-card {
   min-width: 0;
@@ -1238,6 +1239,7 @@ article.va-member-row,
   .va-command-bar, .va-section-heading, .va-subsection-heading { align-items: flex-start; flex-direction: column; }
   .va-command-bar .va-actions, .va-section-heading .va-actions { width: 100%; }
   .va-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .va-grid.three { grid-template-columns: 1fr; }
   .va-drawer { padding: 18px 15px; }
   .va-workspace-picker, .va-workspace-picker select { width: 100%; }
   .va-quote-line { grid-template-columns: repeat(2, minmax(0, 1fr)); }
