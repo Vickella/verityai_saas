@@ -9,12 +9,34 @@
   let analyticsFilters = {from_date:"", to_date:""};
   let commerceView = "overview";
 
+  const guidedSteps = [
+    {route:"assistant", label:"Assistant", title:"Define your assistant", description:"Choose its identity and your business sales profile.", codes:["assistant","business_nature"]},
+    {route:"widget", label:"Website widget", title:"Prepare your website widget", description:"Style the widget and approve the website domains where it may run.", codes:["widget","domain"]},
+    {route:"knowledge", label:"Knowledge", title:"Add trusted knowledge", description:"Give the assistant accurate business facts, services, policies or documents.", codes:["knowledge"]},
+    {route:"email", label:"Email", title:"Configure notifications", description:"Choose where leads, handoffs and operational alerts should be delivered.", codes:["email"]},
+    {route:"whatsapp", label:"WhatsApp", title:"Choose your WhatsApp setup", description:"Configure the contact button now or prepare WhatsApp AI Early Access.", codes:["whatsapp"]},
+    {route:"onboarding", label:"Launch review", title:"Review and launch", description:"Review setup progress and complete any optional launch tasks.", codes:[]},
+  ];
+
   const esc = (value) => String(value ?? "").replace(/[&<>'"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[c]));
   const number = (value) => new Intl.NumberFormat().format(Number(value || 0));
   const pill = (value) => `<span class="va-pill ${["Active","Connected","Done","Normal","Trial","Healthy","Approved","Won"].includes(value)?"good":["Failed","Suspended","Exhausted","Critical","Lost","Cancelled"].includes(value)?"bad":""}">${esc(value || "—")}</span>`;
   const field = (label, name, value="", type="text", full=false) => `<div class="va-field ${full?"full":""}"><label>${esc(label)}</label>${type==="textarea"?`<textarea name="${name}">${esc(value)}</textarea>`:`<input type="${type}" name="${name}" value="${esc(value)}">`}</div>`;
   const selectField = (label,name,options,value="",placeholder="Choose an option",full=false) => `<div class="va-field ${full?"full":""}"><label>${esc(label)}</label><select name="${name}" required><option value="">${esc(placeholder)}</option>${options.map(option=>`<option value="${esc(option.value)}" ${option.value===value?"selected":""}>${esc(option.label)}</option>`).join("")}</select></div>`;
   const json = (form) => Object.fromEntries(new FormData(form).entries());
+  const routeUrl = (route, guided=false) => `/verityai/${route}?workspace=${encodeURIComponent(workspace)}${guided?"&guided=1":""}`;
+  const isGuided = () => new URLSearchParams(location.search).get("guided") === "1";
+  const guidedIndex = () => guidedSteps.findIndex(step=>step.route===page);
+  const guidedNav = () => {
+    if(!isGuided()) return "";
+    const index=guidedIndex();
+    if(index<0) return "";
+    const previous=index>0?guidedSteps[index-1]:null;
+    const next=index<guidedSteps.length-1?guidedSteps[index+1]:null;
+    return `<nav class="va-guided-nav" aria-label="Setup journey"><div><span>Guided setup</span><strong>Step ${index+1} of ${guidedSteps.length} · ${esc(guidedSteps[index].label)}</strong></div><div class="va-actions">${previous?`<a class="va-button ghost" href="${routeUrl(previous.route,true)}">Back</a>`:""}${next?`<a class="va-button secondary" href="${routeUrl(next.route,true)}">Continue</a>`:`<a class="va-button" href="${routeUrl("dashboard")}">Finish setup</a>`}</div></nav>`;
+  };
+  const showGuidedNav = () => content.insertAdjacentHTML("beforeend", guidedNav());
+  const continueGuided = route => { if(isGuided()) location.assign(routeUrl(route,true)); };
 
   const natureProfile = (name,natures) => {
     const nature=(natures||[]).find(row=>row.business_nature===name);
@@ -61,7 +83,8 @@
 
   async function dashboard() {
     const d = await call("verityai_saas.api.workspace.get", {workspace});
-    content.innerHTML = `<div class="va-grid"><div class="va-card va-metric"><span>Setup progress</span><strong>${number(d.workspace.setup_progress)}%</strong><div class="va-progress"><i style="width:${Number(d.workspace.setup_progress||0)}%"></i></div></div><div class="va-card va-metric"><span>Conversations</span><strong>${number(d.conversation_count)}</strong></div><div class="va-card va-metric"><span>New leads</span><strong>${number(d.new_leads)}</strong></div><div class="va-card va-metric"><span>AI credits remaining</span><strong>${number(d.wallet.tokens_remaining)}</strong></div></div><div class="va-grid two"><div class="va-card"><h2>Workspace health</h2><p>${pill(d.workspace.status)} ${pill(d.wallet.status)}</p><p class="muted">${d.recent_alerts.length ? esc(d.recent_alerts[0].summary) : "No recent alerts."}</p></div><div class="va-card"><h2>Current plan</h2><p><strong>${esc(d.subscription?.plan || "No plan")}</strong></p><p class="muted">${esc(d.subscription?.status || "Not configured")}</p></div></div>`;
+    const resume=Number(d.workspace.setup_progress||0)<100?`<div class="va-callout info va-setup-resume"><div><strong>Finish setting up your workspace</strong><span>Your progress is saved. Continue the guided journey before inviting customers.</span></div><a class="va-button" href="${routeUrl("onboarding",true)}">Resume setup</a></div>`:"";
+    content.innerHTML = `${resume}<div class="va-grid"><div class="va-card va-metric"><span>Setup progress</span><strong>${number(d.workspace.setup_progress)}%</strong><div class="va-progress"><i style="width:${Number(d.workspace.setup_progress||0)}%"></i></div></div><div class="va-card va-metric"><span>Conversations</span><strong>${number(d.conversation_count)}</strong></div><div class="va-card va-metric"><span>New leads</span><strong>${number(d.new_leads)}</strong></div><div class="va-card va-metric"><span>AI credits remaining</span><strong>${number(d.wallet.tokens_remaining)}</strong></div></div><div class="va-grid two"><div class="va-card"><h2>Workspace health</h2><p>${pill(d.workspace.status)} ${pill(d.wallet.status)}</p><p class="muted">${d.recent_alerts.length ? esc(d.recent_alerts[0].summary) : "No recent alerts."}</p></div><div class="va-card"><h2>Current plan</h2><p><strong>${esc(d.subscription?.plan || "No plan")}</strong></p><p class="muted">${esc(d.subscription?.status || "Not configured")}</p></div></div>`;
   }
 
   async function health(filters={}) {
@@ -74,7 +97,14 @@
   }
   async function onboarding() {
     const d = await call("verityai_saas.api.workspace.get", {workspace});
-    content.innerHTML = `<div class="va-card"><h2>Set up your assistant</h2><div class="va-progress"><i style="width:${Number(d.workspace.setup_progress||0)}%"></i></div><p class="muted">${number(d.workspace.setup_progress)}% complete</p></div>${table([["Step",r=>esc(r.step_label)],["Status",r=>pill(r.status)]], d.checklist)}`;
+    const statuses=Object.fromEntries((d.checklist||[]).map(row=>[row.step_code,row.status]));
+    const cards=guidedSteps.slice(0,-1).map((step,index)=>{
+      const complete=step.codes.every(code=>statuses[code]==="Done");
+      return `<a class="va-journey-step ${complete?"complete":""}" href="${routeUrl(step.route,true)}"><span>${complete?"✓":index+1}</span><div><strong>${esc(step.title)}</strong><p>${esc(step.description)}</p></div>${pill(complete?"Done":"Continue")}</a>`;
+    }).join("");
+    const pending=guidedSteps.slice(0,-1).find(step=>!step.codes.every(code=>["Done","Skipped"].includes(statuses[code])));
+    content.innerHTML = `<section class="va-setup-hero"><div><p class="eyebrow">Launch journey</p><h2>Set up your assistant in order</h2><p>Follow these steps from top to bottom. VerityAI saves each stage and always brings you back to the next action.</p></div><div><strong>${number(d.workspace.setup_progress)}%</strong><span>complete</span></div></section><div class="va-progress"><i style="width:${Number(d.workspace.setup_progress||0)}%"></i></div><div class="va-journey-list">${cards}</div><div class="va-callout info"><strong>After launch</strong><span>Installing and testing the widget and capturing your first lead remain visible as recommended post-launch milestones.</span></div><div class="va-form-actions">${pending?`<a class="va-button" href="${routeUrl(pending.route,true)}">Continue setup</a>`:`<button class="va-button" type="button" id="finish-setup">Finish setup</button>`}<a class="va-button ghost" href="${routeUrl("dashboard")}">Return to dashboard</a></div>`;
+    document.querySelector("#finish-setup")?.addEventListener("click",async event=>{event.currentTarget.disabled=true;try{await call("verityai_saas.api.onboarding.finish",{workspace});alert("Workspace setup complete.");location.assign(routeUrl("dashboard"));}catch(err){alert(err.message,true);event.currentTarget.disabled=false;}});
   }
 
   async function assistant() {
@@ -83,14 +113,16 @@
     const options=natures.map(row=>({value:row.business_nature,label:row.business_nature}));
     content.innerHTML = `<form id="assistant-form" class="va-card va-form va-form-card"><div class="va-card-heading"><div><p class="eyebrow">Assistant configuration</p><h2>Identity &amp; sales profile</h2><p class="muted">Shape how your assistant represents the business and what it learns from each prospect.</p></div></div><div class="va-fields">${field("Assistant name","assistant_name",d.assistant_name)}${field("Brand name","brand_name",d.brand_name)}${selectField("Business nature","business_nature",options,d.business_nature,"Select your industry",true)}${field("Welcome greeting","widget_greeting",d.widget_greeting,"textarea",true)}</div><div id="nature-profile">${natureProfile(d.business_nature,natures)}</div><div class="va-form-actions"><button class="va-button">Save changes</button></div></form>`;
     document.querySelector('#assistant-form [name="business_nature"]').addEventListener("change",event=>{document.querySelector("#nature-profile").innerHTML=natureProfile(event.target.value,natures);});
-    bind("assistant-form", async f => call("verityai_saas.api.assistant.update", {workspace, values:json(f)}));
+    bind("assistant-form", async f => call("verityai_saas.api.assistant.update", {workspace, values:json(f)}), null, "widget");
+    showGuidedNav();
   }
 
   async function widget() {
     const d = await call("verityai_saas.api.widget.get", {workspace});
     content.innerHTML = `<form id="widget-form" class="va-card va-form"><h2>Widget appearance</h2><div class="va-fields">${field("Widget title","widget_title",d.widget_title)}${field("Greeting","widget_greeting",d.widget_greeting)}${field("Primary preset","widget_primary_color",d.widget_primary_color)}${field("Header preset","widget_header_color",d.widget_header_color)}</div><button class="va-button">Save appearance</button></form><form id="domain-form" class="va-card va-form"><h2>Allowed domains</h2>${field("One domain per line","domains",(d.allowed_domains||[]).join("\n"),"textarea",true)}<button class="va-button">Save domains</button></form><div class="va-card"><h2>Embed code</h2><pre class="va-code">${esc(d.embed_code)}</pre><p class="muted">Add this before your website's closing body tag. It uses the hardened Verity AI widget runtime.</p></div>`;
     bind("widget-form", f => call("verityai_saas.api.widget.update", {workspace, values:json(f)}));
-    bind("domain-form", f => call("verityai_saas.api.widget.set_domains", {workspace, domains:f.domains.value.split(/\r?\n/).filter(Boolean)}));
+    bind("domain-form", f => call("verityai_saas.api.widget.set_domains", {workspace, domains:f.domains.value.split(/\r?\n/).filter(Boolean)}), null, "knowledge");
+    showGuidedNav();
   }
 
   async function knowledge() {
@@ -99,10 +131,11 @@
       call("verityai_saas.api.knowledge.ingestion_status", {workspace})
     ]);
     content.innerHTML = `<div class="va-grid two"><form id="knowledge-text-form" class="va-card va-form"><h2>Add text knowledge</h2><div class="va-fields">${field("Title","title")}${field("Business facts, FAQs, policies or services","content","","textarea",true)}</div><button class="va-button">Add text</button></form><form id="knowledge-file-form" class="va-card va-form"><h2>Upload document or image</h2><p class="muted">Private TXT, Markdown, CSV, JSON, HTML, PDF, DOCX, PNG, or JPEG. Scanned files use OCR when server OCR packages are installed.</p><div class="va-fields">${field("Title","title")}<div class="va-field"><label>Private file</label><input type="file" name="file" required accept=".txt,.md,.csv,.json,.html,.htm,.pdf,.docx,.png,.jpg,.jpeg"></div></div><button class="va-button">Upload &amp; ingest</button></form><form id="knowledge-url-form" class="va-card va-form"><h2>Crawl website</h2><p class="muted">Only public HTTP(S) pages on the same host are followed. robots.txt and strict size/page limits are respected.</p><div class="va-fields">${field("Title","title")}${field("Public URL","url","","url")}</div><button class="va-button">Queue crawl</button></form><div class="va-card"><h2>Pipeline</h2><p class="muted">Extraction and crawling run on the long queue, then content is passed to the engine-owned chunk index.</p></div></div><h2>Ingestion status</h2>${table([["Source",r=>`<strong>${esc(r.title)}</strong><br><span class="muted">${esc(r.source_type)}</span>`],["Status",r=>pill(r.status)],["Processed",r=>`${number(r.pages_processed)} page(s)<br><span class="muted">${number(r.bytes_processed)} bytes</span>`],["Last refresh",r=>esc(r.last_refreshed_on||"—")],["Details",r=>esc(r.error||r.source_url||r.file_url||"—")],["Action",r=>r.source_type==="URL"?`<button class="va-button secondary" data-refresh-ingestion="${esc(r.name)}">Refresh</button>`:"—"]],ingestions)}<h2>Indexed sources</h2>${table([["Source",r=>esc(r.title)],["Status",r=>pill(r.active?"Active":"Inactive")],["Chunks",r=>number(r.chunk_count)],["Updated",r=>esc(r.modified)]],sources)}`;
-    bind("knowledge-text-form",form=>call("verityai_saas.api.knowledge.create",{workspace,...json(form)}),knowledge);
-    bind("knowledge-url-form",form=>call("verityai_saas.api.knowledge.ingest_url",{workspace,...json(form)}),knowledge);
+    bind("knowledge-text-form",form=>call("verityai_saas.api.knowledge.create",{workspace,...json(form)}),knowledge,"email");
+    bind("knowledge-url-form",form=>call("verityai_saas.api.knowledge.ingest_url",{workspace,...json(form)}),knowledge,"email");
     document.querySelector("#knowledge-file-form").addEventListener("submit",async event=>{event.preventDefault();const form=event.currentTarget;const button=form.querySelector("button");button.disabled=true;try{const fileName=await uploadPrivateFile(form.file.files[0]);await call("verityai_saas.api.knowledge.ingest_file",{workspace,title:form.title.value,file:fileName});alert("File queued for ingestion.");await knowledge();}catch(err){alert(err.message,true);button.disabled=false;}});
     document.querySelectorAll("[data-refresh-ingestion]").forEach(button=>button.addEventListener("click",async()=>{button.disabled=true;try{await call("verityai_saas.api.knowledge.refresh",{workspace,ingestion_name:button.dataset.refreshIngestion});alert("Refresh queued.");await knowledge();}catch(err){alert(err.message,true);button.disabled=false;}}));
+    showGuidedNav();
   }
   async function leads() {
     const [data, assignees] = await Promise.all([
@@ -251,7 +284,7 @@
     const checks = toggles.map(([name,label])=>`<label><input type="checkbox" name="${name}" ${d[name]?"checked":""}> ${label}</label>`).join("");
     const logs=table([["Delivery",r=>`<strong>${esc(r.subject)}</strong><br><span class="muted">${esc(r.recipient)}</span>`],["Type",r=>esc(r.notification_type)],["Status",r=>pill(r.status)],["Error",r=>esc(r.error||"—")],["Date",r=>esc(r.sent_on||r.creation)],["Action",r=>r.status==="Failed"?`<button type="button" class="va-button secondary" data-retry-email="${esc(r.name)}">Retry</button>`:"—"]],deliveryLogs,{title:"No delivery activity",description:"Notification deliveries will appear here once events occur."});
     content.innerHTML = `<div class="va-status-strip"><div><span class="va-status-dot ${d.status==="Active"?"good":""}"></span><div><strong>Email notifications</strong><p>${d.status==="Active"?"Workspace alerts are enabled.":"Workspace alerts are currently disabled."}</p></div></div><button type="button" id="email-test" class="va-button secondary">Send test email</button></div><form id="email-form" class="va-section va-form-section"><header class="va-section-heading"><div><h2>Notification settings</h2><p>Control sender identity, recipients and the events that reach your team.</p></div>${pill(d.status)}</header><div class="va-settings-block"><h3>Delivery identity</h3><div class="va-fields">${field("Notification email","notification_email",d.notification_email,"email")}${field("Reply-to email","reply_to_email",d.reply_to_email,"email")}${field("Additional recipients","alert_recipients",d.alert_recipients)}${field("Branding name","email_branding_name",d.email_branding_name)}<div class="va-field"><label>Status</label><select name="status"><option ${d.status==="Active"?"selected":""}>Active</option><option ${d.status==="Disabled"?"selected":""}>Disabled</option></select></div>${field("Email footer","email_footer",d.email_footer,"textarea",true)}</div></div><div class="va-settings-block"><h3>Alert subscriptions</h3><p>Select only the events that need a human response.</p><div class="va-check-grid">${checks}</div></div><div class="va-form-actions"><button class="va-button">Save notification settings</button></div></form>${section("Delivery history","Recent notification attempts and any action required.",logs)}`;
-    bind("email-form", f => {const v=json(f);toggles.forEach(([key])=>v[key]=f[key].checked?1:0);return call("verityai_saas.api.email.update",{workspace,values:v});});
+    bind("email-form", f => {const v=json(f);toggles.forEach(([key])=>v[key]=f[key].checked?1:0);return call("verityai_saas.api.email.update",{workspace,values:v});}, null, "whatsapp");
     document.querySelectorAll("[data-retry-email]").forEach(button => button.addEventListener("click", async () => {
       button.disabled = true;
       try { await call("verityai_saas.api.email.retry", {workspace, delivery_log:button.dataset.retryEmail}); alert("Failed email delivery retried successfully."); await email(); }
@@ -263,6 +296,7 @@
       catch (err) { alert(err.message, true); }
       finally { button.disabled = false; }
     });
+    showGuidedNav();
   }
 
   async function whatsapp() {
@@ -270,13 +304,14 @@
     const signature=d.engine?.signature_verification_enabled;
     content.innerHTML = `<div class="va-status-strip"><div><span class="va-status-dot ${d.setup_status==="Connected"?"good":""}"></span><div><strong>WhatsApp channel</strong><p>${esc(d.webhook_health?.message||"Configure Meta Cloud API to activate this channel.")}</p></div></div><div class="va-actions">${pill(d.setup_status)}${pill(d.webhook_health?.status||"Not configured")}</div></div><div class="va-operations-grid"><form id="wa-form" class="va-section va-form-section"><header class="va-section-heading"><div><h2>Channel configuration</h2><p>Connect the business number and choose how the assistant participates.</p></div></header><div class="va-settings-block"><h3>Experience</h3><div class="va-fields"><div class="va-field"><label>Mode</label><select name="mode"><option ${d.mode==="Button Only"?"selected":""}>Button Only</option><option ${d.mode==="Lead Alerts"?"selected":""}>Lead Alerts</option><option ${d.mode==="Full AI Automation"?"selected":""}>Full AI Automation</option></select></div>${field("Business WhatsApp number","business_whatsapp_number",d.business_whatsapp_number)}${field("Meta phone number ID","whatsapp_phone_id",d.whatsapp_phone_id)}</div></div><details class="va-secret-panel"><summary>Meta credentials <span>Encrypted and write-only</span></summary><div class="va-fields">${field("Access token","whatsapp_access_token","","password")}${field("Verify token","meta_verify_token","","password")}${field("App secret","meta_app_secret","","password")}</div></details><label class="va-check"><input type="checkbox" name="verify_meta_signature" ${signature?"checked":""}> Verify every Meta webhook signature</label><div class="va-form-actions"><button type="button" id="wa-test" class="va-button secondary">Test connection</button><button class="va-button">Save channel</button></div></form><aside class="va-section va-callback-card"><header class="va-section-heading"><div><h2>Webhook endpoint</h2><p>Add this callback URL in your Meta application.</p></div></header><div class="va-settings-block"><pre class="va-code">${esc(d.engine?.callback_url)}</pre><button type="button" class="va-button ghost" data-copy="${esc(d.engine?.callback_url||"")}">Copy URL</button></div><div class="va-security-list"><div><span>Signature verification</span>${signature?pill("Active"):pill("Required")}</div><div><span>Webhook health</span>${pill(d.webhook_health?.status||"Unknown")}</div></div></aside></div>`;
     content.insertAdjacentHTML("afterbegin", `<div class="va-callout info"><strong>WhatsApp AI · Early Access</strong><span>Production activation is assisted while Meta business verification, templates and phone-number approval are completed.</span></div>`);
-    bind("wa-form", f => {const v=json(f);v.verify_meta_signature=f.verify_meta_signature.checked?1:0;return call("verityai_saas.api.whatsapp.update",{workspace,values:v});},whatsapp);
+    bind("wa-form", f => {const v=json(f);v.verify_meta_signature=f.verify_meta_signature.checked?1:0;return call("verityai_saas.api.whatsapp.update",{workspace,values:v});},whatsapp,"onboarding");
     document.querySelector("#wa-test").addEventListener("click", async event => {
       const button=event.currentTarget; button.disabled=true;
       try { const result=await call("verityai_saas.api.whatsapp.test_connection",{workspace}); alert(`Meta connected${result.verified_name?`: ${result.verified_name}`:""}.`); await whatsapp(); }
       catch(err){alert(err.message,true);button.disabled=false;}
     });
     document.querySelector("[data-copy]").onclick=async event=>{try{await navigator.clipboard.writeText(event.currentTarget.dataset.copy);alert("Callback URL copied.");}catch(err){alert("Copy failed. Select and copy the URL manually.",true);}};
+    showGuidedNav();
   }
 
   async function integrations() {
@@ -305,7 +340,7 @@
     bind("account-form", form => call("verityai_saas.api.account.update", {workspace, values:json(form)}), account);
     document.querySelector("#additional-workspace")?.addEventListener("submit", async event => {
       event.preventDefault(); const form=event.currentTarget; const button=form.querySelector("button"); button.disabled=true;
-      try { const result=await call("verityai_saas.api.onboarding.create", {account:d.name, account_name:d.account_name, ...json(form)}); location.assign(result.dashboard_url); }
+      try { const result=await call("verityai_saas.api.onboarding.create", {account:d.name, account_name:d.account_name, ...json(form)}); location.assign(result.onboarding_url||result.dashboard_url); }
       catch(err){alert(err.message,true);button.disabled=false;}
     });
   }
@@ -338,7 +373,7 @@
       catch (err) { alert(err.message,true); button.disabled = false; }
     }));
   }
-  function bind(id, action, after) { document.querySelector(`#${id}`).addEventListener("submit", async e => {e.preventDefault();const b=e.currentTarget.querySelector('button[type="submit"],button:not([type])');b.disabled=true;try{await action(e.currentTarget);alert("Saved successfully.");if(after)await after();}catch(err){alert(err.message,true)}finally{b.disabled=false}}); }
+  function bind(id, action, after, nextRoute) { document.querySelector(`#${id}`).addEventListener("submit", async e => {e.preventDefault();const b=e.currentTarget.querySelector('button[type="submit"],button:not([type])');b.disabled=true;try{await action(e.currentTarget);alert("Saved successfully.");if(after)await after();if(nextRoute)continueGuided(nextRoute);}catch(err){alert(err.message,true)}finally{b.disabled=false}}); }
 
   async function newWorkspace() {
     const params = new URLSearchParams(location.search);
@@ -346,10 +381,10 @@
     const options=natures.map(row=>({value:row.business_nature,label:row.business_nature}));
     picker.hidden=true; content.innerHTML=`<form id="new-workspace" class="va-card va-form va-form-card va-onboarding-card"><div class="va-card-heading"><div><p class="eyebrow">Guided setup</p><h2>Create your first workspace</h2><p class="muted">Your secure tenant, assistant, trial AI credits, and sales discovery profile are created together.</p></div><span class="va-step-badge">Step 1 of 1</span></div><div class="va-fields">${field("Account name","account_name",params.get("account_name")||"")}${field("Workspace name","workspace_name",params.get("workspace_name")||"")}${field("Business name","business_name",params.get("business_name")||"")}${selectField("Business nature","business_nature",options,"","Select your industry")}${field("Referral code (optional)","referral_code",params.get("ref")||params.get("referral_code")||"")}</div><div id="nature-profile">${natureProfile("",natures)}</div><div class="va-form-actions"><button class="va-button">Create workspace</button></div></form>`;
     document.querySelector('#new-workspace [name="business_nature"]').addEventListener("change",event=>{document.querySelector("#nature-profile").innerHTML=natureProfile(event.target.value,natures);});
-    bind("new-workspace", async f=>{const d=await call("verityai_saas.api.onboarding.create",json(f));location.href=d.dashboard_url;});
+    bind("new-workspace", async f=>{const d=await call("verityai_saas.api.onboarding.create",json(f));location.href=d.onboarding_url||d.dashboard_url;});
   }
 
   const renderers={dashboard,health,onboarding,assistant,widget,knowledge,leads,crm,conversations,commerce,quotes,usage,billing,integrations,email,whatsapp,team,account};
-  async function init(){try{const rows=await call("verityai_saas.api.workspace.list_workspaces");if(!rows.length){await newWorkspace();return}const params=new URLSearchParams(location.search);workspace=params.get("workspace")||localStorage.getItem("verityai_workspace")||rows[0].name;if(!rows.some(r=>r.name===workspace))workspace=rows[0].name;picker.innerHTML=rows.map(r=>`<option value="${esc(r.name)}" ${r.name===workspace?"selected":""}>${esc(r.business_name||r.workspace_name)}</option>`).join("");picker.addEventListener("change",()=>{workspace=picker.value;localStorage.setItem("verityai_workspace",workspace);renderers[page]();});localStorage.setItem("verityai_workspace",workspace);await (renderers[page]||dashboard)()}catch(err){content.innerHTML=`<div class="va-card va-empty">${esc(err.message)}</div>`;alert(err.message,true)}}
+  async function init(){try{const rows=await call("verityai_saas.api.workspace.list_workspaces");if(!rows.length){await newWorkspace();return}const params=new URLSearchParams(location.search);workspace=params.get("workspace")||localStorage.getItem("verityai_workspace")||rows[0].name;if(!rows.some(r=>r.name===workspace))workspace=rows[0].name;picker.innerHTML=rows.map(r=>`<option value="${esc(r.name)}" ${r.name===workspace?"selected":""}>${esc(r.business_name||r.workspace_name)}</option>`).join("");document.querySelectorAll(".va-sidebar nav a").forEach(link=>{const route=link.pathname.split("/").filter(Boolean).pop();link.href=routeUrl(route);});picker.addEventListener("change",()=>{workspace=picker.value;localStorage.setItem("verityai_workspace",workspace);location.assign(routeUrl(page,isGuided()));});localStorage.setItem("verityai_workspace",workspace);await (renderers[page]||dashboard)()}catch(err){content.innerHTML=`<div class="va-card va-empty">${esc(err.message)}</div>`;alert(err.message,true)}}
   init();
 })();

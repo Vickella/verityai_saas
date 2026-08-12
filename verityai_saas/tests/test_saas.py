@@ -52,6 +52,19 @@ class TestVerityAISaaS(FrappeTestCase):
 		self.assertTrue(frappe.db.exists("VerityAI Usage Wallet", self.created["wallet"]))
 		self.assertEqual(frappe.db.count("VerityAI Onboarding Checklist", {"workspace": self.workspace}), len(onboarding.CHECKLIST))
 
+	def test_setup_cannot_finish_before_required_steps(self):
+		with self.assertRaises(frappe.ValidationError):
+			onboarding.complete_setup(self.workspace, user=self.owner)
+
+	def test_post_launch_steps_are_skipped_when_setup_finishes(self):
+		for code in onboarding.REQUIRED_SETUP_STEPS:
+			onboarding.set_step(self.workspace, code, "Done", user=self.owner)
+		result = onboarding.complete_setup(self.workspace, user=self.owner)
+		self.assertEqual(result["setup_progress"], 100)
+		self.assertEqual(frappe.db.get_value("VerityAI Workspace", self.workspace, "onboarding_status"), "Complete")
+		statuses = dict(frappe.get_all("VerityAI Onboarding Checklist", filters={"workspace": self.workspace}, fields=["step_code", "status"], as_list=True))
+		self.assertTrue(all(statuses[code] == "Skipped" for code in onboarding.POST_LAUNCH_STEPS))
+
 	def test_cross_workspace_access_is_rejected(self):
 		frappe.set_user(self.other)
 		with self.assertRaises(frappe.PermissionError):

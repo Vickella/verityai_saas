@@ -65,6 +65,8 @@ class TestCustomerPortalRoutes(FrappeTestCase):
 
 	def test_onboarding_returns_safe_dashboard_url(self):
 		self.assertTrue(self.created["dashboard_url"].startswith("/verityai/dashboard"))
+		self.assertTrue(self.created["onboarding_url"].startswith("/verityai/assistant"))
+		self.assertIn("guided=1", self.created["onboarding_url"])
 
 	def test_workspace_owner_receives_portal_only_role(self):
 		self.assertIn("VerityAI Customer Owner", frappe.get_roles(self.user))

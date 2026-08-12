@@ -1,7 +1,7 @@
 import frappe
 
 from verityai_saas.api._response import endpoint, json_value
-from verityai_saas.services.onboarding import create_workspace, set_step
+from verityai_saas.services.onboarding import complete_setup, create_workspace, set_step
 from verityai_saas.services.permissions import check_workspace_access, is_operator, require_login
 
 
@@ -38,3 +38,11 @@ def create(
 def update_step(workspace, step_code, status="Done"):
 	check_workspace_access(workspace)
 	return {"setup_progress": set_step(workspace, step_code, status)}
+
+
+@frappe.whitelist(methods=["POST"])
+@endpoint
+def finish(workspace):
+	user = require_login()
+	check_workspace_access(workspace)
+	return complete_setup(workspace, user=user)

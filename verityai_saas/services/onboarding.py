@@ -14,6 +14,8 @@ CHECKLIST = (
 	("knowledge", "Add Knowledge"), ("lead_capture", "Configure Lead Capture"), ("email", "Configure Email Notifications"),
 	("whatsapp", "Configure WhatsApp"), ("install_widget", "Install Widget"), ("first_lead", "Capture First Lead"), ("plan", "Choose Plan"),
 )
+REQUIRED_SETUP_STEPS = ("workspace", "assistant", "business_nature", "domain", "widget", "knowledge", "email", "whatsapp", "plan")
+POST_LAUNCH_STEPS = ("test_widget", "install_widget", "first_lead")
 
 
 def slug_name(value):
@@ -69,7 +71,17 @@ def create_workspace(owner_user, account_name, workspace_name, business_name=Non
 		engine.apply_plan_limits(workspace.name, plan.name)
 		frappe.db.set_value("VerityAI Account", account, "default_workspace", workspace.name)
 		update_progress(workspace.name)
-		return {"workspace": workspace.name, "account": account, "member": member.name, "engine_tenant": tenant, "engine_configuration": configuration, "subscription": subscription.name, "wallet": wallet.name, "dashboard_url": f"/verityai/dashboard?workspace={workspace.name}"}
+		return {
+			"workspace": workspace.name,
+			"account": account,
+			"member": member.name,
+			"engine_tenant": tenant,
+			"engine_configuration": configuration,
+			"subscription": subscription.name,
+			"wallet": wallet.name,
+			"dashboard_url": f"/verityai/dashboard?workspace={workspace.name}",
+			"onboarding_url": f"/verityai/assistant?workspace={workspace.name}&guided=1",
+		}
 	except Exception:
 		frappe.db.rollback(save_point=savepoint)
 		raise
@@ -81,6 +93,29 @@ def set_step(workspace_name, step_code, status="Done", user=None):
 		frappe.throw(_("Onboarding step was not found."), frappe.DoesNotExistError)
 	frappe.db.set_value("VerityAI Onboarding Checklist", name, {"status": status, "completed_on": frappe.utils.now_datetime() if status == "Done" else None, "completed_by": (user or frappe.session.user) if status == "Done" else None})
 	return update_progress(workspace_name)
+
+
+def complete_setup(workspace_name, user=None):
+	statuses = {
+		row.step_code: row.status
+		for row in frappe.get_all(
+			"VerityAI Onboarding Checklist",
+			filters={"workspace": workspace_name},
+			fields=["step_code", "status"],
+		)
+	}
+	missing = [code for code in REQUIRED_SETUP_STEPS if statuses.get(code) not in {"Done", "Skipped"}]
+	if missing:
+		labels = dict(CHECKLIST)
+		frappe.throw(
+			_("Complete these setup steps first: {0}").format(", ".join(labels.get(code, code) for code in missing)),
+			frappe.ValidationError,
+		)
+	for code in POST_LAUNCH_STEPS:
+		if statuses.get(code) == "Not Started":
+			set_step(workspace_name, code, "Skipped", user=user)
+	frappe.db.set_value("VerityAI Workspace", workspace_name, {"setup_progress": 100, "onboarding_status": "Complete"})
+	return {"setup_progress": 100, "onboarding_status": "Complete"}
 
 
 def update_progress(workspace_name):
