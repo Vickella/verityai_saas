@@ -26,6 +26,9 @@ def endpoint(function):
 		except RateLimitExceeded as exc:
 			frappe.local.response["http_status_code"] = 429
 			return failure(exc, "RATE_LIMITED")
+		except frappe.TooManyRequestsError as exc:
+			frappe.local.response["http_status_code"] = 429
+			return failure(exc or "Too many requests. Please try again later.", "RATE_LIMITED")
 		except frappe.PermissionError as exc:
 			frappe.local.response["http_status_code"] = 403
 			return failure(exc, "WORKSPACE_FORBIDDEN")
@@ -42,4 +45,3 @@ def json_value(value, default=None):
 	if value in (None, ""):
 		return default if default is not None else {}
 	return frappe.parse_json(value) if isinstance(value, str) else value
-

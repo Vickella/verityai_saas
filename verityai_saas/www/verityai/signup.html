@@ -12,7 +12,7 @@
 			<a class="va-auth-brand" href="/">VerityAI</a>
 			<p class="eyebrow">Start your trial</p>
 			<h1>Create your AI workspace</h1>
-			<p class="muted">We will verify your email before creating your secure workspace and assistant.</p>
+			<p class="muted">Create your secure login, then finish configuring your business workspace and assistant.</p>
 			<div id="signup-notice" class="va-notice" hidden></div>
 			<form id="signup-form" class="va-form">
 				<div class="va-fields">
@@ -20,8 +20,10 @@
 					<div class="va-field"><label for="email">Work email</label><input id="email" name="email" type="email" maxlength="140" autocomplete="email" required></div>
 					<div class="va-field"><label for="business_name">Business name</label><input id="business_name" name="business_name" maxlength="140" required></div>
 					<div class="va-field"><label for="workspace_name">Workspace name</label><input id="workspace_name" name="workspace_name" maxlength="140" placeholder="Defaults to business name"></div>
+					<div class="va-field"><label for="password">Password</label><input id="password" name="password" type="password" minlength="8" maxlength="128" autocomplete="new-password" required><small>Use at least 8 characters and avoid a commonly used password.</small></div>
+					<div class="va-field"><label for="confirm_password">Confirm password</label><input id="confirm_password" name="confirm_password" type="password" minlength="8" maxlength="128" autocomplete="new-password" required></div>
 				</div>
-				<button class="va-button" type="submit">Create account</button>
+				<button class="va-button" type="submit">Create account and continue</button>
 			</form>
 			<p class="muted">Already registered? <a id="signup-login" href="/login?redirect-to=/verityai">Sign in</a></p>
 		</section>

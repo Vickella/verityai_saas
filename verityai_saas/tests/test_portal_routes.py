@@ -94,3 +94,9 @@ class TestCustomerPortalRoutes(FrappeTestCase):
 		response = get_response("/verityai/dashboard")
 		self.assertIn(response.status_code, {301, 302, 303, 307, 308})
 		self.assertIn("/login", response.headers.get("Location", ""))
+
+	def test_guest_entry_route_is_signup(self):
+		frappe.set_user("Guest")
+		response = get_response("/verityai")
+		self.assertIn(response.status_code, {301, 302, 303, 307, 308})
+		self.assertIn("/verityai/signup", response.headers.get("Location", ""))
