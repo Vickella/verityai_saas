@@ -41,7 +41,7 @@
 				{% for route, label in routes %}<a href="/verityai/{{ route }}" data-route="{{ route }}" class="{% if portal_page == route %}active{% endif %}"><svg class="va-nav-icon" aria-hidden="true"><use href="#va-i-{{ route }}"></use></svg>{{ label }}</a>{% endfor %}
 				{% endfor %}
 			</nav>
-			<div class="va-user"><span class="va-user-avatar">{{ user_email[:1] | upper }}</span><span class="va-user-copy"><strong>{{ user_full_name }}</strong><small>{{ user_email }}</small></span><a class="va-user-logout" href="/api/method/logout" aria-label="Sign out" title="Sign out"><svg aria-hidden="true"><use href="#va-i-logout"></use></svg></a></div>
+			<div class="va-user"><span class="va-user-avatar">{{ user_email[:1] | upper }}</span><span class="va-user-copy"><strong>{{ user_full_name }}</strong><small>{{ user_email }}</small></span><button type="button" class="va-user-logout" id="va-sign-out" aria-label="Sign out" title="Sign out"><svg aria-hidden="true"><use href="#va-i-logout"></use></svg></button></div>
 		</aside>
 		<main>
 			<header class="va-topbar">

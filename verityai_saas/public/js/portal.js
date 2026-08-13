@@ -3,11 +3,32 @@
   const content = document.querySelector("#va-content");
   const picker = document.querySelector("#va-workspace");
   const notice = document.querySelector("#va-notice");
+	const signOut = document.querySelector("#va-sign-out");
   let workspace = null;
   let leadFilters = {start:0, limit:20, status:"", source_channel:"", search:""};
   let conversationFilters = {start:0, limit:20, platform:"", status:"", search:""};
   let analyticsFilters = {from_date:"", to_date:""};
   let commerceView = "overview";
+
+	signOut?.addEventListener("click", async () => {
+		if (signOut.disabled) return;
+		signOut.disabled = true;
+		signOut.setAttribute("aria-label", "Signing out");
+		try {
+			const response = await fetch("/api/method/logout", {
+				method: "POST",
+				headers: {"X-Frappe-CSRF-Token": window.csrf_token || ""},
+				credentials: "same-origin",
+			});
+			if (!response.ok) throw new Error("Sign out failed");
+			localStorage.removeItem("verityai_workspace");
+			location.replace("/login?redirect-to=/verityai");
+		} catch (error) {
+			signOut.disabled = false;
+			signOut.setAttribute("aria-label", "Sign out");
+			alert("We could not sign you out. Please try again.", true);
+		}
+	});
 
   const guidedSteps = [
     {route:"assistant", label:"Assistant", title:"Assistant profile", codes:["assistant","business_nature"]},
