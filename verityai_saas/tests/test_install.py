@@ -14,7 +14,7 @@ class TestStandaloneInstallation(FrappeTestCase):
 	def test_public_plans_and_credit_packs_match_commercial_baseline(self):
 		ensure_default_plan()
 		expected = {
-			"TRIAL": (0, 50_000), "LAUNCH": (12, 500_000), "GROWTH": (24, 1_500_000),
+			"TRIAL": (0, 10_000), "LAUNCH": (12, 500_000), "GROWTH": (24, 1_500_000),
 			"SCALE": (60, 6_000_000), "ENTERPRISE": (100, 12_000_000),
 		}
 		for code, (price, credits) in expected.items():

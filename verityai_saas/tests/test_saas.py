@@ -116,6 +116,26 @@ class TestVerityAISaaS(FrappeTestCase):
 		billing.set_subscription_status(self.workspace, "Suspended", "Test")
 		self.assertEqual(frappe.db.get_value("AI Tenant", self.tenant, "active"), 0)
 
+	def test_trial_reduction_preserves_non_trial_credits(self):
+		from verityai_saas.services.billing import apply_trial_allowance_limit
+
+		frappe.db.set_value(
+			"VerityAI Usage Wallet",
+			self.created["wallet"],
+			{"opening_token_allowance": 50_000, "top_up_tokens": 2_000, "promotional_credits": 1_000, "tokens_used": 4_000},
+		)
+		self.assertEqual(apply_trial_allowance_limit(10_000, self.workspace), 1)
+		wallet = frappe.db.get_value(
+			"VerityAI Usage Wallet",
+			self.created["wallet"],
+			["opening_token_allowance", "top_up_tokens", "promotional_credits", "tokens_remaining"],
+			as_dict=True,
+		)
+		self.assertEqual(wallet.opening_token_allowance, 10_000)
+		self.assertEqual(wallet.top_up_tokens, 2_000)
+		self.assertEqual(wallet.promotional_credits, 1_000)
+		self.assertEqual(wallet.tokens_remaining, 9_000)
+
 	def test_email_delivery_log_is_created(self):
 		with patch("frappe.sendmail"):
 			logs = notifications.send_notification(self.workspace, "Test", "Subject", "Body")

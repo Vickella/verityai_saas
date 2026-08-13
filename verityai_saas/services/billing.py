@@ -12,6 +12,46 @@ BILLING_EVENT_TYPES = {"Invoice", "Payment", "Credit", "Adjustment", "Top-Up", "
 BILLING_EVENT_STATUSES = {"Pending", "Completed", "Failed", "Cancelled"}
 
 
+def apply_trial_allowance_limit(limit=10_000, workspace_name=None):
+	"""Reduce the free allowance while preserving paid and promotional credits."""
+	limit = max(cint(limit), 0)
+	plan_name = frappe.db.get_value("VerityAI Plan", {"plan_code": "TRIAL"}, "name")
+	if not plan_name:
+		return 0
+	frappe.db.set_value("VerityAI Plan", plan_name, "monthly_token_limit", limit, update_modified=False)
+	filters = {"plan": plan_name, "status": "Trial"}
+	if workspace_name:
+		filters["workspace"] = workspace_name
+	updated = 0
+	for subscription in frappe.get_all("VerityAI Subscription", filters=filters, fields=["workspace"]):
+		wallet = frappe.db.get_value(
+			"VerityAI Usage Wallet",
+			{"workspace": subscription.workspace},
+			["name", "top_up_tokens", "promotional_credits", "tokens_used"],
+			as_dict=True,
+		)
+		if not wallet:
+			continue
+		total = limit + cint(wallet.top_up_tokens) + cint(wallet.promotional_credits)
+		remaining = max(total - cint(wallet.tokens_used), 0)
+		frappe.db.set_value(
+			"VerityAI Usage Wallet",
+			wallet.name,
+			{
+				"opening_token_allowance": limit,
+				"tokens_remaining": remaining,
+				"status": "Normal" if remaining else "Exhausted",
+			},
+			update_modified=False,
+		)
+		tenant = frappe.db.get_value("VerityAI Workspace", subscription.workspace, "engine_tenant")
+		config_name = frappe.db.get_value("AI Configuration", {"tenant": tenant}, "name") if tenant else None
+		if config_name:
+			frappe.db.set_value("AI Configuration", config_name, "monthly_token_limit", total, update_modified=False)
+		updated += 1
+	return updated
+
+
 def _validate_choice(value, allowed, label):
 	if value not in allowed:
 		frappe.throw(f"Invalid {label}.", frappe.ValidationError)

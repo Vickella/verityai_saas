@@ -492,8 +492,8 @@ def ensure_default_plan():
 		return
 	plans = (
 		{"plan_name": "Trial", "plan_code": "TRIAL", "monthly_price": 0, "annual_price": 0, "trial_days": 14,
-		 "monthly_token_limit": 50000, "max_tokens": 500, "max_workspaces": 1, "max_assistants": 1, "max_team_members": 1,
-		 "monthly_web_conversations": 50, "monthly_whatsapp_messages": 0, "monthly_email_sends": 100,
+		 "monthly_token_limit": 10000, "max_tokens": 500, "max_workspaces": 1, "max_assistants": 1, "max_team_members": 1,
+		 "monthly_web_conversations": 15, "monthly_whatsapp_messages": 0, "monthly_email_sends": 100,
 		 "max_knowledge_sources": 3, "max_allowed_domains": 1, "public_rate_limit_per_minute": 10,
 		 "max_public_message_chars": 2000, "can_use_whatsapp_button": 1, "can_use_email_notifications": 1, "support_level": "Community"},
 		{"plan_name": "Launch", "plan_code": "LAUNCH", "monthly_price": 12, "annual_price": 120, "trial_days": 0,

@@ -10,3 +10,4 @@ verityai_saas.patches.v0_6.business_natures_and_portal_polish
 verityai_saas.patches.v0_7.production_workspace_ux
 verityai_saas.patches.v0_8.ai_credits_commercial_hardening
 verityai_saas.patches.v0_9.hide_enterprise_plan
+verityai_saas.patches.v0_10.reduce_trial_allowance
