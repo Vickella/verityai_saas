@@ -13,9 +13,27 @@ from verityai_saas.services.workspace import (
 
 @frappe.whitelist()
 @endpoint
-def list_workspaces():
+def list_workspaces(workspace=None):
+	"""Return one resolved customer workspace without exposing a tenant directory."""
 	names = get_user_workspaces()
-	return frappe.get_all("VerityAI Workspace", filters={"name": ["in", names]}, fields=["name", "workspace_name", "business_name", "status", "setup_progress", "engine_tenant"], order_by="workspace_name asc")
+	if not names:
+		return []
+	if workspace and workspace in names:
+		selected = workspace
+	else:
+		default_workspaces = frappe.get_all(
+			"VerityAI Account",
+			filters={"default_workspace": ["in", names]},
+			pluck="default_workspace",
+			order_by="modified desc",
+		)
+		selected = default_workspaces[0] if default_workspaces else names[0]
+	return frappe.get_all(
+		"VerityAI Workspace",
+		filters={"name": selected},
+		fields=["name", "workspace_name", "business_name", "status", "setup_progress", "engine_tenant"],
+		limit=1,
+	)
 
 
 @frappe.whitelist()

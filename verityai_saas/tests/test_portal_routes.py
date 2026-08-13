@@ -5,6 +5,7 @@ from frappe.tests.utils import FrappeTestCase
 from frappe.website.serve import get_response, get_response_content
 
 from verityai_saas import __version__
+from verityai_saas.api import workspace as workspace_api
 from verityai_saas.services.admin_reauth import mark_admin_reauthenticated
 from verityai_saas.services.onboarding import create_workspace
 from verityai_saas.www.verityai.integrations import get_context as integrations_context
@@ -54,6 +55,9 @@ class TestCustomerPortalRoutes(FrappeTestCase):
 		self.assertIn("/verityai/account", content)
 		self.assertNotIn("/verityai/integrations", content)
 		self.assertNotIn('href="/app/assistant"', content)
+		self.assertNotIn('<select id="va-workspace"', content)
+		self.assertIn('class="va-nav-icon"', content)
+		self.assertIn('class="va-user-logout"', content)
 		quote_content = get_response_content("/verityai/quotes")
 		self.assertIn('data-verity-page="quotes"', quote_content)
 		commerce_content = get_response_content("/verityai/commerce")
@@ -67,6 +71,17 @@ class TestCustomerPortalRoutes(FrappeTestCase):
 		self.assertTrue(self.created["dashboard_url"].startswith("/verityai/dashboard"))
 		self.assertTrue(self.created["onboarding_url"].startswith("/verityai/assistant"))
 		self.assertIn("guided=1", self.created["onboarding_url"])
+
+	def test_customer_workspace_endpoint_never_returns_a_tenant_directory(self):
+		frappe.set_user(self.user)
+		response = workspace_api.list_workspaces()
+		self.assertTrue(response["success"])
+		self.assertEqual(len(response["data"]), 1)
+		self.assertEqual(response["data"][0].name, self.created["workspace"])
+		requested_other = workspace_api.list_workspaces("another-private-tenant")
+		self.assertTrue(requested_other["success"])
+		self.assertEqual(len(requested_other["data"]), 1)
+		self.assertEqual(requested_other["data"][0].name, self.created["workspace"])
 
 	def test_workspace_owner_receives_portal_only_role(self):
 		self.assertIn("VerityAI Customer Owner", frappe.get_roles(self.user))

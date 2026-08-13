@@ -36,6 +36,10 @@ def portal_context(context, page):
 	context.page_title = page_title
 	context.page_description = page_description
 	context.user_email = frappe.session.user
+	first_name, last_name = frappe.db.get_value(
+		"User", frappe.session.user, ["first_name", "last_name"]
+	) or ("", "")
+	context.user_full_name = " ".join(value for value in (first_name, last_name) if value).strip() or frappe.session.user
 	context.csrf_token = get_csrf_token()
 	context.asset_version = __version__
 	return context

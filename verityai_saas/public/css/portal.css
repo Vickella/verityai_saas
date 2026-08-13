@@ -1357,3 +1357,28 @@ main { position: relative; }
   .va-nav-mark { display: none; }
   .va-topbar { min-height: 0; padding-bottom: 16px; }
 }
+
+/* Tenant context and navigation refinement */
+.va-sidebar { overflow: hidden; padding: 24px 16px 16px; }
+.va-sidebar nav { min-height: 0; overflow: auto; padding: 0 2px 12px 0; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.13) transparent; }
+.va-icon-sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
+.va-nav-icon { width: 18px; height: 18px; flex: 0 0 auto; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; opacity: .78; transition: opacity 150ms ease,transform 150ms ease; }
+.va-sidebar nav a:hover .va-nav-icon,.va-sidebar nav a.active .va-nav-icon { opacity: 1; }
+.va-sidebar nav a.active .va-nav-icon { color: #8db9fb; transform: scale(1.04); }
+.va-nav-mark { display: none; }
+.va-user { flex: 0 0 auto; min-height: 64px; margin: 12px 0 0; padding: 10px 9px 10px 10px; gap: 10px; border-color: rgba(150,185,226,.13); border-radius: 13px; background: linear-gradient(145deg,rgba(255,255,255,.065),rgba(255,255,255,.025)); box-shadow: 0 8px 20px rgba(0,0,0,.08); white-space: normal; }
+.va-user-avatar { width: 36px; height: 36px; border-radius: 11px; color: #f1f6ff; background: linear-gradient(145deg,rgba(62,130,229,.58),rgba(62,93,169,.38)); font-size: 12px; }
+.va-user-copy { min-width: 0; display: grid; gap: 2px; }
+.va-user strong { overflow: hidden; color: #eef5ff; font-size: 11px; font-weight: 760; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
+.va-user small { overflow: hidden; color: #91a8c1; font-size: 9px; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
+.va-user-logout { width: 30px; height: 30px; margin-left: auto; display: grid; place-items: center; flex: 0 0 auto; color: #8fa7c1; border-radius: 9px; transition: color 150ms ease,background 150ms ease; }
+.va-user-logout:hover { color: #fff; background: rgba(255,255,255,.09); }
+.va-user-logout svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.va-workspace-context { min-width: min(320px,35vw); display: grid; gap: 3px; padding: 10px 14px; border: 1px solid #dbe2ec; border-radius: 12px; background: rgba(255,255,255,.78); box-shadow: 0 1px 2px rgba(15,23,42,.025); }
+.va-workspace-context span { color: #7a8799; font-size: 8px; font-weight: 820; letter-spacing: .12em; text-transform: uppercase; }
+.va-workspace-context strong { overflow: hidden; color: #243247; font-size: 12px; font-weight: 720; text-overflow: ellipsis; white-space: nowrap; }
+
+@media (max-width: 760px) {
+  .va-workspace-context { width: 100%; min-width: 0; }
+  .va-user { display: none; }
+}
