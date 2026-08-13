@@ -1085,15 +1085,16 @@ article.va-member-row,
 .va-plan-features li::before { content: "✓"; position: absolute; left: 0; color: #168765; font-weight: 900; }
 .va-checkout-methods { display: grid; gap: 8px; margin-top: auto; }
 .va-checkout-security { margin: 0; color: var(--ink-500); font-size: 9px; line-height: 1.45; }
-.va-credit-pack-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 11px; padding: 15px 18px 18px; }
-.va-credit-pack { display: flex; align-items: center; justify-content: space-between; gap: 18px; min-width: 0; padding: 18px; border: 1px solid var(--line); border-radius: 14px; background: linear-gradient(145deg,#fff,#f6f9fe); box-shadow: 0 7px 18px rgba(16,49,91,.04); }
-.va-credit-pack-copy { min-width: 0; display: grid; gap: 5px; }
-.va-credit-pack-copy > strong { color: var(--ink-950); font-size: 21px; line-height: 1.1; white-space: nowrap; }
-.va-credit-pack-copy > strong span { color: var(--ink-500); font-size: 10px; font-weight: 700; }
-.va-credit-pack-copy small { max-width: 220px; color: var(--ink-500); font-size: 9px; line-height: 1.45; }
-.va-credit-pack-action { flex: 0 0 auto; display: grid; justify-items: end; gap: 9px; }
-.va-credit-pack-action > strong { color: var(--ink-950); font-size: 15px; white-space: nowrap; }
-.va-credit-pack-action .va-button { width: auto; min-width: 112px; }
+.va-credit-pack-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; padding: 16px 18px 18px; }
+.va-credit-pack { min-width: 0; min-height: 196px; display: grid; grid-template-rows: auto 1fr auto; gap: 15px; padding: 18px; overflow: hidden; border: 1px solid var(--line); border-radius: 14px; background: linear-gradient(145deg,#fff,#f6f9fe); box-shadow: 0 7px 18px rgba(16,49,91,.04); }
+.va-credit-pack-head { min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.va-credit-pack-head > strong { flex: 0 0 auto; color: var(--ink-950); font-size: 15px; white-space: nowrap; }
+.va-credit-pack-copy { min-width: 0; display: grid; align-content: start; gap: 4px; }
+.va-credit-pack-copy > strong { overflow-wrap: anywhere; color: var(--ink-950); font-size: clamp(22px,2vw,28px); line-height: 1; letter-spacing: -.035em; }
+.va-credit-pack-copy > span { color: var(--ink-500); font-size: 10px; font-weight: 750; }
+.va-credit-pack-copy small { max-width: 30rem; margin-top: 3px; color: var(--ink-500); font-size: 9px; line-height: 1.45; }
+.va-credit-pack-action { min-width: 0; display: flex; align-items: center; justify-content: flex-end; padding-top: 12px; border-top: 1px solid #e4eaf2; }
+.va-credit-pack-action .va-button { max-width: 100%; min-width: 0; }
 .va-referral-card { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: center; gap: 14px; padding: 18px; }
 .va-referral-card h3 { margin: 0 0 4px; font-size: 16px; }
 .va-referral-card p { margin: 0; color: var(--ink-500); font-size: 10px; }
@@ -1381,5 +1382,101 @@ main { position: relative; }
 
 @media (max-width: 760px) {
   .va-workspace-context { width: 100%; min-width: 0; }
-  .va-user { display: none; }
+  .va-user { display: flex; }
+}
+
+/* Portal quality audit: resilient content, actions and responsive states. */
+body { overflow-x: clip; }
+img, svg, video, canvas { max-width: 100%; }
+.va-shell, .va-sidebar, main, .va-content,
+.va-grid, .va-card, .va-section, .va-table-wrap,
+.va-command-bar, .va-section-heading, .va-subsection-heading,
+.va-filter-bar, .va-invite-bar, .va-status-strip,
+.va-plan-hero, .va-account-hero, .va-referral-card,
+.va-admin-search, .va-admin-drawer-tools { min-width: 0; }
+.va-command-bar > *, .va-section-heading > *, .va-subsection-heading > *,
+.va-filter-bar > *, .va-invite-bar > *, .va-status-strip > *,
+.va-plan-hero > *, .va-account-hero > *, .va-referral-card > *,
+.va-admin-search > *, .va-admin-drawer-tools > * { min-width: 0; }
+.va-card h1, .va-card h2, .va-card h3,
+.va-section h1, .va-section h2, .va-section h3,
+.va-command-bar h2, .va-section-heading h2,
+.va-subsection-heading h3, .va-empty strong, .va-empty p,
+.va-status-strip p, .va-member-identity strong,
+.va-member-identity span { overflow-wrap: anywhere; }
+.va-field input, .va-field select, .va-field textarea,
+.va-filter-fields, .va-invite-fields { min-width: 0; max-width: 100%; }
+.va-field input, .va-field select, .va-field textarea { width: 100%; }
+.va-code { max-width: 100%; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+.va-button { max-width: 100%; white-space: normal; text-align: center; }
+.va-actions, .va-form-actions { min-width: 0; flex-wrap: wrap; }
+.va-actions > *, .va-form-actions > * { max-width: 100%; }
+.va-actions.compact { flex-wrap: wrap; }
+.va-table td .va-actions { row-gap: 5px; }
+.va-table td .va-button { min-height: 32px; padding: 6px 9px; }
+.va-plan-card-head { min-width: 0; flex-wrap: wrap; }
+.va-plan-card-head > div { min-width: 0; }
+.va-payment-choice { min-width: 0; }
+.va-payment-choice > span:nth-child(2) { min-width: 0; }
+.va-payment-choice strong, .va-payment-choice small { overflow-wrap: anywhere; }
+.va-referral-code { min-width: 0; max-width: 100%; flex-wrap: wrap; }
+.va-referral-code code { min-width: 0; overflow-wrap: anywhere; }
+.va-member-row summary > *, .va-member-access > * { min-width: 0; }
+.va-drawer-heading > div { min-width: 0; }
+.va-quote-line > * { min-width: 0; }
+.va-admin-tabs button, .va-tabs button { flex: 0 0 auto; }
+
+@media (max-width: 1120px) {
+  .va-credit-pack-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .va-filter-bar, .va-invite-bar { align-items: flex-start; flex-direction: column; }
+  .va-filter-fields, .va-invite-fields { width: 100%; flex-wrap: wrap; }
+  .va-filter-bar > .va-actions { width: 100%; }
+}
+
+@media (max-width: 760px) {
+  .va-sidebar { overflow: visible; }
+  .va-sidebar nav { overflow-x: auto; overflow-y: hidden; padding-bottom: 8px; }
+  .va-user { margin-top: 8px; }
+  .va-topbar { gap: 11px; }
+  .va-topbar h1 { font-size: 26px; }
+  .va-command-bar, .va-section-heading, .va-subsection-heading,
+  .va-status-strip, .va-filter-bar, .va-invite-bar,
+  .va-admin-search, .va-admin-drawer-tools { gap: 12px; }
+  .va-command-bar > .va-actions, .va-section-heading > .va-actions,
+  .va-status-strip > .va-actions, .va-filter-bar > .va-actions { width: 100%; }
+  .va-command-bar > .va-actions .va-button,
+  .va-filter-bar > .va-actions .va-button { flex: 1 1 130px; }
+  .va-form-actions .va-button { flex: 1 1 140px; }
+  .va-credit-pack-grid { grid-template-columns: 1fr; padding: 13px; }
+  .va-credit-pack { min-height: 0; }
+  .va-credit-pack-action { justify-content: stretch; }
+  .va-credit-pack-action .va-button { width: 100% !important; }
+  .va-referral-card { grid-template-columns: 1fr; }
+  .va-referral-code { align-items: stretch; flex-direction: column; }
+  .va-referral-code .va-button { width: 100% !important; }
+  .va-payment-choice { grid-template-columns: 34px minmax(0,1fr) auto; }
+  .va-plan-usage { flex-wrap: wrap; gap: 18px 28px; }
+  .va-plan-usage > div { flex: 1 1 120px; }
+  .va-drawer-heading { align-items: flex-start; }
+  .va-quote-line .va-icon-button { align-self: end; }
+  .va-table td .va-actions { width: 100%; justify-content: flex-end; }
+  .va-table td .va-actions .va-button { flex: 0 1 auto; }
+  .va-admin-attention { grid-template-columns: 1fr; }
+  .va-payment-methods { grid-template-columns: 1fr; padding-inline: 13px; }
+  .va-payment-gateway-brand { grid-template-columns: 42px minmax(0,1fr); }
+  .va-payment-connection { grid-column: 1 / -1; justify-content: space-between; }
+  .va-payment-gateway-card > footer { flex-direction: column; }
+}
+
+@media (max-width: 430px) {
+  main { padding-inline: 10px; }
+  .va-card, .va-command-bar { padding: 16px; }
+  .va-section-heading, .va-settings-block { padding-inline: 14px; }
+  .va-metrics { grid-template-columns: 1fr; }
+  .va-quote-line { grid-template-columns: 1fr; }
+  .va-quote-line .va-line-product { grid-column: auto; }
+  .va-quote-line .va-icon-button { justify-self: end; }
+  .va-empty { padding: 22px 16px; }
+  .va-credit-pack-head { align-items: flex-start; }
+  .va-plan-card-head { flex-direction: column; }
 }
