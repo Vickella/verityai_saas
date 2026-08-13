@@ -25,6 +25,9 @@ def install():
 	seed_business_natures()
 	ensure_default_plan()
 	ensure_workspace()
+	from verityai_saas.services.platform_email import ensure_system_email_templates
+
+	ensure_system_email_templates()
 	frappe.db.commit()
 
 

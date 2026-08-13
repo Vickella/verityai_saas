@@ -1,5 +1,4 @@
 from email.message import EmailMessage
-from html import escape
 import smtplib
 import ssl
 
@@ -7,6 +6,7 @@ import frappe
 from frappe.utils import cint, now_datetime
 
 from verityai_saas.services.entitlements import email_delivery_allowance, feature_allowed, workspace_context
+from verityai_saas.services.platform_email import render_message
 
 
 def workspace_for_tenant(tenant):
@@ -30,7 +30,7 @@ def _deliver_email(workspace_name, setting, recipient, subject, message):
 		email["Subject"] = subject
 		if setting.reply_to_email:
 			email["Reply-To"] = setting.reply_to_email
-		email.set_content("This message requires an HTML-capable email client.")
+		email.set_content("This message requires an email client that supports HTML.")
 		email.add_alternative(message, subtype="html")
 		context_ssl = ssl.create_default_context()
 		if port == 465:
@@ -60,12 +60,9 @@ def send_notification(workspace_name, notification_type, subject, message, refer
 	if not setting_name:
 		return []
 	setting = frappe.get_doc("VerityAI Notification Setting", setting_name)
-	branding = escape(setting.email_branding_name or "VerityAI")
-	body = escape(message).replace("\n", "<br>")
-	footer = escape(setting.email_footer or "").replace("\n", "<br>")
-	email_body = f"<p><strong>{branding}</strong></p><p>{body}</p>"
-	if footer:
-		email_body += f"<p>{footer}</p>"
+	branding = setting.email_branding_name or "VerityAI"
+	footer = setting.email_footer or ""
+	email_body = render_message(subject, [message, footer], preheader=f"{branding}: {subject}")
 	recipient_values = recipients(setting)
 	if allowance is not None:
 		recipient_values = recipient_values[:allowance]
@@ -144,7 +141,7 @@ def send_usage_warning(workspace_name):
 		return []
 	total = cint(wallet.opening_token_allowance) + cint(wallet.top_up_tokens) + cint(wallet.promotional_credits)
 	percent = round((cint(wallet.tokens_used) / max(total, 1)) * 100)
-	threshold = 100 if percent >= 100 else 85 if percent >= 85 else 70 if percent >= 70 else 0
+	threshold = 100 if percent >= 100 else 90 if percent >= 90 else 75 if percent >= 75 else 50 if percent >= 50 else 0
 	if not threshold:
 		return []
 	reference = f"{wallet.name}:{wallet.period_start}:{threshold}"
@@ -153,8 +150,8 @@ def send_usage_warning(workspace_name):
 		return []
 	subject = "Your VerityAI assistant is paused" if threshold == 100 else f"You have used {threshold}% of your AI credits"
 	message = (
-		f"AI credits used: {cint(wallet.tokens_used):,}. AI credits remaining: {cint(wallet.tokens_remaining):,}. "
-		+ ("Purchase a plan or additional credits to resume AI responses." if threshold == 100 else "Review usage or add prepaid credits before service is interrupted.")
+		f"You have used {cint(wallet.tokens_used):,} AI credits and have {cint(wallet.tokens_remaining):,} remaining. "
+		+ ("Choose a plan or add credits to restore AI responses." if threshold == 100 else "Review your usage and add credits early if you expect more customer conversations.")
 	)
 	return send_notification(workspace_name, notification_type, subject, message, "VerityAI Usage Wallet", reference)
 

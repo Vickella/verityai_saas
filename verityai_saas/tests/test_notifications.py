@@ -6,10 +6,17 @@ from frappe.tests.utils import FrappeTestCase
 from verityai_saas import setup_doctypes
 from verityai_saas.api import email as email_api
 from verityai_saas.services.notifications import (
+	send_usage_warning,
 	send_provider_failure_notification,
 	send_quote_request_notification,
 )
 from verityai_saas.services.onboarding import create_workspace
+from verityai_saas.services.platform_email import (
+	PASSWORD_RESET_TEMPLATE,
+	ensure_system_email_templates,
+	send_trial_lifecycle_emails,
+	send_workspace_welcome,
+)
 from verityai_saas.tests.cleanup import cleanup_all_test_fixtures, cleanup_test_workspace
 
 
@@ -161,3 +168,53 @@ class TestNotificationManagement(FrappeTestCase):
 		self.assertEqual(response["data"]["status"], "Sent")
 		self.assertEqual(frappe.db.get_value("VerityAI Email Delivery Log", log.name, "error"), None)
 		self.assertEqual(sendmail.call_args.kwargs["message"], "<p>Original safe message</p>")
+
+	def test_password_reset_template_uses_native_secure_link(self):
+		ensure_system_email_templates()
+		template = frappe.get_doc("Email Template", PASSWORD_RESET_TEMPLATE)
+		self.assertEqual(template.subject, "Reset your VerityAI password")
+		self.assertIn("{{ link }}", template.response_html)
+		self.assertIn("support@veritycore.co.zw", template.response_html)
+		self.assertEqual(
+			frappe.db.get_single_value("System Settings", "reset_password_template"),
+			PASSWORD_RESET_TEMPLATE,
+		)
+
+	def test_welcome_and_trial_messages_are_deduplicated(self):
+		subscription = frappe.db.get_value("VerityAI Subscription", {"workspace": self.workspace}, "name")
+		frappe.db.set_value(
+			"VerityAI Subscription", subscription, "trial_end", frappe.utils.add_days(frappe.utils.today(), 7)
+		)
+		with patch("frappe.sendmail") as sendmail:
+			self.assertEqual(len(send_workspace_welcome(self.workspace)), 1)
+			self.assertEqual(send_workspace_welcome(self.workspace), [])
+			send_trial_lifecycle_emails()
+			send_trial_lifecycle_emails()
+		self.assertEqual(sendmail.call_count, 2)
+		self.assertEqual(
+			frappe.db.count(
+				"VerityAI Email Delivery Log",
+				{"workspace": self.workspace, "notification_type": "Trial Ending 7"},
+			),
+			1,
+		)
+
+	def test_credit_reminders_use_four_progressive_thresholds(self):
+		wallet = frappe.db.get_value("VerityAI Usage Wallet", {"workspace": self.workspace}, "name")
+		frappe.db.set_value(
+			"VerityAI Usage Wallet",
+			wallet,
+			{"opening_token_allowance": 10000, "tokens_used": 5000, "tokens_remaining": 5000},
+		)
+		with patch("frappe.sendmail") as sendmail:
+			first = send_usage_warning(self.workspace)
+			second = send_usage_warning(self.workspace)
+		self.assertEqual(len(first), 1)
+		self.assertEqual(second, [])
+		self.assertEqual(sendmail.call_count, 1)
+		self.assertTrue(
+			frappe.db.exists(
+				"VerityAI Email Delivery Log",
+				{"workspace": self.workspace, "notification_type": "AI Credits 50%"},
+			)
+		)

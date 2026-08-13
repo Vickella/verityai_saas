@@ -71,6 +71,9 @@ def create_workspace(owner_user, account_name, workspace_name, business_name=Non
 		engine.apply_plan_limits(workspace.name, plan.name)
 		frappe.db.set_value("VerityAI Account", account, "default_workspace", workspace.name)
 		update_progress(workspace.name)
+		from verityai_saas.services.platform_email import queue_workspace_welcome
+
+		queue_workspace_welcome(workspace.name)
 		return {
 			"workspace": workspace.name,
 			"account": account,

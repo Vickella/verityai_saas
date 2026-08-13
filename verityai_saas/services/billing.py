@@ -178,6 +178,8 @@ def create_billing_event(workspace_name, event_type, amount=0, status="Pending",
 		frappe.db.set_value("VerityAI Subscription", subscription, "last_payment_reference", provider_reference)
 		from verityai_saas.services.billing_documents import ensure_receipt_for_payment
 		ensure_receipt_for_payment(event.name)
+		from verityai_saas.services.platform_email import send_payment_confirmation
+		send_payment_confirmation(workspace_name, event.name)
 	return event.name
 
 
@@ -321,8 +323,10 @@ def roll_usage_periods():
 def check_trial_expiry():
 	if not frappe.db.exists("DocType", "VerityAI Subscription"):
 		return
-	for row in frappe.get_all("VerityAI Subscription", filters={"status": "Trial", "trial_end": ["<", today()]}, fields=["workspace"]):
+	for row in frappe.get_all("VerityAI Subscription", filters={"status": "Trial", "trial_end": ["<", today()]}, fields=["name", "workspace"]):
 		set_subscription_status(row.workspace, "Expired", "Trial expired")
+		from verityai_saas.services.platform_email import send_trial_expired
+		send_trial_expired(row.workspace, row.name)
 	frappe.db.commit()
 
 
@@ -340,7 +344,7 @@ def check_subscription_expiry():
 
 
 def send_payment_reminders():
-	from verityai_saas.services.notifications import send_notification
+	from verityai_saas.services.platform_email import send_transactional
 
 	current_date = getdate(today())
 	for row in frappe.get_all("VerityAI Subscription", filters={"status": ["in", ["Trial", "Active", "Past Due"]]}, fields=["name", "workspace", "status", "next_billing_date", "grace_period_end", "amount", "currency"]):
@@ -351,12 +355,25 @@ def send_payment_reminders():
 		if frappe.db.exists("VerityAI Email Delivery Log", {"workspace": row.workspace, "notification_type": "Payment Reminder", "reference_name": row.name, "creation": [">=", current_date]}):
 			continue
 		if row.status == "Past Due":
-			message = f"Your payment is past due. The recovery grace period ends {grace or 'soon'}."
+			title = "Your payment needs attention"
+			message = f"Your payment is past due. Your access recovery period ends {grace or 'soon'}."
 		elif row.status == "Trial":
+			title = "Your free trial is ending"
 			message = f"Your VerityAI trial ends on {due}. Choose a paid plan to avoid interruption."
 		else:
+			title = "Your subscription renewal is approaching"
 			message = f"Your {row.currency or ''} {flt(row.amount):.2f} subscription payment is due on {due}."
-		send_notification(row.workspace, "Payment Reminder", "VerityAI payment reminder", message, "VerityAI Subscription", row.name)
+		send_transactional(
+			row.workspace,
+			"Payment Reminder",
+			"VerityAI payment reminder",
+			title,
+			[message, "Open billing to review your plan and payment options."],
+			"VerityAI Subscription",
+			f"{row.name}:payment:{current_date}",
+			frappe.utils.get_url(f"/verityai/billing?workspace={row.workspace}"),
+			"Open billing",
+		)
 	frappe.db.commit()
 
 

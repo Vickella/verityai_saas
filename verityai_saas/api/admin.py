@@ -4,7 +4,7 @@ import frappe
 from frappe.utils import add_days, cint, flt, getdate, today
 
 from verityai_saas.api._response import endpoint, json_value
-from verityai_saas.services import paynow
+from verityai_saas.services import paynow, platform_email
 from verityai_saas.services.admin_reauth import require_admin_reauthentication
 from verityai_saas.services.permissions import is_platform_admin, require_platform_admin
 
@@ -194,6 +194,7 @@ def dashboard():
 		"provider_failures": provider_failures,
 		"paynow": paynow.configuration_status(),
 		"paynow_configured": paynow.is_configured(),
+		"support_email": platform_email.email_configuration_status(),
 		"commercial_metrics": commercial_metrics,
 	}
 
@@ -205,6 +206,17 @@ def configure_paynow(values):
 	require_platform_admin()
 	require_admin_reauthentication()
 	return paynow.configure(json_value(values, {}))
+
+
+@frappe.whitelist(methods=["POST"])
+@endpoint
+def configure_support_email(values):
+	"""Configure the platform sender through Frappe's encrypted Email Account."""
+	require_platform_admin()
+	require_admin_reauthentication()
+	from verityai_saas.services.platform_email import configure_support_email as configure
+
+	return configure(json_value(values, {}))
 
 @frappe.whitelist(methods=["POST"])
 @endpoint
