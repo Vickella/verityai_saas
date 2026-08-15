@@ -22,7 +22,7 @@
 			});
 			if (!response.ok) throw new Error("Sign out failed");
 			localStorage.removeItem("verityai_workspace");
-			location.replace("/login?redirect-to=/verityai");
+			location.replace("/verityai/signin");
 		} catch (error) {
 			signOut.disabled = false;
 			signOut.setAttribute("aria-label", "Sign out");

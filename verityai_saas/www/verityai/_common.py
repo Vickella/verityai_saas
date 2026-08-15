@@ -27,7 +27,7 @@ PAGE_META = {
 
 def portal_context(context, page):
 	if frappe.session.user == "Guest":
-		frappe.local.flags.redirect_location = "/login?redirect-to=/verityai"
+		frappe.local.flags.redirect_location = "/verityai/signin?redirect-to=/verityai"
 		raise frappe.Redirect
 	context.no_cache = 1
 	page_title, page_description = PAGE_META.get(page, (page.replace("_", " ").title(), ""))

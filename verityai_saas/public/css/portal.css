@@ -1480,3 +1480,58 @@ img, svg, video, canvas { max-width: 100%; }
   .va-credit-pack-head { align-items: flex-start; }
   .va-plan-card-head { flex-direction: column; }
 }
+
+/* Customer authentication */
+.va-auth {
+  max-width: none;
+  min-height: 100vh;
+  padding: clamp(18px,4vw,44px);
+  background:
+    radial-gradient(circle at 15% 10%,rgba(43,118,228,.11),transparent 26rem),
+    radial-gradient(circle at 90% 90%,rgba(105,79,228,.08),transparent 30rem),
+    #f3f6fa;
+}
+.va-auth-card {
+  width: min(620px,100%);
+  gap: 20px;
+  padding: clamp(24px,3vw,34px);
+  border: 1px solid rgba(205,216,231,.94);
+  border-radius: 20px;
+  background: rgba(255,255,255,.98);
+  box-shadow: 0 28px 70px rgba(16,39,70,.11);
+}
+.va-signin-card { width: min(440px,100%); }
+.va-auth-header { display: grid; gap: 22px; }
+.va-auth-header > div { display: grid; gap: 5px; }
+.va-auth-header .eyebrow { margin: 0; }
+.va-auth-header h1 { margin: 0; font-size: clamp(27px,3vw,34px); line-height: 1.08; letter-spacing: -.045em; }
+.va-auth-header p:not(.eyebrow) { margin: 2px 0 0; color: var(--ink-500); font-size: 12px; }
+.va-auth-brand { width: fit-content; display: inline-flex; align-items: center; gap: 10px; color: var(--ink-950) !important; font-size: 17px; font-weight: 820; }
+.va-auth-brand { line-height: 1; }
+.va-auth-brand { min-height: 34px; }
+.va-auth-brand > span { color: var(--ink-950); }
+.va-auth-card .va-auth-brand { position: relative; padding-left: 44px; }
+.va-auth-card .va-auth-brand::before { content: "V"; position: absolute; left: 0; width: 34px; height: 34px; display: grid; place-items: center; border-radius: 10px; color: #fff; background: linear-gradient(145deg,#337ff0,#6156e6); box-shadow: 0 7px 16px rgba(45,104,220,.2); font-size: 15px; font-weight: 850; }
+.va-auth-card .va-form { gap: 16px; }
+.va-auth-card .va-fields { gap: 13px 16px; }
+.va-auth-card .va-field { gap: 5px; }
+.va-auth-card .va-field label { font-size: 10px; }
+.va-auth-card .va-field input,
+.va-auth-card .va-field select { min-height: 37px; padding: 7px 10px; border-radius: 9px; font-size: 12px; }
+.va-auth-card .va-field small { color: var(--ink-500); font-size: 9px; line-height: 1.45; }
+.va-auth-card .va-button { min-height: 38px; padding: 8px 15px; }
+.va-signin-card .va-button { width: 100% !important; }
+.va-label-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.va-label-row a { font-size: 10px; font-weight: 700; text-decoration: none; }
+.va-label-row a:hover { text-decoration: underline; }
+.va-auth-footer { display: flex; align-items: center; gap: 6px; padding-top: 16px; color: var(--ink-500); border-top: 1px solid #edf0f5; font-size: 11px; }
+.va-auth-footer a { font-weight: 750; text-decoration: none; }
+.va-auth-footer a:hover { text-decoration: underline; }
+
+@media (max-width: 620px) {
+  .va-auth { align-items: start; padding: 12px; }
+  .va-auth-card { gap: 18px; padding: 22px 18px; border-radius: 16px; }
+  .va-auth-card .va-fields { grid-template-columns: 1fr; }
+  .va-auth-header { gap: 18px; }
+  .va-auth-header h1 { font-size: 27px; }
+}

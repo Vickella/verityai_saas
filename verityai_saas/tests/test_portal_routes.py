@@ -8,6 +8,7 @@ from verityai_saas import __version__
 from verityai_saas.api import workspace as workspace_api
 from verityai_saas.services.admin_reauth import mark_admin_reauthenticated
 from verityai_saas.services.onboarding import create_workspace
+from verityai_saas.services.permissions import check_workspace_access
 from verityai_saas.www.verityai.integrations import get_context as integrations_context
 from verityai_saas.tests.cleanup import cleanup_all_test_fixtures, cleanup_test_workspace
 
@@ -84,6 +85,14 @@ class TestCustomerPortalRoutes(FrappeTestCase):
 		self.assertEqual(len(requested_other["data"]), 1)
 		self.assertEqual(requested_other["data"][0].name, self.created["workspace"])
 
+	def test_administrator_customer_portal_is_limited_to_explicit_workspaces(self):
+		frappe.set_user("Administrator")
+		response = workspace_api.list_workspaces(self.created["workspace"])
+		self.assertTrue(response["success"])
+		self.assertNotIn(self.created["workspace"], [row.name for row in response["data"]])
+		with self.assertRaises(frappe.PermissionError):
+			check_workspace_access(self.created["workspace"])
+
 	def test_workspace_owner_receives_portal_only_role(self):
 		self.assertIn("VerityAI Customer Owner", frappe.get_roles(self.user))
 		self.assertEqual(frappe.db.get_value("Role", "VerityAI Customer Owner", "desk_access"), 0)
@@ -111,7 +120,14 @@ class TestCustomerPortalRoutes(FrappeTestCase):
 		frappe.set_user("Guest")
 		response = get_response("/verityai/dashboard")
 		self.assertIn(response.status_code, {301, 302, 303, 307, 308})
-		self.assertIn("/login", response.headers.get("Location", ""))
+		self.assertIn("/verityai/signin", response.headers.get("Location", ""))
+
+	def test_customer_signin_page_is_available_to_guests(self):
+		frappe.set_user("Guest")
+		content = get_response_content("/verityai/signin")
+		self.assertIn('id="signin-form"', content)
+		self.assertIn('autocomplete="current-password"', content)
+		self.assertIn("Use the email address and password registered to your account.", content)
 
 	def test_guest_entry_route_is_signup(self):
 		frappe.set_user("Guest")

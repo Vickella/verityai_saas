@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>{{ title }}</title>
+	<link rel="stylesheet" href="/assets/verityai_saas/css/portal.css?v={{ asset_version }}">
+</head>
+<body>
+	<main class="va-auth">
+		<section class="va-card va-auth-card va-signin-card">
+			<header class="va-auth-header">
+				<a class="va-auth-brand" href="/verityai"><span>VerityAI</span></a>
+				<div><p class="eyebrow">Welcome back</p><h1>Sign in to your workspace</h1><p>Use the email address and password registered to your account.</p></div>
+			</header>
+			<div id="signin-notice" class="va-notice" hidden></div>
+			<form id="signin-form" class="va-form">
+				<div class="va-field"><label for="login_email">Email address</label><input id="login_email" name="usr" type="email" maxlength="140" autocomplete="username" required autofocus></div>
+				<div class="va-field"><div class="va-label-row"><label for="login_password">Password</label><a href="/login#forgot">Forgot password?</a></div><input id="login_password" name="pwd" type="password" maxlength="128" autocomplete="current-password" required></div>
+				<button class="va-button" type="submit">Sign in securely</button>
+			</form>
+			<footer class="va-auth-footer"><span>New to VerityAI?</span><a href="/verityai/signup">Create an account</a></footer>
+		</section>
+	</main>
+	<script>window.csrf_token={{ (csrf_token or '') | tojson }};</script>
+	<script src="/assets/verityai_saas/js/signin.js?v={{ asset_version }}"></script>
+</body>
+</html>

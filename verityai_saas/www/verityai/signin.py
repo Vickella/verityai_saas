@@ -6,10 +6,10 @@ from verityai_saas import __version__
 
 def get_context(context):
 	if frappe.session.user != "Guest":
-		frappe.local.flags.redirect_location = "/verityai/onboarding"
+		frappe.local.flags.redirect_location = "/verityai"
 		raise frappe.Redirect
 	context.no_cache = 1
-	context.title = "Create your VerityAI account"
+	context.title = "Sign in to VerityAI"
 	context.csrf_token = get_csrf_token()
 	context.asset_version = __version__
 	return context

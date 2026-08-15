@@ -85,8 +85,8 @@ def _overall_status(workspace_status, engine_active, critical_alerts, open_alert
 	return "Healthy"
 
 
-def update_workspace_alert(workspace_name, alert_name, status, note=None):
-	workspace = check_workspace_access(workspace_name)
+def update_workspace_alert(workspace_name, alert_name, status, note=None, allow_operator=False):
+	workspace = check_workspace_access(workspace_name, allow_operator=allow_operator)
 	status = (status or "").strip()
 	if status not in {"Acknowledged", "Resolved"}:
 		frappe.throw("Alert status must be Acknowledged or Resolved.", frappe.ValidationError)

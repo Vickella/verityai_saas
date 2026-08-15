@@ -36,9 +36,12 @@ def require_login(user=None):
 
 
 def get_user_workspaces(user=None):
+	"""Return only workspaces explicitly owned by or assigned to the user.
+
+	Operator roles intentionally do not widen this list. Cross-tenant access belongs
+	in the separately authenticated operator console, never the customer portal.
+	"""
 	user = require_login(user)
-	if is_operator(user):
-		return frappe.get_all("VerityAI Workspace", pluck="name", order_by="workspace_name asc")
 	owned = frappe.get_all("VerityAI Workspace", filters={"owner_user": user}, pluck="name")
 	memberships = frappe.get_all(
 		"VerityAI Workspace Member", filters={"user": user, "status": "Active"}, pluck="workspace"
@@ -46,11 +49,11 @@ def get_user_workspaces(user=None):
 	return sorted(set(owned + memberships))
 
 
-def check_workspace_access(workspace_name, user=None):
+def check_workspace_access(workspace_name, user=None, allow_operator=False):
 	user = require_login(user)
 	if not workspace_name or not frappe.db.exists("VerityAI Workspace", workspace_name):
 		frappe.throw(_("Workspace was not found."), frappe.DoesNotExistError)
-	if not is_operator(user) and workspace_name not in get_user_workspaces(user):
+	if workspace_name not in get_user_workspaces(user) and not (allow_operator and is_operator(user)):
 		frappe.throw(_("You do not have access to this workspace."), frappe.PermissionError)
 	return frappe.get_doc("VerityAI Workspace", workspace_name)
 

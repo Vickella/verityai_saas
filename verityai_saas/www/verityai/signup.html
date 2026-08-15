@@ -4,14 +4,15 @@
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<title>{{ title }}</title>
-	<link rel="stylesheet" href="/assets/verityai_saas/css/portal.css">
+	<link rel="stylesheet" href="/assets/verityai_saas/css/portal.css?v={{ asset_version }}">
 </head>
 <body>
 	<main class="va-auth">
 		<section class="va-card va-auth-card">
-			<a class="va-auth-brand" href="/">VerityAI</a>
-			<p class="eyebrow">Start your trial</p>
-			<h1>Create your AI workspace</h1>
+			<header class="va-auth-header">
+				<a class="va-auth-brand" href="/verityai"><span>VerityAI</span></a>
+				<div><p class="eyebrow">Start your trial</p><h1>Create your AI workspace</h1><p>Set up your secure business account and assistant.</p></div>
+			</header>
 			<div id="signup-notice" class="va-notice" hidden></div>
 			<form id="signup-form" class="va-form">
 				<div class="va-fields">
@@ -24,10 +25,10 @@
 				</div>
 				<button class="va-button" type="submit">Create account and continue</button>
 			</form>
-			<p class="muted">Already registered? <a id="signup-login" href="/login?redirect-to=/verityai">Sign in</a></p>
+			<footer class="va-auth-footer"><span>Already registered?</span><a id="signup-login" href="/verityai/signin">Sign in</a></footer>
 		</section>
 	</main>
 	<script>window.csrf_token={{ (csrf_token or '') | tojson }};</script>
-	<script src="/assets/verityai_saas/js/signup.js"></script>
+	<script src="/assets/verityai_saas/js/signup.js?v={{ asset_version }}"></script>
 </body>
 </html>

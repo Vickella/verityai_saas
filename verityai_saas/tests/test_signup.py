@@ -60,7 +60,7 @@ class TestCustomerSignup(FrappeTestCase):
 		self.assertEqual(redirect.path, "/verityai/onboarding")
 		self.assertEqual(parse_qs(redirect.query)["business_name"], ["Example & Sons"])
 		self.assertEqual(parse_qs(redirect.query)["workspace_name"], ["Customer Success"])
-		self.assertTrue(response["data"]["login_url"].startswith("/login?"))
+		self.assertTrue(response["data"]["login_url"].startswith("/verityai/signin?"))
 
 	@patch("verityai_saas.api.signup.frappe.get_doc")
 	def test_invalid_registration_does_not_create_user(self, get_doc):

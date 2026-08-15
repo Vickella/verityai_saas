@@ -63,7 +63,7 @@ def register(email, full_name, business_name, password, confirm_password=None, w
 	except Exception:
 		frappe.db.rollback(save_point=savepoint)
 		raise
-	login_url = "/login?" + urlencode({"redirect-to": redirect_to})
+	login_url = "/verityai/signin?" + urlencode({"redirect-to": redirect_to})
 	return {
 		"registered": True,
 		"authenticated": frappe.session.user == email,

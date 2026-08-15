@@ -9,7 +9,7 @@ from verityai_saas.services.permissions import check_workspace_access, require_p
 def _require_configuration_admin(workspace):
 	require_platform_admin()
 	require_admin_reauthentication()
-	return check_workspace_access(workspace)
+	return check_workspace_access(workspace, allow_operator=True)
 
 
 @frappe.whitelist()

@@ -15,4 +15,4 @@ def get(workspace, status=None, severity=None, limit=100):
 @endpoint
 def update_alert(workspace, alert, status, note=None):
 	require_admin_reauthentication()
-	return update_workspace_alert(workspace, alert, status, note)
+	return update_workspace_alert(workspace, alert, status, note, allow_operator=True)
