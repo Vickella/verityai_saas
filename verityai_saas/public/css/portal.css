@@ -1367,6 +1367,7 @@ main { position: relative; }
 .va-sidebar nav a:hover .va-nav-icon,.va-sidebar nav a.active .va-nav-icon { opacity: 1; }
 .va-sidebar nav a.active .va-nav-icon { color: #8db9fb; transform: scale(1.04); }
 .va-nav-mark { display: none; }
+.va-mobile-nav-toggle { display: none; }
 .va-user { flex: 0 0 auto; min-height: 64px; margin: 12px 0 0; padding: 10px 9px 10px 10px; gap: 10px; border-color: rgba(150,185,226,.13); border-radius: 13px; background: linear-gradient(145deg,rgba(255,255,255,.065),rgba(255,255,255,.025)); box-shadow: 0 8px 20px rgba(0,0,0,.08); white-space: normal; }
 .va-user-avatar { width: 36px; height: 36px; border-radius: 11px; color: #f1f6ff; background: linear-gradient(145deg,rgba(62,130,229,.58),rgba(62,93,169,.38)); font-size: 12px; }
 .va-user-copy { min-width: 0; display: grid; gap: 2px; }
@@ -1379,6 +1380,11 @@ main { position: relative; }
 .va-workspace-context { min-width: min(320px,35vw); display: grid; gap: 3px; padding: 10px 14px; border: 1px solid #dbe2ec; border-radius: 12px; background: rgba(255,255,255,.78); box-shadow: 0 1px 2px rgba(15,23,42,.025); }
 .va-workspace-context span { color: #7a8799; font-size: 8px; font-weight: 820; letter-spacing: .12em; text-transform: uppercase; }
 .va-workspace-context strong { overflow: hidden; color: #243247; font-size: 12px; font-weight: 720; text-overflow: ellipsis; white-space: nowrap; }
+.va-knowledge-create > .va-form { height: 100%; align-content: start; }
+.va-knowledge-create .va-fields { grid-template-columns: 1fr; }
+.va-knowledge-create .va-button { align-self: end; justify-self: start; margin-top: auto; }
+.va-chart-empty { display: grid; align-content: start; }
+.va-chart-empty .va-empty { min-height: 150px; margin-top: 10px; }
 
 @media (max-width: 760px) {
   .va-workspace-context { width: 100%; min-width: 0; }
@@ -1434,8 +1440,19 @@ img, svg, video, canvas { max-width: 100%; }
 }
 
 @media (max-width: 760px) {
-  .va-sidebar { overflow: visible; }
-  .va-sidebar nav { overflow-x: auto; overflow-y: hidden; padding-bottom: 8px; }
+  .va-sidebar { position: relative; overflow: visible; padding: 14px 16px 12px; }
+  .va-brand { width: fit-content; padding: 0; }
+  .va-mobile-nav-toggle { position: absolute; top: 14px; right: 16px; min-height: 34px; display: inline-flex; align-items: center; gap: 9px; padding: 7px 11px; color: #eaf2ff; border: 1px solid rgba(167,195,229,.24); border-radius: 9px; background: rgba(255,255,255,.06); font: inherit; font-size: 12px; font-weight: 760; cursor: pointer; }
+  .va-mobile-nav-toggle i,.va-mobile-nav-toggle i::before,.va-mobile-nav-toggle i::after { width: 14px; height: 1.5px; display: block; border-radius: 2px; background: currentColor; content: ""; transition: transform 150ms ease; }
+  .va-mobile-nav-toggle i { position: relative; }
+  .va-mobile-nav-toggle i::before { position: absolute; top: -5px; }
+  .va-mobile-nav-toggle i::after { position: absolute; top: 5px; }
+  .va-sidebar.nav-open .va-mobile-nav-toggle i { background: transparent; }
+  .va-sidebar.nav-open .va-mobile-nav-toggle i::before { top: 0; transform: rotate(45deg); }
+  .va-sidebar.nav-open .va-mobile-nav-toggle i::after { top: 0; transform: rotate(-45deg); }
+  .va-sidebar nav { display: none; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 5px; margin-top: 12px; padding: 10px; overflow: visible; border: 1px solid rgba(155,190,229,.14); border-radius: 12px; background: rgba(255,255,255,.035); }
+  .va-sidebar.nav-open nav { display: grid; }
+  .va-sidebar nav a { overflow: hidden; text-overflow: ellipsis; }
   .va-user { margin-top: 8px; }
   .va-topbar { gap: 11px; }
   .va-topbar h1 { font-size: 26px; }

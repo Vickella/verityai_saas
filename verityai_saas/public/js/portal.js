@@ -4,11 +4,17 @@
   const picker = document.querySelector("#va-workspace");
   const notice = document.querySelector("#va-notice");
 	const signOut = document.querySelector("#va-sign-out");
+  const mobileNavToggle = document.querySelector("#va-mobile-nav-toggle");
   let workspace = null;
   let leadFilters = {start:0, limit:20, status:"", source_channel:"", search:""};
   let conversationFilters = {start:0, limit:20, platform:"", status:"", search:""};
   let analyticsFilters = {from_date:"", to_date:""};
   let commerceView = "overview";
+
+  mobileNavToggle?.addEventListener("click", () => {
+    const open = document.querySelector(".va-sidebar")?.classList.toggle("nav-open") || false;
+    mobileNavToggle.setAttribute("aria-expanded", String(open));
+  });
 
 	signOut?.addEventListener("click", async () => {
 		if (signOut.disabled) return;
@@ -95,6 +101,8 @@
   }
 
   const barChart = (rows, key, label) => {
+    const hasActivity=(rows||[]).some(row=>Number(row[key]||0)>0);
+    if(!hasActivity)return `<div class="va-card va-chart-empty"><h2>${esc(label)}</h2>${emptyState("No activity in this period","Activity will appear here as your workspace starts using this feature.")}</div>`;
     const maximum=Math.max(...rows.map(row=>Number(row[key]||0)),1);
     return `<div class="va-card"><h2>${esc(label)}</h2><div class="va-bar-chart">${rows.map(row=>`<div class="va-bar-column" title="${esc(row.date)}: ${number(row[key])}"><i style="height:${Math.max(Number(row[key]||0)*100/maximum,2)}%"></i><span>${esc(row.date.slice(5))}</span></div>`).join("")}</div></div>`;
   };
@@ -151,7 +159,7 @@
       call("verityai_saas.api.knowledge.list_sources", {workspace}),
       call("verityai_saas.api.knowledge.ingestion_status", {workspace})
     ]);
-    content.innerHTML = `<div class="va-grid three"><form id="knowledge-text-form" class="va-card va-form"><h2>Add text</h2><div class="va-fields">${field("Title","title")}${field("Content","content","","textarea",true)}</div><button class="va-button">Add</button></form><form id="knowledge-file-form" class="va-card va-form"><h2>Upload file</h2><div class="va-fields">${field("Title","title")}<div class="va-field"><label>Private file</label><input type="file" name="file" required accept=".txt,.md,.csv,.json,.html,.htm,.pdf,.docx,.png,.jpg,.jpeg"></div></div><button class="va-button">Upload</button></form><form id="knowledge-url-form" class="va-card va-form"><h2>Add website</h2><div class="va-fields">${field("Title","title")}${field("Public URL","url","","url")}</div><button class="va-button">Add</button></form></div><h2>Processing</h2>${table([["Source",r=>`<strong>${esc(r.title)}</strong><br><span class="muted">${esc(r.source_type)}</span>`],["Status",r=>pill(r.status)],["Processed",r=>`${number(r.pages_processed)} page(s)`],["Updated",r=>esc(r.last_refreshed_on||"—")],["Details",r=>esc(r.error||r.source_url||r.file_url||"—")],["Action",r=>r.source_type==="URL"?`<button class="va-button secondary" data-refresh-ingestion="${esc(r.name)}">Refresh</button>`:"—"]],ingestions)}<h2>Sources</h2>${table([["Source",r=>esc(r.title)],["Status",r=>pill(r.active?"Active":"Inactive")],["Chunks",r=>number(r.chunk_count)],["Updated",r=>esc(r.modified)]],sources)}`;
+    content.innerHTML = `<div class="va-grid three va-knowledge-create"><form id="knowledge-text-form" class="va-card va-form"><h2>Add text</h2><div class="va-fields">${field("Title","title")}${field("Content","content","","textarea",true)}</div><button class="va-button">Add text</button></form><form id="knowledge-file-form" class="va-card va-form"><h2>Upload file</h2><div class="va-fields">${field("Title","title")}<div class="va-field"><label>Private file</label><input type="file" name="file" required accept=".txt,.md,.csv,.json,.html,.htm,.pdf,.docx,.png,.jpg,.jpeg"></div></div><button class="va-button">Upload file</button></form><form id="knowledge-url-form" class="va-card va-form"><h2>Add website</h2><div class="va-fields">${field("Title","title")}${field("Public URL","url","","url")}</div><button class="va-button">Add website</button></form></div><h2>Processing</h2>${table([["Source",r=>`<strong>${esc(r.title)}</strong><br><span class="muted">${esc(r.source_type)}</span>`],["Status",r=>pill(r.status)],["Processed",r=>`${number(r.pages_processed)} page(s)`],["Updated",r=>esc(r.last_refreshed_on||"—")],["Details",r=>esc(r.error||r.source_url||r.file_url||"—")],["Action",r=>r.source_type==="URL"?`<button class="va-button secondary" data-refresh-ingestion="${esc(r.name)}">Refresh</button>`:"—"]],ingestions,{title:"No processing jobs",description:"New sources will appear here while VerityAI prepares them."})}<h2>Sources</h2>${table([["Source",r=>esc(r.title)],["Status",r=>pill(r.active?"Active":"Inactive")],["Chunks",r=>number(r.chunk_count)],["Updated",r=>esc(r.modified)]],sources,{title:"No knowledge sources",description:"Add text, a private file or a public website to build your assistant's knowledge."})}`;
     bind("knowledge-text-form",form=>call("verityai_saas.api.knowledge.create",{workspace,...json(form)}),knowledge,"email");
     bind("knowledge-url-form",form=>call("verityai_saas.api.knowledge.ingest_url",{workspace,...json(form)}),knowledge,"email");
     document.querySelector("#knowledge-file-form").addEventListener("submit",async event=>{event.preventDefault();const form=event.currentTarget;const button=form.querySelector("button");button.disabled=true;try{const fileName=await uploadPrivateFile(form.file.files[0]);await call("verityai_saas.api.knowledge.ingest_file",{workspace,title:form.title.value,file:fileName});alert("File queued for ingestion.");await knowledge();}catch(err){alert(err.message,true);button.disabled=false;}});
@@ -250,7 +258,7 @@
   async function quotes() {
     const rows = await call("verityai_saas.api.quotes.list_requests", {workspace});
     const pending = rows.filter(row => row.status === "Pending").length;
-    content.innerHTML = `<div class="va-grid two"><div class="va-card va-metric"><span>Pending approval</span><strong>${number(pending)}</strong></div><div class="va-card"><h2>Safe approval flow</h2><p class="muted">Approval submits and sends the existing engine quotation. VerityAI never bypasses the engine approval hook.</p></div></div>${table([["Request",r=>`<strong>${esc(r.name)}</strong><br><span class="muted">${esc(r.erpnext_quotation_id||"Draft quotation")}</span>`],["Customer",r=>`<strong>${esc(r.customer_name)}</strong><br><span class="muted">${esc(r.client_email||r.client_whatsapp_number||"")}</span>`],["Total",r=>number(r.estimated_total)],["Status",r=>pill(r.status)],["Created",r=>esc(r.creation)],["Action",r=>r.status==="Pending"?`<button type="button" class="va-button" data-approve-quote="${esc(r.name)}">Approve &amp; send</button>`:'<span class="muted">Complete</span>']],rows)}`;
+    content.innerHTML = `<div class="va-grid two"><div class="va-card va-metric"><span>Pending approval</span><strong>${number(pending)}</strong></div><div class="va-card"><h2>Review before sending</h2><p class="muted">Check every customer request and approve the final quotation before it is sent.</p></div></div>${table([["Request",r=>`<strong>${esc(r.name)}</strong><br><span class="muted">${esc(r.erpnext_quotation_id||"Draft quotation")}</span>`],["Customer",r=>`<strong>${esc(r.customer_name)}</strong><br><span class="muted">${esc(r.client_email||r.client_whatsapp_number||"")}</span>`],["Total",r=>number(r.estimated_total)],["Status",r=>pill(r.status)],["Created",r=>esc(r.creation)],["Action",r=>r.status==="Pending"?`<button type="button" class="va-button" data-approve-quote="${esc(r.name)}">Approve &amp; send</button>`:'<span class="muted">Complete</span>']],rows,{title:"No requests awaiting review",description:"New AI assisted quotation requests will appear here for approval."})}`;
     document.querySelectorAll("[data-approve-quote]").forEach(button => button.addEventListener("click", async () => {
       const request = button.dataset.approveQuote;
       if (!window.confirm(`Approve ${request}? This submits the quotation and sends it through the configured engine channel.`)) return;
