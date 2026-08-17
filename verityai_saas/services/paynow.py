@@ -48,7 +48,9 @@ def is_configured():
 def operating_mode():
 	if not frappe.db.exists("DocType", SETTINGS_DOCTYPE):
 		return "Test"
-	mode = str(frappe.get_single(SETTINGS_DOCTYPE).get("paynow_environment") or "Test").strip()
+	# Read Singles directly so an older cached Single document cannot make the
+	# operator console appear to fall back after a successful save.
+	mode = str(frappe.db.get_single_value(SETTINGS_DOCTYPE, "paynow_environment") or "Test").strip()
 	return mode if mode in {"Test", "Production"} else "Test"
 
 
@@ -96,6 +98,13 @@ def configure(values):
 	if integration_key:
 		settings.paynow_integration_key = integration_key
 	settings.save()
+	# Persist the non-secret gateway controls explicitly after the Password field
+	# is saved, then invalidate the singleton cache before building the response.
+	frappe.db.set_single_value(SETTINGS_DOCTYPE, "paynow_integration_id", integration_id)
+	frappe.db.set_single_value(SETTINGS_DOCTYPE, "paynow_environment", environment)
+	frappe.clear_cache(doctype=SETTINGS_DOCTYPE)
+	if operating_mode() != environment:
+		frappe.throw("Paynow operating mode could not be saved. Refresh the page and try again.", frappe.ValidationError)
 	return configuration_status()
 
 

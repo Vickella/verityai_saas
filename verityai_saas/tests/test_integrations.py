@@ -83,12 +83,20 @@ class TestSecureIntegrations(FrappeTestCase):
 		self.assertTrue(status["configured"])
 		self.assertTrue(status["checkout_enabled"])
 		self.assertEqual(status["environment"], "Production")
+		self.assertEqual(frappe.db.get_single_value("VerityAI Platform Settings", "paynow_environment"), "Production")
+		frappe.clear_cache(doctype="VerityAI Platform Settings")
+		self.assertEqual(paynow.operating_mode(), "Production")
 		self.assertNotIn("paynow-secret", str(status))
 		settings = frappe.get_single("VerityAI Platform Settings")
 		self.assertEqual(settings.get_password("paynow_integration_key"), "paynow-secret")
 		dashboard = admin_api.dashboard()["data"]
 		self.assertEqual(dashboard["paynow"]["integration_id"], "test-integration")
 		self.assertNotIn("paynow-secret", frappe.as_json(dashboard))
+		test_status = admin_api.configure_paynow({"integration_id": "test-integration", "integration_key": "", "environment": "Test"})["data"]
+		self.assertEqual(test_status["environment"], "Test")
+		self.assertFalse(test_status["checkout_enabled"])
+		frappe.clear_cache(doctype="VerityAI Platform Settings")
+		self.assertEqual(paynow.operating_mode(), "Test")
 
 	def test_plan_gate_blocks_disabled_integrations(self):
 		frappe.db.set_value("VerityAI Plan", self.plan, "can_use_api_access", 0)
