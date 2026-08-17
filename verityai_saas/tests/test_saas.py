@@ -84,6 +84,7 @@ class TestVerityAISaaS(FrappeTestCase):
 		colours = frappe.db.get_value("AI Tenant", self.tenant, ["widget_primary_color", "widget_header_color"], as_dict=True)
 		self.assertEqual(colours.widget_primary_color, "#2f6fed")
 		self.assertEqual(colours.widget_header_color, "#16345f")
+		self.assertIn("widget.js?v=20260817-2", engine.generate_embed_code(self.workspace))
 		with self.assertRaises(frappe.ValidationError):
 			engine.update_widget_settings(self.workspace, {"widget_primary_color": "url(javascript:alert(1))"})
 		self.assertEqual(frappe.db.get_value("AI Tenant", other_tenant.name, "assistant_name"), "Other")

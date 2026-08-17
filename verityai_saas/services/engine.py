@@ -19,7 +19,7 @@ TENANT_SAFE_FIELDS = [
 WIDGET_PRIMARY_PRESETS = {"Verity Blue", "Navy", "Emerald", "Slate", "Gold"}
 WIDGET_HEADER_PRESETS = {"Navy Gradient", "Blue Gradient", "Emerald Gradient", "Slate Gradient"}
 HEX_COLOUR = re.compile(r"^#[0-9a-fA-F]{6}$")
-WIDGET_ASSET_VERSION = "20260817"
+WIDGET_ASSET_VERSION = "20260817-2"
 CONFIG_SAFE_FIELDS = [
 	"model_name", "max_tokens", "monthly_token_limit", "public_rate_limit_per_minute",
 	"max_public_message_chars", "enable_monitoring_alerts", "verify_meta_signature",
