@@ -167,7 +167,7 @@ def ensure_doctype(name, fields, autoname=None, istable=False, issingle=False, p
 	frappe.get_doc({"doctype": "DocType", "name": name, **values}).insert(ignore_permissions=True)
 
 
-def ensure_doctypes():
+def ensure_platform_settings():
 	ensure_doctype(
 		"VerityAI Platform Settings",
 		[
@@ -179,6 +179,10 @@ def ensure_doctypes():
 		issingle=True,
 		permission_rows=platform_settings_permissions(),
 	)
+
+
+def ensure_doctypes():
+	ensure_platform_settings()
 
 	ensure_doctype("VerityAI Account", [
 		field("account_name", "Account Name", reqd=1, unique=1, in_list_view=1),

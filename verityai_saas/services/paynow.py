@@ -45,8 +45,14 @@ def is_configured():
 	return all(_configured_credentials())
 
 
-def operating_mode():
+def _environment_field_available():
 	if not frappe.db.exists("DocType", SETTINGS_DOCTYPE):
+		return False
+	return frappe.get_meta(SETTINGS_DOCTYPE).has_field("paynow_environment")
+
+
+def operating_mode():
+	if not _environment_field_available():
 		return "Test"
 	# Read Singles directly so an older cached Single document cannot make the
 	# operator console appear to fall back after a successful save.
@@ -81,6 +87,8 @@ def configuration_status():
 
 
 def configure(values):
+	if not _environment_field_available():
+		frappe.throw("Payment settings need a database update before they can be changed.", frappe.ValidationError)
 	integration_id = str(values.get("integration_id") or "").strip()
 	integration_key = str(values.get("integration_key") or "").strip()
 	environment = str(values.get("environment") or "Test").strip().title()

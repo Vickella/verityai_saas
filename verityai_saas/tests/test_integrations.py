@@ -98,6 +98,12 @@ class TestSecureIntegrations(FrappeTestCase):
 		frappe.clear_cache(doctype="VerityAI Platform Settings")
 		self.assertEqual(paynow.operating_mode(), "Test")
 
+	@patch("verityai_saas.services.paynow._environment_field_available", return_value=False)
+	def test_missing_paynow_environment_field_fails_safely(self, _field_available):
+		self.assertEqual(paynow.operating_mode(), "Test")
+		with self.assertRaisesRegex(frappe.ValidationError, "database update"):
+			paynow.configure({"integration_id": "test-integration", "integration_key": "secret", "environment": "Production"})
+
 	def test_plan_gate_blocks_disabled_integrations(self):
 		frappe.db.set_value("VerityAI Plan", self.plan, "can_use_api_access", 0)
 		with self.assertRaises(frappe.PermissionError):
