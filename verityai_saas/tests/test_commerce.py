@@ -151,6 +151,13 @@ class TestTenantNativeCommerce(FrappeTestCase):
 		with self.assertRaises(frappe.ValidationError):
 			commerce.delete_product(self.workspace, self.product.name)
 
+	def test_unreferenced_product_can_be_deleted_by_workspace_owner(self):
+		product = commerce.save_product(self.workspace, {"item_code": "DELETE-ME", "item_name": "Temporary", "standard_rate": 1})
+		frappe.set_user(self.owner)
+		response = commerce_api.delete_product(self.workspace, product.name)
+		self.assertTrue(response["success"])
+		self.assertFalse(frappe.db.exists("VerityAI Product", product.name))
+
 	def test_pdf_download_is_scoped(self):
 		quote = commerce.save_quotation(self.workspace, {"customer": self.customer.name, "items": [{"product": self.product.name, "qty": 1}], "notes": "Thank you"})
 		frappe.set_user(self.owner)
@@ -158,6 +165,20 @@ class TestTenantNativeCommerce(FrappeTestCase):
 			commerce_api.download_quotation(self.workspace, quote.name)
 		self.assertEqual(frappe.local.response.filecontent, b"%PDF-commerce")
 		self.assertEqual(frappe.local.response.type, "pdf")
+
+	def test_approved_quote_has_expiring_public_pdf_download(self):
+		quote = commerce.save_quotation(self.workspace, {"customer": self.customer.name, "items": [{"product": self.product.name, "qty": 1}]})
+		commerce.set_quotation_status(self.workspace, quote.name, "Pending Approval")
+		commerce.set_quotation_status(self.workspace, quote.name, "Approved")
+		status = commerce.handle_ai_quote_status(self.created["engine_tenant"], quote.name, client_email="buyer@example.com")
+		self.assertIn("download_public_quotation", status["pdf_url"])
+		token = commerce.public_quotation_token(self.workspace, quote.name)
+		self.assertTrue(commerce.verify_public_quotation_token(self.workspace, quote.name, token))
+		self.assertFalse(commerce.verify_public_quotation_token(self.workspace, quote.name, token + "tampered"))
+		frappe.set_user("Guest")
+		with patch("frappe.utils.pdf.get_pdf", return_value=b"%PDF-public"):
+			commerce_api.download_public_quotation(self.workspace, quote.name, token)
+		self.assertEqual(frappe.local.response.filecontent, b"%PDF-public")
 
 	def test_ai_quote_tools_use_native_commerce_unless_erpnext_is_enabled(self):
 		from verity_ai.engine import tools as ai_tools

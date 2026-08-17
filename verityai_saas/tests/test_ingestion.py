@@ -70,6 +70,28 @@ class TestKnowledgeIngestion(FrappeTestCase):
 			ingestion.process_ingestion(ingestion_name)
 		self.assertEqual(frappe.db.get_value("AI Knowledge Source", source, "content"), "Updated website content")
 
+	def test_crawl_skips_discovered_webp_and_keeps_page_text(self):
+		def fetch(url, allowed_types=("text/html", "text/plain", "application/xhtml+xml")):
+			if url.endswith("/image"):
+				raise frappe.ValidationError("Unsupported website content type: image/webp.")
+			return url, '<html><body><h1>Useful service knowledge</h1><a href="/image">Image</a></body></html>', "text/html", 85
+
+		with patch("verityai_saas.services.ingestion._validate_public_url", side_effect=lambda url: url), patch("verityai_saas.services.ingestion._robots_allows", return_value=True), patch("verityai_saas.services.ingestion._fetch", side_effect=fetch):
+			content, pages, _ = ingestion.crawl_url("https://example.com", max_pages=5)
+		self.assertIn("Useful service knowledge", content)
+		self.assertEqual(pages, 1)
+
+	def test_workspace_owner_can_delete_source_and_index(self):
+		frappe.set_user(self.owner)
+		response = knowledge_api.create(self.workspace, "Temporary", "Temporary knowledge for deletion")
+		source = response["data"]["source"]
+		self.assertTrue(frappe.db.exists("AI Knowledge Source", source))
+		self.assertGreater(frappe.db.count("AI Knowledge Chunk", {"knowledge_source": source}), 0)
+		deleted = knowledge_api.delete(self.workspace, source)
+		self.assertTrue(deleted["success"])
+		self.assertFalse(frappe.db.exists("AI Knowledge Source", source))
+		self.assertFalse(frappe.db.exists("AI Knowledge Chunk", {"knowledge_source": source}))
+
 	def test_private_and_loopback_urls_are_rejected(self):
 		with patch("socket.getaddrinfo", return_value=[(2, 1, 6, "", ("127.0.0.1", 80))]):
 			with self.assertRaises(frappe.PermissionError):

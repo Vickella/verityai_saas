@@ -205,3 +205,17 @@ def download_quotation(workspace, quotation):
 	frappe.local.response.filename = f"{quotation}.pdf"
 	frappe.local.response.filecontent = get_pdf(commerce.quotation_html(workspace, quotation))
 	frappe.local.response.type = "pdf"
+
+
+@frappe.whitelist(allow_guest=True)
+def download_public_quotation(workspace, quotation, token):
+	if not commerce.verify_public_quotation_token(workspace, quotation, token):
+		frappe.throw("This quotation download link is invalid or has expired.", frappe.PermissionError)
+	quote = commerce.get_quotation(workspace, quotation)
+	if quote.status not in {"Approved", "Sent", "Accepted"}:
+		frappe.throw("This quotation is not available for customer download.", frappe.PermissionError)
+	from frappe.utils.pdf import get_pdf
+
+	frappe.local.response.filename = f"{quotation}.pdf"
+	frappe.local.response.filecontent = get_pdf(commerce.quotation_html(workspace, quotation))
+	frappe.local.response.type = "pdf"

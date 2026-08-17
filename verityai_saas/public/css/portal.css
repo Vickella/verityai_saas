@@ -1558,3 +1558,9 @@ img, svg, video, canvas { max-width: 100%; }
   .va-auth-header { gap: 18px; }
   .va-auth-header h1 { font-size: 27px; }
 }
+
+.va-colour-field { align-content: start; }
+.va-colour-control { display: grid; grid-template-columns: 54px 1fr; align-items: center; gap: 12px; }
+.va-colour-control input[type="color"] { width: 54px; min-height: 42px; padding: 4px; cursor: pointer; }
+.va-colour-control output { min-height: 42px; display: flex; align-items: center; padding: 0 13px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-soft); color: var(--ink-700); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; font-weight: 700; }
+.va-colour-field small { margin-top: 2px; font-size: 10px; line-height: 1.45; }

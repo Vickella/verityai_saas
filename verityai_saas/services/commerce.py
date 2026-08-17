@@ -1,8 +1,12 @@
 from html import escape
 from io import BytesIO
+import hashlib
+import hmac
+import time
+from urllib.parse import urlencode
 
 import frappe
-from frappe.utils import add_to_date, flt, get_datetime, getdate, now_datetime, nowdate, validate_email_address
+from frappe.utils import add_to_date, flt, get_datetime, get_url, getdate, now_datetime, nowdate, validate_email_address
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 
@@ -427,6 +431,38 @@ def set_quotation_status(workspace, quotation, status):
 	return get_quotation(workspace, doc.name)
 
 
+def _quote_signing_secret():
+	secret = (getattr(frappe.local, "conf", {}) or {}).get("encryption_key")
+	if not secret:
+		frappe.throw("Quotation downloads are unavailable until the site encryption key is configured.", frappe.ValidationError)
+	return str(secret).encode("utf-8")
+
+
+def public_quotation_token(workspace, quotation, expires=None):
+	expires = int(expires or add_to_date(now_datetime(), days=7).timestamp())
+	payload = f"{workspace}:{quotation}:{expires}".encode("utf-8")
+	signature = hmac.new(_quote_signing_secret(), payload, hashlib.sha256).hexdigest()
+	return f"{expires}.{signature}"
+
+
+def verify_public_quotation_token(workspace, quotation, token):
+	try:
+		expires_text, supplied = str(token or "").split(".", 1)
+		expires = int(expires_text)
+	except (TypeError, ValueError):
+		return False
+	if expires < int(time.time()):
+		return False
+	expected = public_quotation_token(workspace, quotation, expires=expires).split(".", 1)[1]
+	return hmac.compare_digest(supplied, expected)
+
+
+def public_quotation_url(workspace, quotation):
+	token = public_quotation_token(workspace, quotation)
+	query = urlencode({"workspace": workspace, "quotation": quotation, "token": token})
+	return f"{get_url().rstrip('/')}/api/method/verityai_saas.api.commerce.download_public_quotation?{query}"
+
+
 def _scoped_lead(workspace, lead):
 	tenant = frappe.db.get_value("VerityAI Workspace", workspace, "engine_tenant")
 	if not lead or not frappe.db.exists("AI Lead", {"name": lead, "tenant": tenant}):
@@ -823,4 +859,5 @@ def handle_ai_quote_status(tenant_name, quotation_reference=None, customer=None,
 	name_matches = bool(customer and customer.strip().lower() == customer_doc.customer_name.strip().lower())
 	if not (email_matches or phone_matches or name_matches):
 		return {"handled": True, "success": False, "error": "The contact details did not match this quotation."}
-	return {"handled": True, "success": True, "request": quote.name, "quotation": quote.name, "customer": quote.customer_name, "approval_status": quote.status, "quotation_status": quote.status, "total": quote.total, "currency": quote.currency, "pdf_url": None}
+	pdf_url = public_quotation_url(workspace, quote.name) if quote.status in {"Approved", "Sent", "Accepted"} else None
+	return {"handled": True, "success": True, "request": quote.name, "quotation": quote.name, "customer": quote.customer_name, "approval_status": quote.status, "quotation_status": quote.status, "total": quote.total, "currency": quote.currency, "pdf_url": pdf_url}

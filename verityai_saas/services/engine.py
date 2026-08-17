@@ -1,4 +1,5 @@
 import json
+import re
 from collections import defaultdict
 
 import frappe
@@ -14,6 +15,11 @@ TENANT_SAFE_FIELDS = [
 	"name", "tenant_name", "assistant_name", "brand_name", "business_nature", "widget_title",
 	"widget_greeting", "widget_primary_color", "widget_header_color", "active",
 ]
+
+WIDGET_PRIMARY_PRESETS = {"Verity Blue", "Navy", "Emerald", "Slate", "Gold"}
+WIDGET_HEADER_PRESETS = {"Navy Gradient", "Blue Gradient", "Emerald Gradient", "Slate Gradient"}
+HEX_COLOUR = re.compile(r"^#[0-9a-fA-F]{6}$")
+WIDGET_ASSET_VERSION = "20260817"
 CONFIG_SAFE_FIELDS = [
 	"model_name", "max_tokens", "monthly_token_limit", "public_rate_limit_per_minute",
 	"max_public_message_chars", "enable_monitoring_alerts", "verify_meta_signature",
@@ -128,6 +134,21 @@ def update_assistant_identity(workspace_name, values):
 def update_widget_settings(workspace_name, values):
 	allowed = {"widget_title", "widget_greeting", "widget_primary_color", "widget_header_color"}
 	values = {key: value for key, value in (values or {}).items() if key in allowed}
+	if "widget_title" in values:
+		values["widget_title"] = str(values["widget_title"] or "").strip()[:120]
+		if not values["widget_title"]:
+			frappe.throw(_("Widget title is required."), frappe.ValidationError)
+	if "widget_greeting" in values:
+		values["widget_greeting"] = str(values["widget_greeting"] or "").strip()[:500]
+		if not values["widget_greeting"]:
+			frappe.throw(_("Widget greeting is required."), frappe.ValidationError)
+	for key, presets in (("widget_primary_color", WIDGET_PRIMARY_PRESETS), ("widget_header_color", WIDGET_HEADER_PRESETS)):
+		if key not in values:
+			continue
+		colour = str(values[key] or "").strip()
+		if colour not in presets and not HEX_COLOUR.fullmatch(colour):
+			frappe.throw(_("Choose a valid six digit colour."), frappe.ValidationError)
+		values[key] = colour
 	tenant = get_workspace_engine_tenant(workspace_name)
 	doc = frappe.get_doc("AI Tenant", tenant)
 	for key, value in values.items():
@@ -159,7 +180,7 @@ def replace_allowed_domains(workspace_name, domains):
 def generate_embed_code(workspace_name):
 	tenant = get_workspace_engine_tenant(workspace_name)
 	base = get_url().rstrip("/")
-	return f'<script src="{base}/assets/verity_ai/js/widget.js" data-tenant-id="{tenant}"></script>'
+	return f'<script src="{base}/assets/verity_ai/js/widget.js?v={WIDGET_ASSET_VERSION}" data-tenant-id="{tenant}"></script>'
 
 
 def create_knowledge_source(workspace_name, title, content, file=None):
@@ -193,6 +214,18 @@ def update_knowledge_source(workspace_name, source_name, values):
 			setattr(doc, key, values[key])
 	doc.save(ignore_permissions=True)
 	return doc.name
+
+
+def delete_knowledge_source(workspace_name, source_name):
+	tenant = get_workspace_engine_tenant(workspace_name)
+	if not frappe.db.exists("AI Knowledge Source", {"name": source_name, "tenant": tenant}):
+		frappe.throw(_("Knowledge source was not found."), frappe.DoesNotExistError)
+	for chunk in frappe.get_all("AI Knowledge Chunk", filters={"tenant": tenant, "knowledge_source": source_name}, pluck="name"):
+		frappe.delete_doc("AI Knowledge Chunk", chunk, ignore_permissions=True, force=True)
+	for ingestion in frappe.get_all("VerityAI Knowledge Ingestion", filters={"workspace": workspace_name, "knowledge_source": source_name}, pluck="name"):
+		frappe.delete_doc("VerityAI Knowledge Ingestion", ingestion, ignore_permissions=True, force=True)
+	frappe.delete_doc("AI Knowledge Source", source_name, ignore_permissions=True, force=True)
+	return {"deleted": source_name}
 
 
 def get_workspace_usage(workspace_name, from_date=None, to_date=None):

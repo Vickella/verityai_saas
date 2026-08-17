@@ -80,6 +80,12 @@ class TestVerityAISaaS(FrappeTestCase):
 		engine.update_widget_settings(self.workspace, {"widget_title": "Help", "provider_api_key": "must not write"})
 		self.assertEqual(frappe.db.get_value("AI Tenant", self.tenant, "assistant_name"), "My Assistant")
 		self.assertEqual(frappe.db.get_value("AI Tenant", self.tenant, "widget_title"), "Help")
+		engine.update_widget_settings(self.workspace, {"widget_primary_color": "#2f6fed", "widget_header_color": "#16345f"})
+		colours = frappe.db.get_value("AI Tenant", self.tenant, ["widget_primary_color", "widget_header_color"], as_dict=True)
+		self.assertEqual(colours.widget_primary_color, "#2f6fed")
+		self.assertEqual(colours.widget_header_color, "#16345f")
+		with self.assertRaises(frappe.ValidationError):
+			engine.update_widget_settings(self.workspace, {"widget_primary_color": "url(javascript:alert(1))"})
 		self.assertEqual(frappe.db.get_value("AI Tenant", other_tenant.name, "assistant_name"), "Other")
 
 	def test_assistant_uses_curated_business_nature(self):

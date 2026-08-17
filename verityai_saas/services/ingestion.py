@@ -17,6 +17,7 @@ from verityai_saas.services.permissions import is_operator
 
 
 ALLOWED_EXTENSIONS = {".txt", ".md", ".csv", ".json", ".html", ".htm", ".pdf", ".docx", ".png", ".jpg", ".jpeg"}
+NON_DOCUMENT_EXTENSIONS = {"avif", "bmp", "css", "gif", "ico", "jpeg", "jpg", "js", "map", "mp3", "mp4", "ogg", "png", "svg", "webm", "webp", "woff", "woff2", "zip"}
 MAX_FILE_BYTES = 10 * 1024 * 1024
 MAX_FETCH_BYTES = 2 * 1024 * 1024
 MAX_CONTENT_CHARS = 2_000_000
@@ -68,11 +69,15 @@ def _validate_public_url(url):
 	return parsed.geturl()
 
 
-def _fetch(url, allowed_types=("text/html", "text/plain")):
+def _fetch(url, allowed_types=("text/html", "text/plain", "application/xhtml+xml")):
 	session = requests.Session()
 	session.trust_env = False
 	current = _validate_public_url(url)
-	for _ in range(6):
+	redirects = set()
+	for _ in range(8):
+		if current in redirects:
+			frappe.throw("Website redirect loop detected.", frappe.ValidationError)
+		redirects.add(current)
 		response = session.get(current, headers={"User-Agent": USER_AGENT, "Accept": ", ".join(allowed_types)}, timeout=(5, 20), allow_redirects=False, stream=True)
 		if response.is_redirect or response.is_permanent_redirect:
 			location = response.headers.get("Location")
@@ -121,23 +126,31 @@ def crawl_url(url, max_pages=None):
 		if candidate in seen:
 			continue
 		seen.add(candidate)
-		final_url, raw, content_type, size = _fetch(candidate)
+		try:
+			final_url, raw, content_type, size = _fetch(candidate)
+		except (requests.RequestException, frappe.ValidationError, frappe.PermissionError):
+			if not documents and candidate == start:
+				raise
+			continue
 		if (urlparse(final_url).scheme, urlparse(final_url).netloc.lower()) != origin:
 			continue
 		total_bytes += size
-		if content_type == "text/html":
+		if content_type in {"text/html", "application/xhtml+xml"}:
 			parser = PageParser()
 			parser.feed(raw)
 			text = "\n".join(parser.text)
 			for link in parser.links:
 				next_url = urljoin(final_url, link).split("#", 1)[0]
 				parsed = urlparse(next_url)
-				if (parsed.scheme, parsed.netloc.lower()) == origin and parsed.path.lower().rsplit(".", 1)[-1] not in {"jpg", "jpeg", "png", "gif", "svg", "pdf", "zip"}:
+				extension = parsed.path.lower().rsplit(".", 1)[-1] if "." in parsed.path.rsplit("/", 1)[-1] else ""
+				if (parsed.scheme, parsed.netloc.lower()) == origin and extension not in NON_DOCUMENT_EXTENSIONS:
 					queue.append(next_url)
 		else:
 			text = raw
 		if text.strip():
 			documents.append(f"Source: {final_url}\n{text.strip()}")
+	if not documents:
+		frappe.throw("No readable website text was found.", frappe.ValidationError)
 	return "\n\n".join(documents)[:MAX_CONTENT_CHARS], len(documents), total_bytes
 
 
