@@ -8,7 +8,7 @@ from verityai_saas.api._response import RateLimitExceeded, endpoint
 from verityai_saas.api import admin as admin_api
 from verityai_saas.api import assistant as assistant_api
 from verityai_saas.api import integrations as integrations_api
-from verityai_saas.services import engine, integrations, notifications, onboarding, paynow
+from verityai_saas.services import engine, integrations, notifications, onboarding, paynow, platform_ai
 from verityai_saas.services.admin_reauth import mark_admin_reauthenticated
 from verityai_saas.tests.cleanup import cleanup_all_test_fixtures, cleanup_test_workspace
 
@@ -34,6 +34,13 @@ class TestSecureIntegrations(FrappeTestCase):
 			"integration_key": settings.get_password("paynow_integration_key", raise_exception=False),
 			"environment": settings.paynow_environment,
 		}
+		self.original_ai = {
+			"provider": settings.ai_provider,
+			"model": settings.ai_model,
+			"api_base": settings.ai_api_base,
+			"api_key": settings.get_password("ai_api_key", raise_exception=False),
+			"embedding_model": settings.ai_embedding_model,
+		}
 		self.token = frappe.generate_hash(length=8).lower()
 		self.owner = frappe.get_doc({
 			"doctype": "User", "email": f"integration-owner-{self.token}@example.com",
@@ -58,6 +65,11 @@ class TestSecureIntegrations(FrappeTestCase):
 		settings.paynow_integration_id = self.original_paynow["integration_id"]
 		settings.paynow_integration_key = self.original_paynow["integration_key"]
 		settings.paynow_environment = self.original_paynow["environment"]
+		settings.ai_provider = self.original_ai["provider"]
+		settings.ai_model = self.original_ai["model"]
+		settings.ai_api_base = self.original_ai["api_base"]
+		settings.ai_api_key = self.original_ai["api_key"]
+		settings.ai_embedding_model = self.original_ai["embedding_model"]
 		settings.save(ignore_permissions=True)
 		cleanup_test_workspace(self.workspace, users=[self.owner], engine_tenant=self.tenant, commit=False)
 		if frappe.db.exists("VerityAI Plan", self.plan):
@@ -97,6 +109,20 @@ class TestSecureIntegrations(FrappeTestCase):
 		self.assertFalse(test_status["checkout_enabled"])
 		frappe.clear_cache(doctype="VerityAI Platform Settings")
 		self.assertEqual(paynow.operating_mode(), "Test")
+
+	def test_platform_ai_key_is_admin_only_and_provisions_engine_configs(self):
+		response = admin_api.configure_platform_ai({
+			"provider": "OpenAI", "model": "gpt-4.1-mini", "api_key": "platform-test-secret",
+			"embedding_model": "text-embedding-3-small",
+		})
+		self.assertTrue(response["success"])
+		status = response["data"]
+		self.assertTrue(status["api_key_present"])
+		self.assertNotIn("platform-test-secret", frappe.as_json(status))
+		self.assertGreaterEqual(status["configurations_updated"], 1)
+		config = engine.get_engine_configuration(self.workspace)
+		self.assertEqual(config.get_password("provider_api_key"), "platform-test-secret")
+		self.assertNotIn("platform-test-secret", frappe.as_json(platform_ai.configuration_status()))
 
 	@patch("verityai_saas.services.paynow._environment_field_available", return_value=False)
 	def test_missing_paynow_environment_field_fails_safely(self, _field_available):

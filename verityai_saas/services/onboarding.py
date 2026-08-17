@@ -56,6 +56,8 @@ def create_workspace(owner_user, account_name, workspace_name, business_name=Non
 		assign_workspace_role(owner_user, "Owner")
 		tenant = engine.create_engine_tenant(workspace.name)
 		configuration = engine.ensure_engine_configuration(workspace.name)
+		from verityai_saas.services.platform_ai import apply_to_configuration
+		apply_to_configuration(frappe.get_doc("AI Configuration", configuration))
 		plan_name = plan_name or frappe.db.get_value("VerityAI Plan", {"plan_code": "TRIAL", "active": 1}, "name") or frappe.db.get_value("VerityAI Plan", {"active": 1}, "name")
 		if not plan_name:
 			frappe.throw(_("No active SaaS plan is configured."), frappe.ValidationError)

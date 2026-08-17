@@ -171,6 +171,12 @@ def ensure_platform_settings():
 	ensure_doctype(
 		"VerityAI Platform Settings",
 		[
+			field("ai_section", "AI Provider", "Section Break"),
+			field("ai_provider", "Provider", "Select", options="OpenAI\nOpenAI-Compatible", default="OpenAI"),
+			field("ai_model", "Model", default="gpt-4.1-mini"),
+			field("ai_api_base", "API Base URL"),
+			field("ai_api_key", "API Key", "Password"),
+			field("ai_embedding_model", "Embedding Model", default="text-embedding-3-small"),
 			field("paynow_section", "Paynow", "Section Break"),
 			field("paynow_environment", "Operating Mode", "Select", options="Test\nProduction", default="Test"),
 			field("paynow_integration_id", "Integration ID"),
