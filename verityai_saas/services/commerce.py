@@ -1,11 +1,18 @@
 from html import escape
+from io import BytesIO
 
 import frappe
 from frappe.utils import add_to_date, flt, get_datetime, getdate, now_datetime, nowdate, validate_email_address
+from openpyxl import Workbook, load_workbook
+from openpyxl.styles import Alignment, Font, PatternFill
 
 
 CUSTOMER_FIELDS = ["name", "customer_name", "customer_type", "email", "phone", "tax_id", "address", "city", "country", "notes", "status", "external_system", "external_id", "last_synced_on", "creation", "modified"]
 PRODUCT_FIELDS = ["name", "item_code", "item_name", "description", "item_group", "stock_uom", "is_stock_item", "standard_rate", "currency", "active", "external_system", "external_id", "last_synced_on", "creation", "modified"]
+PRODUCT_IMPORT_HEADERS = [
+	"Item Code", "Item Name", "Description", "Category", "Unit of Measure",
+	"Selling Price", "Currency", "Item Type", "Active",
+]
 PRICE_FIELDS = ["name", "product", "price_list", "currency", "rate", "valid_from", "valid_upto", "active", "creation", "modified"]
 QUOTE_FIELDS = ["name", "customer", "customer_name", "customer_email", "transaction_date", "valid_till", "price_list", "currency", "status", "subtotal", "discount_amount", "tax_rate", "tax_amount", "total", "external_system", "external_id", "sync_status", "last_synced_on", "creation", "modified"]
 QUOTE_TRANSITIONS = {
@@ -143,6 +150,127 @@ def save_product(workspace, values, product=None):
 	else:
 		doc.save(ignore_permissions=True)
 	return frappe.db.get_value("VerityAI Product", doc.name, PRODUCT_FIELDS, as_dict=True)
+
+
+def product_import_template():
+	workbook = Workbook()
+	sheet = workbook.active
+	sheet.title = "Products"
+	sheet.append(PRODUCT_IMPORT_HEADERS)
+	sheet.append(["CONSULT-01", "Business consultation", "One hour consultation", "Services", "Hour", 50, "USD", "Service", "Yes"])
+	header_fill = PatternFill("solid", fgColor="1F64C8")
+	for cell in sheet[1]:
+		cell.fill = header_fill
+		cell.font = Font(color="FFFFFF", bold=True)
+		cell.alignment = Alignment(vertical="center")
+	sheet.freeze_panes = "A2"
+	sheet.auto_filter.ref = f"A1:I2"
+	widths = [18, 28, 42, 20, 18, 16, 12, 14, 12]
+	for index, width in enumerate(widths, 1):
+		sheet.column_dimensions[chr(64 + index)].width = width
+	instructions = workbook.create_sheet("Instructions")
+	instructions.append(["Product import"])
+	instructions.append(["Complete the Products sheet without changing the column headings."])
+	instructions.append(["Item Code and Item Name are required. Item Type accepts Product or Service. Active accepts Yes or No."])
+	instructions.append(["Remove the example row before importing your own catalogue."])
+	instructions["A1"].font = Font(bold=True, size=14, color="1F64C8")
+	instructions.column_dimensions["A"].width = 105
+	stream = BytesIO()
+	workbook.save(stream)
+	return stream.getvalue()
+
+
+def product_export(workspace):
+	workbook = load_workbook(BytesIO(product_import_template()))
+	sheet = workbook["Products"]
+	sheet.delete_rows(2, sheet.max_row - 1)
+	for product in list_products(workspace, limit=1000):
+		sheet.append([
+			product.item_code,
+			product.item_name,
+			product.description or "",
+			product.item_group or "Services",
+			product.stock_uom or "Unit",
+			flt(product.standard_rate, 2),
+			product.currency or _workspace_currency(workspace),
+			"Product" if product.is_stock_item else "Service",
+			"Yes" if product.active else "No",
+		])
+	sheet.auto_filter.ref = f"A1:I{max(sheet.max_row, 1)}"
+	stream = BytesIO()
+	workbook.save(stream)
+	return stream.getvalue()
+
+
+def import_products(workspace, content, update_existing=False):
+	try:
+		workbook = load_workbook(BytesIO(content), read_only=True, data_only=False, keep_links=False)
+	except Exception:
+		frappe.throw("The uploaded file is not a valid Excel workbook.", frappe.ValidationError)
+	if "Products" not in workbook.sheetnames:
+		frappe.throw("The workbook must contain a Products sheet.", frappe.ValidationError)
+	sheet = workbook["Products"]
+	if sheet.max_row > 1001:
+		frappe.throw("A single workbook can contain at most 1,000 products.", frappe.ValidationError)
+	headers = [str(cell.value or "").strip() for cell in sheet[1]]
+	if headers != PRODUCT_IMPORT_HEADERS:
+		frappe.throw("The Products sheet columns do not match the current template.", frappe.ValidationError)
+	rows = []
+	seen_codes = set()
+	for row_number, cells in enumerate(sheet.iter_rows(min_row=2, max_col=len(PRODUCT_IMPORT_HEADERS)), 2):
+		if any(cell.data_type == "f" for cell in cells):
+			frappe.throw(f"Row {row_number} contains a formula. Replace formulas with values before importing.", frappe.ValidationError)
+		values = [cell.value for cell in cells]
+		if not any(value not in (None, "") for value in values):
+			continue
+		if len(rows) >= 1000:
+			frappe.throw("A single workbook can contain at most 1,000 products.", frappe.ValidationError)
+		item_code = _text(values[0], "Item code", required=True).upper()
+		item_name = _text(values[1], "Item name", required=True)
+		if item_code in seen_codes:
+			frappe.throw(f"Item code {item_code} appears more than once in the workbook.", frappe.ValidationError)
+		seen_codes.add(item_code)
+		item_type = str(values[7] or "Service").strip().lower()
+		if item_type not in {"product", "service"}:
+			frappe.throw(f"Row {row_number}: Item Type must be Product or Service.", frappe.ValidationError)
+		active_value = str(values[8] if values[8] is not None else "Yes").strip().lower()
+		if active_value not in {"yes", "no", "true", "false", "1", "0"}:
+			frappe.throw(f"Row {row_number}: Active must be Yes or No.", frappe.ValidationError)
+		rate = flt(values[5], 2)
+		if rate < 0:
+			frappe.throw(f"Row {row_number}: Selling Price cannot be negative.", frappe.ValidationError)
+		rows.append({
+			"row_number": row_number,
+			"item_code": item_code,
+			"values": {
+				"item_code": item_code,
+				"item_name": item_name,
+				"description": values[2],
+				"item_group": values[3] or "Services",
+				"stock_uom": values[4] or "Unit",
+				"standard_rate": rate,
+				"currency": str(values[6] or _workspace_currency(workspace)).strip().upper(),
+				"is_stock_item": int(item_type == "product"),
+				"active": int(active_value in {"yes", "true", "1"}),
+			},
+		})
+	if not rows:
+		frappe.throw("The Products sheet does not contain any product rows.", frappe.ValidationError)
+	created = updated = skipped = 0
+	for row in rows:
+		existing = frappe.db.get_value("VerityAI Product", {"workspace": workspace, "item_code": row["item_code"]}, "name")
+		if existing and not update_existing:
+			skipped += 1
+			continue
+		try:
+			save_product(workspace, row["values"], product=existing)
+		except Exception as error:
+			frappe.throw(f"Row {row['row_number']}: {error}", frappe.ValidationError)
+		if existing:
+			updated += 1
+		else:
+			created += 1
+	return {"created": created, "updated": updated, "skipped": skipped, "total": len(rows)}
 
 
 def delete_product(workspace, product):

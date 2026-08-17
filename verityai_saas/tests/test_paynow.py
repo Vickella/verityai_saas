@@ -37,6 +37,7 @@ class TestPaynowBilling(FrappeTestCase):
 	def setUp(self):
 		frappe.set_user("Administrator")
 		mark_admin_reauthenticated()
+		self.original_paynow_environment = frappe.get_single("VerityAI Platform Settings").paynow_environment
 		token = frappe.generate_hash(length=8).lower()
 		self.owner = self.create_user(f"paynow-owner-{token}@example.com")
 		created = create_workspace(
@@ -61,9 +62,15 @@ class TestPaynowBilling(FrappeTestCase):
 			"max_allowed_domains": 5,
 		}).insert(ignore_permissions=True).name
 		self.integration_key = "3e9fed89-60e1-4ce5-ab6e-6b1eb2d4f977"
+		settings = frappe.get_single("VerityAI Platform Settings")
+		settings.paynow_environment = "Production"
+		settings.save(ignore_permissions=True)
 
 	def tearDown(self):
 		super().tearDown()
+		settings = frappe.get_single("VerityAI Platform Settings")
+		settings.paynow_environment = self.original_paynow_environment
+		settings.save(ignore_permissions=True)
 		cleanup_test_workspace(
 			self.workspace,
 			users=[self.owner],
@@ -117,6 +124,13 @@ class TestPaynowBilling(FrappeTestCase):
 			paynow.generate_hash(values, self.integration_key),
 			"2A033FC38798D913D42ECB786B9B19645ADEDBDE788862032F1BD82CF3B92DEF84F316385D5B40DBB35F1A4FD7D5BFE73835174136463CDD48C9366B0749C689",
 		)
+
+	def test_test_mode_blocks_customer_checkout(self):
+		settings = frappe.get_single("VerityAI Platform Settings")
+		settings.paynow_environment = "Test"
+		settings.save(ignore_permissions=True)
+		with self.assertRaisesRegex(frappe.ValidationError, "test mode"):
+			paynow.initiate_checkout(self.workspace, self.plan)
 
 	def test_checkout_verifies_signature_before_returning_redirect(self):
 		response_values = {

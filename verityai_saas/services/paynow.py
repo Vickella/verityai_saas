@@ -45,13 +45,34 @@ def is_configured():
 	return all(_configured_credentials())
 
 
+def operating_mode():
+	if not frappe.db.exists("DocType", SETTINGS_DOCTYPE):
+		return "Test"
+	mode = str(frappe.get_single(SETTINGS_DOCTYPE).get("paynow_environment") or "Test").strip()
+	return mode if mode in {"Test", "Production"} else "Test"
+
+
+def checkout_enabled():
+	return is_configured() and operating_mode() == "Production"
+
+
 def configuration_status():
+	mode = operating_mode()
 	integration_id, integration_key = _settings_credentials()
 	if integration_id and integration_key:
-		return {"configured": True, "integration_id": integration_id, "source": "Encrypted platform settings"}
+		return {
+			"configured": True,
+			"checkout_enabled": mode == "Production",
+			"environment": mode,
+			"integration_id": integration_id,
+			"source": "Encrypted platform settings",
+		}
 	configured_id = str(frappe.conf.get("paynow_integration_id") or "").strip()
+	configured = bool(configured_id and frappe.conf.get("paynow_integration_key"))
 	return {
-		"configured": bool(configured_id and frappe.conf.get("paynow_integration_key")),
+		"configured": configured,
+		"checkout_enabled": configured and mode == "Production",
+		"environment": mode,
 		"integration_id": configured_id,
 		"source": "Site configuration" if configured_id else "Not configured",
 	}
@@ -60,14 +81,18 @@ def configuration_status():
 def configure(values):
 	integration_id = str(values.get("integration_id") or "").strip()
 	integration_key = str(values.get("integration_key") or "").strip()
+	environment = str(values.get("environment") or "Test").strip().title()
 	if not integration_id or len(integration_id) > 140:
 		frappe.throw("A valid Paynow integration ID is required.", frappe.ValidationError)
+	if environment not in {"Test", "Production"}:
+		frappe.throw("Paynow operating mode must be Test or Production.", frappe.ValidationError)
 	settings = frappe.get_single(SETTINGS_DOCTYPE)
 	if not integration_key:
 		_, existing_key = _settings_credentials()
 		if not existing_key:
 			frappe.throw("A Paynow integration key is required.", frappe.ValidationError)
 	settings.paynow_integration_id = integration_id
+	settings.paynow_environment = environment
 	if integration_key:
 		settings.paynow_integration_key = integration_key
 	settings.save()
@@ -79,6 +104,14 @@ def _credentials():
 	if not integration_id or not integration_key:
 		frappe.throw("Paynow is not configured for this site.", frappe.ValidationError)
 	return integration_id, integration_key
+
+
+def _require_checkout_enabled():
+	if operating_mode() != "Production":
+		frappe.throw(
+			"Paynow checkout is in test mode. Change the operating mode to Production in the operator console before accepting customer payments.",
+			frappe.ValidationError,
+		)
 
 
 def generate_hash(values: Iterable[str], integration_key: str):
@@ -165,6 +198,7 @@ def _initiate_gateway_event(workspace_name, event_type, amount, additional_info,
 
 
 def initiate_checkout(workspace_name, plan_name, billing_cycle="Monthly", promotion_code=None):
+	_require_checkout_enabled()
 	plan = frappe.get_doc("VerityAI Plan", plan_name)
 	if not plan.active or plan.plan_code == "TRIAL":
 		frappe.throw("Select an active paid plan.", frappe.ValidationError)
@@ -215,6 +249,7 @@ def initiate_checkout(workspace_name, plan_name, billing_cycle="Monthly", promot
 
 
 def initiate_credit_checkout(workspace_name, credit_pack):
+	_require_checkout_enabled()
 	subscription = frappe.db.get_value("VerityAI Subscription", {"workspace": workspace_name}, ["status"], as_dict=True, order_by="creation desc")
 	if not subscription or subscription.status != "Active":
 		frappe.throw("Choose a paid plan before purchasing additional AI credits.", frappe.PermissionError)

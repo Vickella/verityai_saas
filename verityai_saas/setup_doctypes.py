@@ -172,6 +172,7 @@ def ensure_doctypes():
 		"VerityAI Platform Settings",
 		[
 			field("paynow_section", "Paynow", "Section Break"),
+			field("paynow_environment", "Operating Mode", "Select", options="Test\nProduction", default="Test"),
 			field("paynow_integration_id", "Integration ID"),
 			field("paynow_integration_key", "Integration Key", "Password"),
 		],

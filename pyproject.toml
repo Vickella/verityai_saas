@@ -10,6 +10,7 @@ dependencies = [
     "Pillow>=10.0.0",
     "pytesseract>=0.3.10",
     "pdf2image>=1.17.0",
+    "openpyxl>=3.1.0",
 ]
 
 [tool.bench.frappe-dependencies]

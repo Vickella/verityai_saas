@@ -1339,6 +1339,12 @@ main { position: relative; }
 .va-button:not(.secondary):not(.ghost):not(.danger) { border-color: #1d62c7; background: linear-gradient(180deg,#2b76e4,#1d63ca); box-shadow: 0 4px 10px rgba(29,99,202,.14); }
 .va-button:not(.secondary):not(.ghost):not(.danger):hover { background: linear-gradient(180deg,#347fe9,#1b5dbf); box-shadow: 0 6px 14px rgba(29,99,202,.2); }
 .va-button.secondary:hover { border-color: #b8c8dc; background: #f8faff; }
+.va-import-form { gap: 18px; }
+.va-template-download { display: grid; gap: 4px; padding: 15px 16px; color: var(--ink-900); border: 1px solid #cbdcf1; border-radius: 12px; background: linear-gradient(145deg,#f8fbff,#eef5ff); text-decoration: none; transition: border-color 150ms ease,box-shadow 150ms ease,transform 150ms ease; }
+.va-template-download:hover { border-color: #8bb5ed; box-shadow: 0 8px 20px rgba(29,99,202,.09); transform: translateY(-1px); }
+.va-template-download strong { color: #1d63ca; font-size: 12px; }
+.va-template-download span { color: var(--ink-500); font-size: 10px; line-height: 1.5; }
+.va-import-form input[type="file"] { padding: 9px; }
 
 .va-table { border-collapse: separate; border-spacing: 0; }
 .va-table th { color: #68778d; border-bottom-color: #e5e9f0; background: #f8fafc; letter-spacing: .08em; }

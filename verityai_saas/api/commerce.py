@@ -48,6 +48,37 @@ def delete_product(workspace, product):
 
 
 @frappe.whitelist()
+def download_product_template(workspace):
+	require_workspace_permission(workspace, "manage_catalog")
+	frappe.local.response.filename = "VerityAI_Product_Import_Template.xlsx"
+	frappe.local.response.filecontent = commerce.product_import_template()
+	frappe.local.response.type = "binary"
+
+
+@frappe.whitelist()
+def export_products(workspace):
+	require_workspace_permission(workspace, "view_catalog")
+	frappe.local.response.filename = "VerityAI_Product_Catalogue.xlsx"
+	frappe.local.response.filecontent = commerce.product_export(workspace)
+	frappe.local.response.type = "binary"
+
+
+@frappe.whitelist(methods=["POST"])
+@endpoint
+def import_products(workspace, update_existing=0):
+	require_workspace_permission(workspace, "manage_catalog")
+	upload = getattr(getattr(frappe, "request", None), "files", {}).get("file")
+	if not upload or not str(upload.filename or "").lower().endswith(".xlsx"):
+		frappe.throw("Upload an Excel .xlsx product workbook.", frappe.ValidationError)
+	content = upload.read()
+	if not content:
+		frappe.throw("The uploaded workbook is empty.", frappe.ValidationError)
+	if len(content) > 2 * 1024 * 1024:
+		frappe.throw("The product workbook cannot exceed 2 MB.", frappe.ValidationError)
+	return commerce.import_products(workspace, content, update_existing=bool(int(update_existing or 0)))
+
+
+@frappe.whitelist()
 @endpoint
 def prices(workspace, product=None, price_list=None, limit=200):
 	require_workspace_permission(workspace, "view_catalog")

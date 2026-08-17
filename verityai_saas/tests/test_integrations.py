@@ -28,6 +28,12 @@ class TestSecureIntegrations(FrappeTestCase):
 	def setUp(self):
 		frappe.set_user("Administrator")
 		mark_admin_reauthenticated()
+		settings = frappe.get_single("VerityAI Platform Settings")
+		self.original_paynow = {
+			"integration_id": settings.paynow_integration_id,
+			"integration_key": settings.get_password("paynow_integration_key", raise_exception=False),
+			"environment": settings.paynow_environment,
+		}
 		self.token = frappe.generate_hash(length=8).lower()
 		self.owner = frappe.get_doc({
 			"doctype": "User", "email": f"integration-owner-{self.token}@example.com",
@@ -49,8 +55,9 @@ class TestSecureIntegrations(FrappeTestCase):
 	def tearDown(self):
 		super().tearDown()
 		settings = frappe.get_single("VerityAI Platform Settings")
-		settings.paynow_integration_id = None
-		settings.paynow_integration_key = None
+		settings.paynow_integration_id = self.original_paynow["integration_id"]
+		settings.paynow_integration_key = self.original_paynow["integration_key"]
+		settings.paynow_environment = self.original_paynow["environment"]
 		settings.save(ignore_permissions=True)
 		cleanup_test_workspace(self.workspace, users=[self.owner], engine_tenant=self.tenant, commit=False)
 		if frappe.db.exists("VerityAI Plan", self.plan):
@@ -70,10 +77,12 @@ class TestSecureIntegrations(FrappeTestCase):
 		self.assertEqual(config.get_password("erpnext_api_secret"), "erp-secret")
 
 	def test_paynow_credentials_are_encrypted_and_write_only(self):
-		response = admin_api.configure_paynow({"integration_id": "test-integration", "integration_key": "paynow-secret"})
+		response = admin_api.configure_paynow({"integration_id": "test-integration", "integration_key": "paynow-secret", "environment": "Production"})
 		self.assertTrue(response["success"])
 		status = response["data"]
 		self.assertTrue(status["configured"])
+		self.assertTrue(status["checkout_enabled"])
+		self.assertEqual(status["environment"], "Production")
 		self.assertNotIn("paynow-secret", str(status))
 		settings = frappe.get_single("VerityAI Platform Settings")
 		self.assertEqual(settings.get_password("paynow_integration_key"), "paynow-secret")

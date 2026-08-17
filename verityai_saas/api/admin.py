@@ -193,7 +193,7 @@ def dashboard():
 		),
 		"provider_failures": provider_failures,
 		"paynow": paynow.configuration_status(),
-		"paynow_configured": paynow.is_configured(),
+		"paynow_configured": paynow.checkout_enabled(),
 		"support_email": platform_email.email_configuration_status(),
 		"commercial_metrics": commercial_metrics,
 	}

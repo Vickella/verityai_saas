@@ -1,9 +1,11 @@
 import json
+from io import BytesIO
 from types import SimpleNamespace
 from unittest.mock import patch
 
 import frappe
 from frappe.tests.utils import FrappeTestCase
+from openpyxl import load_workbook
 
 from verityai_saas import setup_doctypes
 from verityai_saas.api import commerce as commerce_api
@@ -54,6 +56,49 @@ class TestTenantNativeCommerce(FrappeTestCase):
 		self.assertNotEqual(other_product.name, self.product.name)
 		with self.assertRaises(frappe.DuplicateEntryError):
 			commerce.save_product(self.workspace, {"item_code": "consult", "item_name": "Duplicate"})
+
+	def test_excel_product_import_creates_updates_and_remains_workspace_scoped(self):
+		template = commerce.product_import_template()
+		workbook = load_workbook(BytesIO(template))
+		sheet = workbook["Products"]
+		sheet["A2"] = "BULK-01"
+		sheet["B2"] = "Imported service"
+		sheet["F2"] = 75
+		stream = BytesIO()
+		workbook.save(stream)
+
+		created = commerce.import_products(self.workspace, stream.getvalue())
+		self.assertEqual(created, {"created": 1, "updated": 0, "skipped": 0, "total": 1})
+		product = frappe.db.get_value("VerityAI Product", {"workspace": self.workspace, "item_code": "BULK-01"}, ["name", "standard_rate"], as_dict=True)
+		self.assertEqual(product.standard_rate, 75)
+		self.assertFalse(frappe.db.exists("VerityAI Product", {"workspace": self.other["workspace"], "item_code": "BULK-01"}))
+		exported = load_workbook(BytesIO(commerce.product_export(self.workspace)), read_only=True)
+		exported_codes = {row[0].value for row in exported["Products"].iter_rows(min_row=2)}
+		self.assertEqual(exported_codes, {"CONSULT", "BULK-01"})
+
+		sheet["F2"] = 90
+		updated_stream = BytesIO()
+		workbook.save(updated_stream)
+		updated = commerce.import_products(self.workspace, updated_stream.getvalue(), update_existing=True)
+		self.assertEqual(updated, {"created": 0, "updated": 1, "skipped": 0, "total": 1})
+		self.assertEqual(frappe.db.get_value("VerityAI Product", product.name, "standard_rate"), 90)
+
+	def test_excel_product_import_rejects_modified_columns_and_duplicate_rows(self):
+		workbook = load_workbook(BytesIO(commerce.product_import_template()))
+		sheet = workbook["Products"]
+		sheet["A1"] = "Changed heading"
+		stream = BytesIO()
+		workbook.save(stream)
+		with self.assertRaises(frappe.ValidationError):
+			commerce.import_products(self.workspace, stream.getvalue())
+
+		workbook = load_workbook(BytesIO(commerce.product_import_template()))
+		sheet = workbook["Products"]
+		sheet.append([cell.value for cell in sheet[2]])
+		stream = BytesIO()
+		workbook.save(stream)
+		with self.assertRaises(frappe.ValidationError):
+			commerce.import_products(self.workspace, stream.getvalue())
 
 	def test_workspace_price_and_quote_totals_are_calculated_server_side(self):
 		price = commerce.save_price(self.workspace, {"product": self.product.name, "price_list": "Retail", "currency": "USD", "rate": 120})
