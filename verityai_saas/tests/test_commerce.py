@@ -219,6 +219,31 @@ class TestTenantNativeCommerce(FrappeTestCase):
 		frappe.db.set_value("AI Configuration", config.name, "enable_erpnext_integration", 1)
 		self.assertTrue(commerce.handle_ai_item_price(self.created["engine_tenant"], "CONSULT")["handled"])
 
+	def test_catalogue_ranking_and_quote_validation_prevent_wrong_item_pricing(self):
+		commerce.save_product(self.workspace, {
+			"item_code": "AUTOMATE", "item_name": "Business Process Automation",
+			"description": "Automate repetitive workflows and approvals", "standard_rate": 350,
+			"currency": "USD",
+		})
+		commerce.save_product(self.workspace, {
+			"item_code": "SOFTWARE", "item_name": "Software Development",
+			"description": "Custom web and compliance software development", "standard_rate": 150,
+			"currency": "USD",
+		})
+		catalogue = commerce.handle_ai_catalog_search(
+			self.created["engine_tenant"], "software development of a compliance system", limit=10,
+		)
+		self.assertEqual(catalogue["products"][0]["item_code"], "SOFTWARE")
+		created = commerce.handle_ai_quotation_request(
+			self.created["engine_tenant"], "Accuracy Buyer",
+			[{"item_code": "AUTOMATE", "requested_description": "software development of a compliance system", "qty": 1}],
+			client_email="accuracy@example.com",
+		)
+		quote = commerce.get_quotation(self.workspace, created["quotation"])
+		self.assertEqual(quote["items"][0]["item_code"], "AI-CUSTOM-SCOPE")
+		self.assertEqual(quote["items"][0]["rate"], 0)
+		self.assertEqual(quote["items"][0]["description"], "software development of a compliance system")
+
 	def test_ai_lead_appointments_and_desk_crm_are_mapped_to_native_sales(self):
 		from verity_ai.engine import tools as ai_tools
 		from verity_ai.engine.openai_handler import execute_tool_call_impl

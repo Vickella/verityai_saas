@@ -37,7 +37,7 @@ class TestCRMOperations(FrappeTestCase):
 		return frappe.get_doc({"doctype": "AI Lead", "tenant": self.tenant, "lead_name": name, "email": email, "source_channel": "Web", "status": status}).insert(ignore_permissions=True)
 
 	def make_conversation(self, identifier):
-		return frappe.get_doc({"doctype": "AI Chat Session", "tenant": self.tenant, "session_id": frappe.generate_hash(), "platform": "Web", "user_identifier": identifier, "status": "Open", "chat_history": "[]"}).insert(ignore_permissions=True)
+		return frappe.get_doc({"doctype": "AI Chat Session", "tenant": self.tenant, "session_id": frappe.generate_hash(), "platform": "Web", "user_identifier": identifier, "status": "Open", "chat_history": frappe.as_json([{"role": "user", "content": "We need manufacturing stock visibility"}, {"role": "assistant", "content": "I can help capture that requirement."}, {"role": "tool", "content": "private tool payload"}])}).insert(ignore_permissions=True)
 
 	def test_lead_search_pagination_assignment_notes_status_and_funnel(self):
 		first = self.make_lead("Alpha Buyer", "alpha@example.com")
@@ -54,6 +54,28 @@ class TestCRMOperations(FrappeTestCase):
 		detail = leads_api.detail(self.workspace, first.name)["data"]
 		self.assertEqual(detail["lead"]["status"], "Qualified")
 		self.assertEqual({row.activity_type for row in detail["activities"]}, {"Assignment", "Note", "Status Change"})
+
+	def test_lead_detail_returns_ai_needs_and_scoped_conversation(self):
+		conversation = self.make_conversation("buyer@example.com")
+		lead = frappe.get_doc({
+			"doctype": "AI Lead", "tenant": self.tenant, "lead_name": "Manufacturing Buyer",
+			"email": "buyer@example.com", "source_channel": "Web", "status": "New",
+			"current_system": "Odoo", "problems_faced": "Stock movement detail is limited",
+			"requirements": "Manufacturing, budgets and three users",
+			"dynamic_details": frappe.as_json({"number_of_users": 3, "modules": "All modules"}),
+			"chat_session": conversation.name,
+		}).insert(ignore_permissions=True)
+		frappe.set_user(self.owner)
+		response = leads_api.detail(self.workspace, lead.name)
+		self.assertTrue(response["success"])
+		data = response["data"]
+		self.assertEqual(data["lead"]["current_system"], "Odoo")
+		self.assertEqual(data["lead"]["requirements"], "Manufacturing, budgets and three users")
+		self.assertEqual([row["role"] for row in data["conversation"]["history"]], ["user", "assistant"])
+		self.assertNotIn("private tool payload", frappe.as_json(data))
+		denied = leads_api.detail("missing-workspace", lead.name)
+		self.assertFalse(denied["success"])
+		self.assertEqual(denied["code"], "NOT_FOUND")
 
 	def test_lead_csv_export_neutralizes_formulas(self):
 		self.make_lead("=HYPERLINK()", "safe@example.com")

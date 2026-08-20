@@ -2,6 +2,7 @@ from html import escape
 from io import BytesIO
 import hashlib
 import hmac
+import re
 import time
 from urllib.parse import urlencode
 
@@ -498,7 +499,51 @@ def approve_and_send_quotation(workspace, quotation):
 	return {"quotation": get_quotation(workspace, quotation), "pdf_url": pdf_url, "delivery": delivery, "erpnext_sync": sync}
 
 
-def _ai_request_product(workspace, requested_label, rate=None):
+CATALOGUE_STOP_WORDS = {
+	"a", "an", "and", "for", "from", "in", "of", "on", "or", "the", "to", "with",
+	"need", "needs", "want", "wants", "system", "service", "solution",
+}
+
+
+def _catalogue_terms(value):
+	return {
+		term for term in re.findall(r"[a-z0-9]+", str(value or "").lower())
+		if len(term) > 1 and term not in CATALOGUE_STOP_WORDS
+	}
+
+
+def _catalogue_score(query, product):
+	query_text = " ".join(re.findall(r"[a-z0-9]+", str(query or "").lower()))
+	query_terms = _catalogue_terms(query)
+	code = str(product.item_code or "").lower()
+	name_text = " ".join(re.findall(r"[a-z0-9]+", str(product.item_name or "").lower()))
+	name_terms = _catalogue_terms(product.item_name)
+	description_terms = _catalogue_terms(product.description)
+	if not query_terms:
+		return 0
+	if query_text == code or query_text == name_text:
+		return 100
+	score = 25 if name_text and name_text in query_text else 0
+	score += 12 * len(query_terms & name_terms) / max(len(query_terms), 1)
+	score += 10 * len(query_terms & name_terms) / max(len(name_terms), 1)
+	score += 3 * len(query_terms & description_terms) / max(len(query_terms), 1)
+	return round(score, 4)
+
+
+def _selection_matches_request(product, requested_description):
+	if not requested_description:
+		return True
+	request_text = " ".join(re.findall(r"[a-z0-9]+", str(requested_description).lower()))
+	name_text = " ".join(re.findall(r"[a-z0-9]+", str(product.item_name or "").lower()))
+	name_terms = _catalogue_terms(product.item_name)
+	request_terms = _catalogue_terms(requested_description)
+	if name_text and name_text in request_text:
+		return True
+	overlap = name_terms & request_terms
+	return bool(overlap) and len(overlap) / max(len(name_terms), 1) >= (1 / 3) and len(overlap) / max(len(request_terms), 1) >= 0.5
+
+
+def _ai_request_product(workspace, requested_label, rate=None, requested_description=None):
 	label = _text(requested_label, "Requested item", required=True, maximum=240)
 	product = frappe.db.get_value(
 		"VerityAI Product",
@@ -510,7 +555,9 @@ def _ai_request_product(workspace, requested_label, rate=None):
 			"VerityAI Product", {"workspace": workspace, "item_name": label, "active": 1}, "name"
 		)
 	if product:
-		return product, None
+		product_doc = frappe.get_doc("VerityAI Product", product)
+		if _selection_matches_request(product_doc, requested_description):
+			return product, requested_description or None
 	placeholder = frappe.db.get_value(
 		"VerityAI Product", {"workspace": workspace, "item_code": "AI-CUSTOM-SCOPE"}, "name"
 	)
@@ -521,7 +568,7 @@ def _ai_request_product(workspace, requested_label, rate=None):
 			"item_group": "Services", "stock_uom": "Unit", "standard_rate": 0,
 			"currency": _workspace_currency(workspace), "active": 1,
 		}).name
-	return placeholder, label
+	return placeholder, requested_description or label
 
 
 def _scoped_lead(workspace, lead):
@@ -777,7 +824,15 @@ def handle_ai_catalog_search(tenant_name, query=None, limit=10):
 	if not workspace:
 		return None
 	currency = _workspace_currency(workspace)
-	products = list_products(workspace, search=query, active=1, limit=limit)
+	products = frappe.get_all(
+		"VerityAI Product", filters={"workspace": workspace, "active": 1}, fields=PRODUCT_FIELDS,
+		order_by="item_name asc", limit_page_length=2000,
+	)
+	if query:
+		ranked = [(_catalogue_score(query, product), product) for product in products]
+		products = [product for score, product in sorted(ranked, key=lambda row: (-row[0], row[1].item_name)) if score > 0][:_limit(limit)]
+	else:
+		products = products[:_limit(limit)]
 	rows = []
 	for product in products:
 		try:
@@ -900,7 +955,10 @@ def handle_ai_quotation_request(tenant_name, customer, items, client_whatsapp_nu
 	quote_items = []
 	for item in items or []:
 		requested = str(item.get("item_code") or item.get("item") or item.get("service") or "").strip()
-		product, custom_description = _ai_request_product(workspace, requested, rate=item.get("rate"))
+		requested_description = str(item.get("requested_description") or item.get("description") or "").strip()
+		product, custom_description = _ai_request_product(
+			workspace, requested, rate=item.get("rate"), requested_description=requested_description,
+		)
 		quote_items.append({
 			"product": product, "qty": item.get("qty") or 1, "rate": item.get("rate"),
 			"discount_percent": item.get("discount_percent") or 0,

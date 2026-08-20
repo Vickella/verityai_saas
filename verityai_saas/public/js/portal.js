@@ -175,6 +175,29 @@
     document.querySelectorAll("[data-delete-source]").forEach(button=>button.addEventListener("click",async()=>{if(!window.confirm(`Delete “${button.dataset.sourceTitle}” and its search index?`))return;button.disabled=true;try{await call("verityai_saas.api.knowledge.delete",{workspace,source:button.dataset.deleteSource});alert("Knowledge source deleted.");await knowledge();}catch(err){alert(err.message,true);button.disabled=false;}}));
     showGuidedNav();
   }
+  function renderLeadDetail(data) {
+    const row=data.lead||{};
+    let dynamic={};
+    try { dynamic=JSON.parse(row.dynamic_details||"{}"); } catch(e) { dynamic={details:row.dynamic_details||""}; }
+    const has=value=>value!==null&&value!==undefined&&String(value).trim()!=="";
+    const label=value=>String(value||"").replaceAll("_"," ").replace(/\b\w/g,char=>char.toUpperCase());
+    const format=value=>Array.isArray(value)?value.join(", "):(value&&typeof value==="object"?Object.entries(value).map(([key,item])=>`${label(key)}: ${item}`).join("; "):value);
+    const facts=[["Email",row.email],["Phone",row.phone],["Business",row.business_type],["Location",row.location],["Enquiry",row.enquiry_type],["Channel",row.source_channel],["Status",row.status],["Captured",row.creation]];
+    const needs=[["What they need",row.requirements],["Problems to solve",row.problems_faced],["Current system",row.current_system]];
+    const safeUrl=url=>/^https?:\/\//i.test(url||"")||String(url||"").startsWith("/");
+    const details=(title,items)=>items.length?`<section class="va-card va-detail-json"><h3>${esc(title)}</h3><dl>${items.map(([key,value])=>`<div><dt>${esc(key)}</dt><dd>${value}</dd></div>`).join("")}</dl></section>`:"";
+    const appointmentRequest=row.appointment_requested||row.appointment_date||row.appointment_time||row.appointment_mode||row.appointment_notes;
+    return `<div class="va-detail-grid">${facts.filter(item=>has(item[1])).map(item=>`<div><span>${esc(item[0])}</span><strong>${esc(item[1])}</strong></div>`).join("")}</div>
+      ${details("Sales need",needs.filter(item=>has(item[1])).map(([key,value])=>[key,esc(value)]))}
+      ${details("AI captured details",Object.entries(dynamic).filter(([,value])=>has(value)).map(([key,value])=>[label(key),esc(format(value))]))}
+      ${appointmentRequest?details("Appointment request",[["Requested",row.appointment_requested?"Yes":"No"],["Date",row.appointment_date],["Time",row.appointment_time],["Mode",row.appointment_mode],["Notes",row.appointment_notes]].filter(item=>has(item[1])).map(([key,value])=>[key,esc(value)])):""}
+      ${details("Appointments",(data.appointments||[]).map(item=>[item.subject||"Appointment",`${esc([item.starts_on,item.mode,item.status,item.assigned_to].filter(has).join(" · "))}${item.notes?`<br>${esc(item.notes)}`:""}${item.meeting_url&&safeUrl(item.meeting_url)?`<br><a href="${esc(item.meeting_url)}" target="_blank" rel="noopener">Open meeting</a>`:""}`]))}
+      ${details("Sales opportunities",(data.opportunities||[]).map(item=>[item.opportunity_name,`${esc([item.stage,item.amount?`${item.currency||""} ${item.amount}`:"",item.probability!==null&&item.probability!==undefined?`${item.probability}% probability`:"",item.next_follow_up_on?`Follow up ${item.next_follow_up_on}`:""].filter(has).join(" · "))}${item.notes?`<br>${esc(item.notes)}`:""}`]))}
+      ${details("Quotation requests",(data.quote_requests||[]).map(item=>[item.name,`${esc([item.status,item.estimated_total?`Estimated ${item.estimated_total}`:"",item.erpnext_quotation_id].filter(has).join(" · "))}${item.client_notes?`<br>${esc(item.client_notes)}`:""}${item.sent_file_url&&safeUrl(item.sent_file_url)?`<br><a href="${esc(item.sent_file_url)}" target="_blank" rel="noopener">Open quotation PDF</a>`:""}`]))}
+      ${details("Conversation",(data.conversation?.history||[]).map(item=>[item.role==="user"?"Visitor":"Assistant",esc(item.content)]))}
+      <section class="va-card va-detail-json"><h3>Activity</h3>${(data.activities||[]).length?`<dl>${data.activities.map(item=>`<div><dt>${esc(item.activity_type)}</dt><dd>${esc(item.note||item.new_status||item.assigned_to||"")}<br><span class="muted">${esc(item.performed_by||"")}${item.creation?` · ${esc(item.creation)}`:""}</span></dd></div>`).join("")}</dl>`:emptyState("No activity yet","")}</section>`;
+  }
+
   async function leads() {
     const [data, assignees] = await Promise.all([
       call("verityai_saas.api.leads.list_leads", {workspace, ...leadFilters}),
@@ -193,6 +216,18 @@
     document.querySelectorAll("[data-lead-note]").forEach(button=>button.addEventListener("click",async()=>{const note=window.prompt("Lead note","");if(!note)return;try{await call("verityai_saas.api.leads.add_note",{workspace,lead:button.dataset.leadNote,note});alert("Lead note added.");await leads();}catch(err){alert(err.message,true);}}));
     const leadDrawer=document.querySelector("#lead-drawer");
     document.querySelectorAll("[data-lead-view]").forEach(button=>button.onclick=async()=>{button.disabled=true;try{const data=await call("verityai_saas.api.leads.detail",{workspace,lead:button.dataset.leadView});const row=data.lead||{};let dynamic={};try{dynamic=JSON.parse(row.dynamic_details||"{}");}catch(e){dynamic={details:row.dynamic_details||""};}const facts=[["Email",row.email],["Phone",row.phone],["Prospect business",row.business_type],["Location",row.location],["Enquiry",row.enquiry_type],["Channel",row.source_channel],["Status",row.status]];document.querySelector("#lead-detail-title").textContent=row.lead_name||"Lead details";document.querySelector("#lead-detail-body").innerHTML=`<div class="va-detail-grid">${facts.filter(item=>item[1]).map(item=>`<div><span>${esc(item[0])}</span><strong>${esc(item[1])}</strong></div>`).join("")}</div>${row.requirements?`<div class="va-card"><h3>Requirements</h3><p>${esc(row.requirements)}</p></div>`:""}${Object.keys(dynamic).length?`<div class="va-card va-detail-json"><h3>Captured details</h3><dl>${Object.entries(dynamic).map(([key,value])=>`<div><dt>${esc(key.replaceAll("_"," "))}</dt><dd>${esc(typeof value==="object"?JSON.stringify(value):value)}</dd></div>`).join("")}</dl></div>`:""}<div class="va-card"><h3>Activity</h3>${(data.activities||[]).length?(data.activities||[]).map(item=>`<p><strong>${esc(item.activity_type)}</strong> ${esc(item.note||item.new_status||item.assigned_to||"")}<br><span class="muted">${esc(item.creation)}</span></p>`).join(""):emptyState("No activity yet","")}</div>`;leadDrawer.hidden=false;document.body.classList.add("va-no-scroll");}catch(err){alert(err.message,true);}finally{button.disabled=false;}});
+    document.querySelectorAll("[data-lead-view]").forEach(button=>button.onclick=async()=>{
+      button.disabled=true;
+      try {
+        const data=await call("verityai_saas.api.leads.detail",{workspace,lead:button.dataset.leadView});
+        document.querySelector("#lead-detail-title").textContent=data.lead?.lead_name||"Lead details";
+        document.querySelector("#lead-detail-body").innerHTML=renderLeadDetail(data);
+        leadDrawer.querySelector(".va-drawer")?.classList.add("va-drawer-wide");
+        leadDrawer.hidden=false;
+        document.body.classList.add("va-no-scroll");
+      } catch(err) { alert(err.message,true); }
+      finally { button.disabled=false; }
+    });
     document.querySelector("[data-lead-close]").onclick=()=>{leadDrawer.hidden=true;document.body.classList.remove("va-no-scroll");};
   }
   async function conversations() {
@@ -301,6 +336,11 @@
     const productOptions=(selected="")=>products.filter(row=>row.active||row.name===selected).map(row=>`<option value="${esc(row.name)}" ${row.name===selected?"selected":""}>${esc(row.item_code)} — ${esc(row.item_name)}</option>`).join("");
     const quoteLine=(item={})=>`<div class="va-quote-line"><div class="va-field va-line-product"><label>Product or service</label><select name="product" required>${productOptions(item.product)}</select></div>${field("Quantity","qty",item.qty||1,"number")}${field("Unit price","rate",item.rate??0,"number")}${field("Discount %","discount_percent",item.discount_percent||0,"number")}<button type="button" class="va-icon-button danger" data-review-remove-line aria-label="Remove line">×</button></div>`;
     content.innerHTML = `<div class="va-grid two"><div class="va-card va-metric"><span>Pending approval</span><strong>${number(pending)}</strong></div><div class="va-card"><h2>Quotation review</h2><p class="muted">Review scope and pricing, then approve delivery or reject the request.</p></div></div>${table([["Request",r=>`<strong>${esc(r.name)}</strong>`],["Customer",r=>`<strong>${esc(r.customer_name)}</strong><br><span class="muted">${esc(r.customer_email||"")}</span>`],["Total",r=>`${esc(r.currency)} ${number(r.total)}`],["Status",r=>pill(r.status)],["Created",r=>esc(r.creation)],["Action",r=>`<div class="va-actions compact"><button type="button" class="va-button ghost" data-quote-view="${esc(r.name)}">View details</button>${["Approved","Sent","Accepted"].includes(r.status)?`<a class="va-button secondary" href="/api/method/verityai_saas.api.commerce.download_quotation?workspace=${encodeURIComponent(workspace)}&quotation=${encodeURIComponent(r.name)}">PDF</a>`:""}</div>`]],rows,{title:"No quotation requests",description:"AI assisted quotation requests will appear here for review."})}<div class="va-drawer-backdrop" id="quote-review-drawer" hidden><aside class="va-drawer va-drawer-wide"><section class="va-drawer-panel"><header class="va-drawer-heading"><div><p class="eyebrow">Quotation request</p><h2 id="quote-review-title">Review</h2></div><button type="button" class="va-icon-button" data-quote-review-close aria-label="Close">×</button></header><div id="quote-review-body"></div></section></aside></div>`;
+    document.querySelectorAll("[data-quote-view]").forEach(button=>{
+      const row=rows.find(item=>item.name===button.dataset.quoteView);
+      button.textContent=row?.status==="Pending Approval"?"Review & action":"View details";
+      if(row?.status==="Pending Approval")button.classList.replace("ghost","primary");
+    });
     const drawer=document.querySelector("#quote-review-drawer");
     const close=()=>{drawer.hidden=true;document.body.classList.remove("va-no-scroll");};
     document.querySelector("[data-quote-review-close]").onclick=close;

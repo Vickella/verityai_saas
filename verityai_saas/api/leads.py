@@ -27,8 +27,45 @@ def list_leads(workspace, status=None, source_channel=None, search=None, limit=5
 def detail(workspace, lead):
 	require_workspace_permission(workspace, "view_leads")
 	doc = crm.require_lead(workspace, lead)
-	fields = ["name", "lead_name", "email", "phone", "business_type", "location", "enquiry_type", "requirements", "dynamic_details", "source_channel", "status", "chat_session", "creation", "modified"]
-	return {"lead": {field: doc.get(field) for field in fields}, "activities": crm.lead_activities(workspace, lead)}
+	fields = [
+		"name", "lead_name", "email", "phone", "business_type", "location", "enquiry_type",
+		"current_system", "problems_faced", "requirements", "dynamic_details", "source_channel",
+		"status", "chat_session", "appointment_requested", "appointment_date", "appointment_time",
+		"appointment_mode", "appointment_notes", "creation", "modified",
+	]
+	conversation = None
+	if doc.chat_session:
+		conversation = engine.get_conversation(workspace, doc.chat_session)
+		conversation["history"] = [
+			{"role": row.get("role"), "content": str(row.get("content") or "")[:4000]}
+			for row in (conversation.get("history") or [])[-100:]
+			if isinstance(row, dict) and row.get("role") in {"user", "assistant"} and row.get("content")
+		]
+	appointments = frappe.get_all(
+		"VerityAI Appointment", filters={"workspace": workspace, "lead": lead},
+		fields=["name", "subject", "starts_on", "ends_on", "mode", "location", "meeting_url", "status", "assigned_to", "notes"],
+		order_by="starts_on desc, creation desc", limit_page_length=20,
+	)
+	opportunities = frappe.get_all(
+		"VerityAI Sales Opportunity", filters={"workspace": workspace, "lead": lead},
+		fields=["name", "opportunity_name", "stage", "probability", "amount", "currency", "expected_close_date", "next_follow_up_on", "notes"],
+		order_by="creation desc", limit_page_length=20,
+	)
+	quote_requests = []
+	if doc.chat_session:
+		quote_requests = frappe.get_all(
+			"AI Quotation Request", filters={"tenant": doc.tenant, "chat_session": doc.chat_session},
+			fields=["name", "status", "estimated_total", "client_notes", "erpnext_quotation_id", "sent_file_url", "creation"],
+			order_by="creation desc", limit_page_length=20,
+		)
+	return {
+		"lead": {field: doc.get(field) for field in fields},
+		"activities": crm.lead_activities(workspace, lead),
+		"conversation": conversation,
+		"appointments": appointments,
+		"opportunities": opportunities,
+		"quote_requests": quote_requests,
+	}
 
 
 @frappe.whitelist(methods=["POST"])
