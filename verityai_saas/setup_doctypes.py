@@ -387,6 +387,7 @@ def ensure_doctypes():
 		field("discount_amount", "Discount Amount", "Currency"), field("promotion", "Promotion", "Link", options="VerityAI Promotion"),
 		field("billing_cycle", "Billing Cycle", "Select", options="Monthly\nAnnual\nManual"),
 		field("gateway_reference", "Gateway Reference"), field("gateway_status", "Gateway Status"), field("checkout_url", "Checkout URL", "Small Text"), field("poll_url", "Poll URL", "Small Text"),
+		field("live_checkout_verified", "Live Checkout Verified", "Check", default=0),
 		field("gateway_response_json", "Gateway Response", "Code", options="JSON"), field("usage_snapshot_json", "Usage Snapshot", "Code", options="JSON"), field("paid_on", "Paid On", "Datetime"),
 	], "VBE-.#####")
 

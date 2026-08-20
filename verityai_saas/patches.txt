@@ -15,3 +15,4 @@ verityai_saas.patches.v0_11.transactional_email
 verityai_saas.patches.v0_12.paynow_operating_mode
 verityai_saas.patches.v0_13.platform_ai_settings
 verityai_saas.patches.v0_14.remote_erpnext
+verityai_saas.patches.v0_15.paynow_live_verification

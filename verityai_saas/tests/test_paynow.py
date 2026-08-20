@@ -107,6 +107,7 @@ class TestPaynowBilling(FrappeTestCase):
 			"target_plan": self.plan,
 			"billing_cycle": "Monthly",
 			"poll_url": "https://www.paynow.co.zw/interface/checkpayment/test",
+			"live_checkout_verified": 1,
 		})
 		return name
 
@@ -142,6 +143,7 @@ class TestPaynowBilling(FrappeTestCase):
 		with (
 			patch.object(paynow, "_credentials", return_value=("1201", self.integration_key)),
 			patch.object(paynow, "get_url", return_value="https://app.example.com"),
+			patch.object(paynow, "_verify_live_checkout", return_value=True),
 			patch.object(paynow.requests, "post", return_value=response) as post,
 		):
 			result = paynow.initiate_checkout(self.workspace, self.plan)
@@ -173,6 +175,7 @@ class TestPaynowBilling(FrappeTestCase):
 		with (
 			patch.object(paynow, "_credentials", return_value=("1201", self.integration_key)),
 			patch.object(paynow, "get_url", return_value="https://app.example.com"),
+			patch.object(paynow, "_verify_live_checkout", return_value=True),
 			patch.object(paynow.requests, "post", return_value=FakeResponse(self.signed_message(response_values))),
 		):
 			result = paynow.initiate_credit_checkout(self.workspace, pack)
@@ -195,6 +198,7 @@ class TestPaynowBilling(FrappeTestCase):
 			with (
 				patch.object(paynow, "_credentials", return_value=("1201", self.integration_key)),
 				patch.object(paynow, "get_url", return_value="https://app.example.com"),
+				patch.object(paynow, "_verify_live_checkout", return_value=True),
 				patch.object(paynow.requests, "post", return_value=FakeResponse(self.signed_message(response_values))),
 			):
 				result = paynow.initiate_checkout(self.workspace, self.plan, promotion_code=promotion.code)
@@ -243,6 +247,39 @@ class TestPaynowBilling(FrappeTestCase):
 			self.assertRaisesRegex(frappe.ValidationError, "merchant account is still in testing"),
 		):
 			paynow.initiate_checkout(self.workspace, self.plan)
+
+	def test_paynow_testing_checkout_is_rejected_before_redirect(self):
+		response_values = {
+			"Status": "Ok", "BrowserUrl": "https://www.paynow.co.zw/Payment/ConfirmPayment/testing",
+			"PollUrl": "https://www.paynow.co.zw/Interface/CheckPayment/?guid=testing",
+		}
+		with (
+			patch.object(paynow, "_credentials", return_value=("1201", self.integration_key)),
+			patch.object(paynow, "get_url", return_value="https://app.example.com"),
+			patch.object(paynow.requests, "post", return_value=FakeResponse(self.signed_message(response_values))),
+			patch.object(paynow.requests, "get", return_value=FakeResponse("<h1>TESTING: Faked Success</h1>")),
+			self.assertRaisesRegex(frappe.ValidationError, "still in testing"),
+		):
+			paynow.initiate_checkout(self.workspace, self.plan)
+		self.assertEqual(
+			frappe.db.get_value("VerityAI Billing Event", {"workspace": self.workspace, "provider": "Paynow"}, "status"),
+			"Failed",
+		)
+
+	def test_unverified_paid_status_never_fulfils_subscription(self):
+		payment = self.create_payment()
+		frappe.db.set_value("VerityAI Billing Event", payment, "live_checkout_verified", 0)
+		with self.assertRaisesRegex(frappe.PermissionError, "not verified as a live Paynow checkout"):
+			paynow.apply_status(payment, {
+				"reference": payment,
+				"paynowreference": "TEST-FAKE",
+				"amount": "25.00",
+				"status": "Paid",
+			})
+		self.assertNotEqual(
+			frappe.db.get_value("VerityAI Subscription", {"workspace": self.workspace}, "plan"),
+			self.plan,
+		)
 
 	def test_callback_is_polled_then_activates_plan_idempotently(self):
 		payment = self.create_payment()
@@ -333,6 +370,7 @@ class TestPaynowBilling(FrappeTestCase):
 		payment = billing.create_billing_event(self.workspace, "Top-Up", 10, "Pending", provider="Paynow")
 		frappe.db.set_value("VerityAI Billing Event", payment, {
 			"transaction_kind": "Credit Top-Up", "purchased_credits": 1_000_000,
+			"live_checkout_verified": 1,
 		})
 		paid = {"reference": payment, "paynowreference": "PN-TOPUP", "amount": "10.00", "status": "Paid"}
 		paynow.apply_status(payment, paid)
