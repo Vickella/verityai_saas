@@ -324,3 +324,47 @@ class TestTenantNativeCommerce(FrappeTestCase):
 		other_customer = commerce.save_customer(self.other["workspace"], {"customer_name": "Other Appointment Customer"})
 		with self.assertRaises(frappe.DoesNotExistError):
 			commerce.save_appointment(self.workspace, {"subject": "Leak", "customer": other_customer.name, "starts_on": "2026-08-20 12:00:00"})
+
+	def test_crm_crud_and_customer_detail_are_scoped(self):
+		opportunity = commerce.save_opportunity(self.workspace, {
+			"opportunity_name": "Customer detail deal", "customer": self.customer.name,
+			"stage": "New", "amount": 450, "currency": "USD",
+		})
+		appointment = commerce.save_appointment(self.workspace, {
+			"subject": "Customer detail meeting", "customer": self.customer.name,
+			"opportunity": opportunity.name, "starts_on": "2026-08-24 09:00:00",
+			"ends_on": "2026-08-24 09:30:00", "mode": "Online",
+		})
+		activity = commerce.save_activity(self.workspace, {
+			"activity_type": "Follow-up", "subject": "Initial follow-up",
+			"customer": self.customer.name, "opportunity": opportunity.name,
+			"appointment": appointment.name, "status": "Open",
+		})
+
+		detail = commerce.get_customer_detail(self.workspace, self.customer.name)
+		self.assertEqual(detail["customer"]["name"], self.customer.name)
+		self.assertEqual(detail["opportunities"][0]["name"], opportunity.name)
+		self.assertEqual(detail["appointments"][0]["name"], appointment.name)
+		self.assertEqual(detail["activities"][0]["name"], activity.name)
+		with self.assertRaises(frappe.DoesNotExistError):
+			commerce.get_customer_detail(self.other["workspace"], self.customer.name)
+
+		updated = commerce.save_activity(self.workspace, {
+			"activity_type": "Follow-up", "subject": "Proposal follow-up",
+			"customer": self.customer.name, "opportunity": opportunity.name,
+			"appointment": appointment.name, "status": "Completed",
+		}, activity=activity.name)
+		self.assertEqual(updated.name, activity.name)
+		self.assertEqual(updated.subject, "Proposal follow-up")
+		self.assertEqual(updated.status, "Completed")
+
+		with self.assertRaises(frappe.ValidationError):
+			commerce.delete_opportunity(self.workspace, opportunity.name)
+		with self.assertRaises(frappe.ValidationError):
+			commerce.delete_appointment(self.workspace, appointment.name)
+		commerce.delete_activity(self.workspace, activity.name)
+		commerce.delete_appointment(self.workspace, appointment.name)
+		commerce.delete_opportunity(self.workspace, opportunity.name)
+		self.assertFalse(frappe.db.exists("VerityAI CRM Activity", activity.name))
+		self.assertFalse(frappe.db.exists("VerityAI Appointment", appointment.name))
+		self.assertFalse(frappe.db.exists("VerityAI Sales Opportunity", opportunity.name))

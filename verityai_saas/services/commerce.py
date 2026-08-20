@@ -12,7 +12,7 @@ from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 
 
-CUSTOMER_FIELDS = ["name", "customer_name", "customer_type", "email", "phone", "tax_id", "address", "city", "country", "notes", "status", "external_system", "external_id", "last_synced_on", "creation", "modified"]
+CUSTOMER_FIELDS = ["name", "customer_name", "customer_type", "email", "phone", "tax_id", "address", "city", "country", "notes", "status", "source_lead", "converted_on", "last_contact_on", "lifetime_value", "external_system", "external_id", "last_synced_on", "creation", "modified"]
 PRODUCT_FIELDS = ["name", "item_code", "item_name", "description", "item_group", "stock_uom", "is_stock_item", "standard_rate", "currency", "active", "external_system", "external_id", "last_synced_on", "creation", "modified"]
 PRODUCT_IMPORT_HEADERS = [
 	"Item Code", "Item Name", "Description", "Category", "Unit of Measure",
@@ -67,6 +67,30 @@ def list_customers(workspace, search=None, status=None, limit=100):
 		pattern = f"%{search}%"
 		or_filters = {"customer_name": ["like", pattern], "email": ["like", pattern], "phone": ["like", pattern]}
 	return frappe.get_all("VerityAI Customer", filters=filters, or_filters=or_filters, fields=CUSTOMER_FIELDS, order_by="customer_name asc", limit_page_length=_limit(limit))
+
+
+def get_customer_detail(workspace, customer):
+	name = _scoped_name("VerityAI Customer", workspace, customer, "Customer")
+	doc = frappe.db.get_value("VerityAI Customer", name, CUSTOMER_FIELDS, as_dict=True)
+	return {
+		"customer": doc,
+		"quotations": list_quotations(workspace, customer=name, limit=50),
+		"opportunities": frappe.get_all(
+			"VerityAI Sales Opportunity", filters={"workspace": workspace, "customer": name},
+			fields=["name", "opportunity_name", "stage", "amount", "currency", "probability", "expected_close_date", "next_follow_up_on", "modified"],
+			order_by="modified desc", limit_page_length=50,
+		),
+		"appointments": frappe.get_all(
+			"VerityAI Appointment", filters={"workspace": workspace, "customer": name},
+			fields=["name", "subject", "starts_on", "mode", "status", "assigned_to"],
+			order_by="starts_on desc", limit_page_length=50,
+		),
+		"activities": frappe.get_all(
+			"VerityAI CRM Activity", filters={"workspace": workspace, "customer": name},
+			fields=["name", "activity_type", "subject", "details", "scheduled_on", "status", "creation"],
+			order_by="creation desc", limit_page_length=50,
+		),
+	}
 
 
 def save_customer(workspace, values, customer=None):
@@ -697,6 +721,14 @@ def set_opportunity_stage(workspace, opportunity, stage, lost_reason=None):
 	return frappe.db.get_value("VerityAI Sales Opportunity", doc.name, ["name", "opportunity_name", "stage", "amount", "currency", "probability", "customer", "lead"], as_dict=True)
 
 
+def delete_opportunity(workspace, opportunity):
+	name = _scoped_name("VerityAI Sales Opportunity", workspace, opportunity, "Opportunity")
+	if frappe.db.exists("VerityAI Appointment", {"workspace": workspace, "opportunity": name}) or frappe.db.exists("VerityAI CRM Activity", {"workspace": workspace, "opportunity": name}):
+		frappe.throw("This opportunity has appointments or activity history. Close it as lost instead.", frappe.ValidationError)
+	frappe.delete_doc("VerityAI Sales Opportunity", name, ignore_permissions=True)
+	return {"deleted": name}
+
+
 def save_appointment(workspace, values, appointment=None):
 	values = values or {}
 	customer = _scoped_optional("VerityAI Customer", workspace, values.get("customer"), "Customer")
@@ -748,7 +780,15 @@ def set_appointment_status(workspace, appointment, status, outcome=None):
 	return frappe.db.get_value("VerityAI Appointment", doc.name, ["name", "subject", "status", "outcome", "starts_on"], as_dict=True)
 
 
-def save_activity(workspace, values):
+def delete_appointment(workspace, appointment):
+	name = _scoped_name("VerityAI Appointment", workspace, appointment, "Appointment")
+	if frappe.db.exists("VerityAI CRM Activity", {"workspace": workspace, "appointment": name}):
+		frappe.throw("This appointment has activity history and cannot be deleted.", frappe.ValidationError)
+	frappe.delete_doc("VerityAI Appointment", name, ignore_permissions=True)
+	return {"deleted": name}
+
+
+def save_activity(workspace, values, activity=None):
 	values = values or {}
 	lead = _scoped_lead(workspace, values.get("lead")) if values.get("lead") else None
 	customer = _scoped_optional("VerityAI Customer", workspace, values.get("customer"), "Customer")
@@ -760,7 +800,15 @@ def save_activity(workspace, values):
 	if activity_type not in {"Call", "Email", "Meeting", "Note", "Follow-up", "Status Change"}:
 		frappe.throw("Unsupported activity type.", frappe.ValidationError)
 	status = values.get("status") if values.get("status") in {"Open", "Completed", "Cancelled"} else "Open"
-	doc = frappe.get_doc({"doctype": "VerityAI CRM Activity", "workspace": workspace, "activity_type": activity_type, "subject": _text(values.get("subject"), "Subject", required=True), "details": _text(values.get("details"), "Details", maximum=5000) or None, "lead": lead, "customer": customer, "opportunity": opportunity, "appointment": appointment, "scheduled_on": get_datetime(values.get("scheduled_on")) if values.get("scheduled_on") else None, "completed_on": now_datetime() if status == "Completed" else None, "assigned_to": _validate_assignee(workspace, values.get("assigned_to")), "status": status}).insert(ignore_permissions=True)
+	if activity:
+		doc = frappe.get_doc("VerityAI CRM Activity", _scoped_name("VerityAI CRM Activity", workspace, activity, "Activity"))
+	else:
+		doc = frappe.get_doc({"doctype": "VerityAI CRM Activity", "workspace": workspace})
+	doc.update({"activity_type": activity_type, "subject": _text(values.get("subject"), "Subject", required=True), "details": _text(values.get("details"), "Details", maximum=5000) or None, "lead": lead, "customer": customer, "opportunity": opportunity, "appointment": appointment, "scheduled_on": get_datetime(values.get("scheduled_on")) if values.get("scheduled_on") else None, "completed_on": now_datetime() if status == "Completed" else None, "assigned_to": _validate_assignee(workspace, values.get("assigned_to")), "status": status})
+	if doc.is_new():
+		doc.insert(ignore_permissions=True)
+	else:
+		doc.save(ignore_permissions=True)
 	contact_time = doc.completed_on or now_datetime()
 	if customer:
 		frappe.db.set_value("VerityAI Customer", customer, "last_contact_on", contact_time)
@@ -795,6 +843,12 @@ def set_activity_status(workspace, activity, status):
 		if doc.opportunity:
 			frappe.db.set_value("VerityAI Sales Opportunity", doc.opportunity, "last_contact_on", doc.completed_on)
 	return frappe.db.get_value("VerityAI CRM Activity", doc.name, ["name", "status", "completed_on"], as_dict=True)
+
+
+def delete_activity(workspace, activity):
+	name = _scoped_name("VerityAI CRM Activity", workspace, activity, "Activity")
+	frappe.delete_doc("VerityAI CRM Activity", name, ignore_permissions=True)
+	return {"deleted": name}
 
 
 def quotation_html(workspace, quotation):

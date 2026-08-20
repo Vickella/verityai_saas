@@ -12,6 +12,13 @@ def customers(workspace, search=None, status=None, limit=100):
 	return commerce.list_customers(workspace, search=search, status=status, limit=limit)
 
 
+@frappe.whitelist()
+@endpoint
+def customer(workspace, customer):
+	require_workspace_permission(workspace, "view_customers")
+	return commerce.get_customer_detail(workspace, customer)
+
+
 @frappe.whitelist(methods=["POST"])
 @endpoint
 def save_customer(workspace, values, customer=None):
@@ -155,6 +162,13 @@ def set_opportunity_stage(workspace, opportunity, stage, lost_reason=None):
 	return commerce.set_opportunity_stage(workspace, opportunity, stage, lost_reason=lost_reason)
 
 
+@frappe.whitelist(methods=["POST"])
+@endpoint
+def delete_opportunity(workspace, opportunity):
+	require_workspace_permission(workspace, "manage_customers")
+	return commerce.delete_opportunity(workspace, opportunity)
+
+
 @frappe.whitelist()
 @endpoint
 def appointments(workspace, status=None, from_date=None, to_date=None, limit=200):
@@ -176,6 +190,13 @@ def set_appointment_status(workspace, appointment, status, outcome=None):
 	return commerce.set_appointment_status(workspace, appointment, status, outcome=outcome)
 
 
+@frappe.whitelist(methods=["POST"])
+@endpoint
+def delete_appointment(workspace, appointment):
+	require_workspace_permission(workspace, "manage_customers")
+	return commerce.delete_appointment(workspace, appointment)
+
+
 @frappe.whitelist()
 @endpoint
 def activities(workspace, lead=None, customer=None, opportunity=None, status=None, limit=200):
@@ -185,9 +206,9 @@ def activities(workspace, lead=None, customer=None, opportunity=None, status=Non
 
 @frappe.whitelist(methods=["POST"])
 @endpoint
-def save_activity(workspace, values):
+def save_activity(workspace, values, activity=None):
 	require_workspace_permission(workspace, "manage_customers")
-	return commerce.save_activity(workspace, json_value(values, {}))
+	return commerce.save_activity(workspace, json_value(values, {}), activity=activity)
 
 
 @frappe.whitelist(methods=["POST"])
@@ -195,6 +216,13 @@ def save_activity(workspace, values):
 def set_activity_status(workspace, activity, status):
 	require_workspace_permission(workspace, "manage_customers")
 	return commerce.set_activity_status(workspace, activity, status)
+
+
+@frappe.whitelist(methods=["POST"])
+@endpoint
+def delete_activity(workspace, activity):
+	require_workspace_permission(workspace, "manage_customers")
+	return commerce.delete_activity(workspace, activity)
 
 
 @frappe.whitelist()

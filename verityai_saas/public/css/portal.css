@@ -1413,6 +1413,67 @@ main { position: relative; }
   .va-user { display: flex; }
 }
 
+/* Compact product density: applies consistently across every customer module. */
+main { padding-top: 18px; padding-bottom: 34px; }
+.va-topbar { min-height: 52px; margin-bottom: 14px; padding-bottom: 12px; }
+.va-content { gap: 10px; }
+.va-grid { gap: 9px; }
+.va-card { padding: 11px 13px; border-radius: 11px; }
+.va-card h2 { font-size: 15px; }
+.va-card h3 { margin-block: 5px; font-size: 13px; }
+.va-metric { min-height: 64px; padding: 10px 13px; }
+.va-metric > span { font-size: 10px; }
+.va-metric > strong { margin-top: 3px; font-size: clamp(20px,1.65vw,25px); }
+.va-metric small { margin-top: 2px; font-size: 9px; }
+.va-command-bar { gap: 12px; padding: 10px 13px; border-radius: 11px; }
+.va-command-bar.compact { padding-block: 9px; }
+.va-command-bar h2,.va-section-heading h2,.va-subsection-heading h3 { font-size: 14px; }
+.va-command-bar p,.va-section-heading p,.va-subsection-heading p { font-size: 10px; }
+.va-section { border-radius: 11px; }
+.va-section-heading { padding: 10px 13px; }
+.va-section.compact .va-section-heading { padding-block: 9px; }
+.va-table-wrap { border-radius: 11px; }
+.va-table th,.va-table td { padding: 8px 11px; }
+.va-table th { font-size: 8px; }
+.va-table td { font-size: 11px; }
+.va-empty { min-height: 76px; gap: 9px; padding: 14px; }
+.va-empty-icon { width: 28px; height: 28px; }
+.va-section > .va-empty { margin: 9px; }
+.va-tabs { width: 100%; padding: 2px; }
+.va-tabs button { min-height: 30px; padding: 5px 9px; font-size: 10px; }
+.va-commerce-view,.va-crm-view { display: grid; gap: 9px; }
+.va-form { gap: 11px; }
+.va-fields { gap: 9px 12px; }
+.va-field input,.va-field select,.va-field textarea { min-height: 37px; padding: 7px 10px; font-size: 12px; }
+.va-field textarea { min-height: 70px; }
+.va-form-actions { padding-top: 9px; }
+.va-workspace-context { padding: 7px 11px; border-radius: 10px; }
+
+.va-crm-tabs { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); overflow: visible; }
+.va-crm-tabs button { width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.va-pipeline-board { display: grid; grid-template-columns: repeat(6,minmax(0,1fr)); gap: 8px; }
+.va-pipeline-board article { min-width: 0; padding: 11px 12px; border: 1px solid var(--line); border-top: 3px solid #397ce0; border-radius: 10px; background: #fff; box-shadow: var(--shadow-sm); }
+.va-pipeline-board span,.va-pipeline-board small { display: block; overflow: hidden; color: var(--ink-500); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.va-pipeline-board strong { display: block; margin: 3px 0 1px; color: var(--ink-950); font-size: 22px; }
+.va-detail-columns { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; margin-top: 12px; }
+.va-detail-columns > div { min-width: 0; padding: 11px; border: 1px solid var(--line); border-radius: 10px; background: #fbfcfe; }
+.va-detail-columns h3 { margin: 0 0 7px; }
+.va-detail-row { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: center; gap: 5px 8px; padding: 7px 0; border-bottom: 1px solid var(--line); }
+.va-detail-row:last-child { border-bottom: 0; }
+.va-detail-row strong { overflow: hidden; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.va-detail-row > span:last-child { grid-column: 1 / -1; color: var(--ink-500); font-size: 9px; }
+.va-detail-block { margin-top: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: #fbfcfe; }
+.va-detail-block p { margin: 4px 0 0; color: var(--ink-700); font-size: 11px; }
+
+@media (max-width: 900px) {
+  .va-pipeline-board { grid-template-columns: repeat(3,minmax(0,1fr)); }
+}
+@media (max-width: 760px) {
+  .va-crm-tabs { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .va-pipeline-board,.va-detail-columns { grid-template-columns: 1fr; }
+  .va-metric { min-height: 60px; }
+}
+
 /* Portal quality audit: resilient content, actions and responsive states. */
 body { overflow-x: clip; }
 img, svg, video, canvas { max-width: 100%; }
