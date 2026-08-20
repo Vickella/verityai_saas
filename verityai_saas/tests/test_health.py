@@ -98,6 +98,24 @@ class TestWorkspaceHealthPortal(FrappeTestCase):
 
 		self.assertEqual([row.name for row in data["alerts"]], [open_alert.name])
 
+	def test_customer_can_open_own_alert_details_but_not_another_tenant(self):
+		alert = self.create_alert(severity="Warning")
+		alert.details_json = frappe.as_json({"provider": "OpenAI", "attempts": 2})
+		alert.save(ignore_permissions=True)
+		other_tenant = frappe.get_doc({
+			"doctype": "AI Tenant", "tenant_name": f"alert-other-{frappe.generate_hash(length=8)}",
+			"assistant_name": "Other", "active": 1,
+		}).insert(ignore_permissions=True)
+		other_alert = self.create_alert(other_tenant.name)
+		frappe.set_user(self.owner)
+		response = health_api.alert_detail(self.workspace, alert.name)
+		self.assertTrue(response["success"])
+		self.assertEqual(response["data"]["details"]["provider"], "OpenAI")
+		self.assertNotIn("tenant", response["data"])
+		denied = health_api.alert_detail(self.workspace, other_alert.name)
+		self.assertFalse(denied["success"])
+		self.assertEqual(denied["code"], "NOT_FOUND")
+
 	def test_non_member_cannot_read_workspace_health(self):
 		frappe.set_user(self.other)
 		response = health_api.get(self.workspace)

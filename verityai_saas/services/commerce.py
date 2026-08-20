@@ -391,8 +391,8 @@ def save_quotation(workspace, values, quotation=None):
 	total = flt(subtotal - discount_amount + tax_amount, 2)
 	if quotation:
 		doc = frappe.get_doc("VerityAI Quotation", _scoped_name("VerityAI Quotation", workspace, quotation, "Quotation"))
-		if doc.status != "Draft":
-			frappe.throw("Only draft quotations can be edited.", frappe.ValidationError)
+		if doc.status not in {"Draft", "Pending Approval"}:
+			frappe.throw("Only draft or pending quotations can be edited.", frappe.ValidationError)
 	else:
 		doc = frappe.get_doc({"doctype": "VerityAI Quotation", "workspace": workspace, "status": "Draft"})
 	doc.update({"customer": customer_name, "customer_name": customer.customer_name, "customer_email": customer.email, "transaction_date": transaction_date, "valid_till": valid_till, "price_list": price_list, "currency": currency, "subtotal": subtotal, "discount_amount": discount_amount, "tax_rate": tax_rate, "tax_amount": tax_amount, "total": total, "notes": _text(values.get("notes"), "Notes", maximum=10000) or None})
@@ -461,6 +461,60 @@ def public_quotation_url(workspace, quotation):
 	token = public_quotation_token(workspace, quotation)
 	query = urlencode({"workspace": workspace, "quotation": quotation, "token": token})
 	return f"{get_url().rstrip('/')}/api/method/verityai_saas.api.commerce.download_public_quotation?{query}"
+
+
+def approve_and_send_quotation(workspace, quotation):
+	quote = get_quotation(workspace, quotation)
+	if quote.status == "Pending Approval":
+		quote = set_quotation_status(workspace, quotation, "Approved")
+	elif quote.status not in {"Approved", "Sent"}:
+		frappe.throw("Only a pending quotation can be approved.", frappe.ValidationError)
+	pdf_url = public_quotation_url(workspace, quotation)
+	delivery = "Not sent"
+	if quote.customer_email:
+		business_name = frappe.db.get_value("VerityAI Workspace", workspace, "business_name") or "VerityAI"
+		frappe.sendmail(
+			recipients=[quote.customer_email],
+			subject=f"Quotation {quote.name} from {business_name}",
+			message=(
+				f"<p>Hello {escape(quote.customer_name)},</p>"
+				f"<p>Your quotation from {escape(business_name)} is ready.</p>"
+				f"<p><a href=\"{escape(pdf_url)}\">Download quotation {escape(quote.name)}</a></p>"
+				"<p>Please reply to this email if you would like any clarification.</p>"
+			),
+			reference_doctype="VerityAI Quotation",
+			reference_name=quote.name,
+		)
+		delivery = "Email queued"
+		if quote.status == "Approved":
+			quote = set_quotation_status(workspace, quotation, "Sent")
+	return {"quotation": get_quotation(workspace, quotation), "pdf_url": pdf_url, "delivery": delivery}
+
+
+def _ai_request_product(workspace, requested_label, rate=None):
+	label = _text(requested_label, "Requested item", required=True, maximum=240)
+	product = frappe.db.get_value(
+		"VerityAI Product",
+		{"workspace": workspace, "item_code": label.upper(), "active": 1},
+		"name",
+	)
+	if not product:
+		product = frappe.db.get_value(
+			"VerityAI Product", {"workspace": workspace, "item_name": label, "active": 1}, "name"
+		)
+	if product:
+		return product, None
+	placeholder = frappe.db.get_value(
+		"VerityAI Product", {"workspace": workspace, "item_code": "AI-CUSTOM-SCOPE"}, "name"
+	)
+	if not placeholder:
+		placeholder = save_product(workspace, {
+			"item_code": "AI-CUSTOM-SCOPE", "item_name": "Custom scope",
+			"description": "Scope and pricing are confirmed during quotation review.",
+			"item_group": "Services", "stock_uom": "Unit", "standard_rate": 0,
+			"currency": _workspace_currency(workspace), "active": 1,
+		}).name
+	return placeholder, label
 
 
 def _scoped_lead(workspace, lead):
@@ -563,7 +617,13 @@ def list_opportunities(workspace, stage=None, assigned_to=None, limit=200):
 	for row in frappe.get_all("VerityAI Sales Opportunity", filters={"workspace": workspace}, fields=["stage", "count(name) as count", "sum(amount) as amount"], group_by="stage"):
 		counts[row.stage] = int(row.count or 0)
 		values[row.stage] = flt(row.amount, 2)
-	return {"rows": rows, "counts": counts, "values": values, "open_value": flt(sum(values[name] for name in ("New", "Qualified", "Proposal", "Negotiation")), 2), "won_value": values["Won"]}
+	tenant = frappe.db.get_value("VerityAI Workspace", workspace, "engine_tenant")
+	lead_inbox = frappe.db.count("AI Lead", {"tenant": tenant, "status": "New"}) if tenant else 0
+	return {
+		"rows": rows, "counts": counts, "values": values, "lead_inbox": lead_inbox,
+		"open_value": flt(sum(values[name] for name in ("New", "Qualified", "Proposal", "Negotiation")), 2),
+		"won_value": values["Won"],
+	}
 
 
 def set_opportunity_stage(workspace, opportunity, stage, lost_reason=None):
@@ -834,14 +894,18 @@ def handle_ai_quotation_request(tenant_name, customer, items, client_whatsapp_nu
 		customer_name = save_customer(workspace, {"customer_name": customer, "email": client_email, "phone": client_whatsapp_number}).name
 	quote_items = []
 	for item in items or []:
-		item_code = str(item.get("item_code") or item.get("item") or item.get("service") or "").strip().upper()
-		product = frappe.db.get_value("VerityAI Product", {"workspace": workspace, "item_code": item_code, "active": 1}, "name")
-		if not product:
-			return {"handled": True, "success": False, "error": f"Product {item_code or 'without an item code'} is not configured in this workspace catalogue."}
-		quote_items.append({"product": product, "qty": item.get("qty") or 1, "rate": item.get("rate"), "discount_percent": item.get("discount_percent") or 0})
+		requested = str(item.get("item_code") or item.get("item") or item.get("service") or "").strip()
+		product, custom_description = _ai_request_product(workspace, requested, rate=item.get("rate"))
+		quote_items.append({
+			"product": product, "qty": item.get("qty") or 1, "rate": item.get("rate"),
+			"discount_percent": item.get("discount_percent") or 0,
+			"description": custom_description,
+		})
+	if not quote_items:
+		return {"handled": True, "success": False, "error": "At least one requested product or service is required."}
 	quote = save_quotation(workspace, {"customer": customer_name, "items": quote_items, "notes": notes, "price_list": "Standard Selling", "currency": _workspace_currency(workspace)})
 	quote = set_quotation_status(workspace, quote.name, "Pending Approval")
-	return {"handled": True, "success": True, "quotation_request": quote.name, "quotation": quote.name, "estimated_total": quote.total, "currency": quote.currency, "message": "Quotation request staged for workspace approval."}
+	return {"handled": True, "success": True, "quotation_request": quote.name, "quotation": quote.name, "estimated_total": quote.total, "currency": quote.currency, "message": f"Quotation request {quote.name} is pending review."}
 
 
 def handle_ai_quote_status(tenant_name, quotation_reference=None, customer=None, client_email=None, client_whatsapp_number=None):

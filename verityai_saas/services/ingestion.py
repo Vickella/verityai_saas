@@ -287,3 +287,13 @@ def refresh_ingestion(workspace_name, ingestion_name):
 
 def list_ingestions(workspace_name):
 	return frappe.get_all("VerityAI Knowledge Ingestion", filters={"workspace": workspace_name}, fields=["name", "knowledge_source", "title", "source_type", "source_url", "file_url", "status", "pages_processed", "bytes_processed", "last_refreshed_on", "next_refresh_on", "error", "creation", "modified"], order_by="creation desc", limit=200)
+
+
+def delete_ingestion(workspace_name, ingestion_name):
+	if not frappe.db.exists("VerityAI Knowledge Ingestion", {"name": ingestion_name, "workspace": workspace_name}):
+		frappe.throw("Knowledge processing record was not found.", frappe.DoesNotExistError)
+	doc = frappe.get_doc("VerityAI Knowledge Ingestion", ingestion_name)
+	if doc.status == "Processing":
+		frappe.throw("Wait for processing to finish before deleting this record.", frappe.ValidationError)
+	frappe.delete_doc("VerityAI Knowledge Ingestion", ingestion_name, ignore_permissions=True, force=True)
+	return {"deleted": ingestion_name}

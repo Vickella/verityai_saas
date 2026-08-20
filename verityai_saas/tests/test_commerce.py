@@ -271,14 +271,19 @@ class TestTenantNativeCommerce(FrappeTestCase):
 			commerce.convert_lead(self.workspace, other_lead.name)
 
 	def test_pipeline_conversion_and_won_value_are_workspace_scoped(self):
+		self.create_lead(name="New Inbox Lead")
+		self.create_lead(self.other["workspace"], "Other Inbox Lead")
 		opportunity = commerce.save_opportunity(self.workspace, {"opportunity_name": "Expansion", "customer": self.customer.name, "stage": "New", "amount": 750, "probability": 10})
 		for stage in ("Qualified", "Proposal", "Negotiation", "Won"):
 			opportunity = commerce.set_opportunity_stage(self.workspace, opportunity.name, stage)
 		pipeline = commerce.list_opportunities(self.workspace)
 		self.assertEqual(pipeline["counts"]["Won"], 1)
+		self.assertEqual(pipeline["lead_inbox"], 1)
 		self.assertEqual(pipeline["won_value"], 750)
 		self.assertEqual(frappe.db.get_value("VerityAI Customer", self.customer.name, "lifetime_value"), 750)
-		self.assertEqual(commerce.list_opportunities(self.other["workspace"])["won_value"], 0)
+		other_pipeline = commerce.list_opportunities(self.other["workspace"])
+		self.assertEqual(other_pipeline["won_value"], 0)
+		self.assertEqual(other_pipeline["lead_inbox"], 1)
 
 	def test_appointments_and_activity_history_validate_workspace_links(self):
 		opportunity = commerce.save_opportunity(self.workspace, {"opportunity_name": "Meeting Deal", "customer": self.customer.name, "amount": 200})

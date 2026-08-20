@@ -85,6 +85,24 @@ def _overall_status(workspace_status, engine_active, critical_alerts, open_alert
 	return "Healthy"
 
 
+def workspace_alert_detail(workspace_name, alert_name, user=None):
+	workspace = check_workspace_access(workspace_name, user)
+	tenant = engine.get_workspace_engine_tenant(workspace.name)
+	if not frappe.db.exists("AI Monitoring Alert", {"name": alert_name, "tenant": tenant}):
+		frappe.throw("Monitoring alert was not found.", frappe.DoesNotExistError)
+	doc = frappe.get_doc("AI Monitoring Alert", alert_name)
+	try:
+		details = json.loads(doc.details_json or "{}")
+	except (TypeError, ValueError):
+		details = {"message": str(doc.details_json or "")[:4000]}
+	return {
+		"name": doc.name, "alert_type": doc.alert_type, "severity": doc.severity,
+		"status": doc.status, "summary": doc.summary, "occurrence_count": doc.occurrence_count,
+		"first_seen": doc.first_seen, "last_seen": doc.last_seen, "details": details,
+		"creation": doc.creation, "modified": doc.modified,
+	}
+
+
 def update_workspace_alert(workspace_name, alert_name, status, note=None, allow_operator=False):
 	workspace = check_workspace_access(workspace_name, allow_operator=allow_operator)
 	status = (status or "").strip()

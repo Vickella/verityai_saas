@@ -876,6 +876,22 @@ main { max-width: 1420px; padding: 26px clamp(22px, 3vw, 42px) 52px; }
 @keyframes va-spin { to { transform: rotate(360deg); } }
 
 .va-no-scroll { overflow: hidden; }
+
+.va-drawer-wide { width: min(880px, 96vw); }
+.va-detail-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin-bottom:20px; }
+.va-detail-grid > div { padding:14px 16px; border:1px solid var(--line); border-radius:12px; background:#f8fafc; }
+.va-detail-grid span { display:block; color:var(--ink-500); font-size:.78rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase; margin-bottom:5px; }
+.va-detail-json { margin-top:16px; }
+.va-detail-json pre { white-space:pre-wrap; overflow-wrap:anywhere; font:inherit; color:var(--ink-950); }
+.va-detail-json dl { margin:0; }
+.va-detail-json dl > div { display:grid; grid-template-columns:minmax(130px,.45fr) 1fr; gap:16px; padding:10px 0; border-bottom:1px solid var(--line); }
+.va-detail-json dt { color:var(--ink-500); text-transform:capitalize; }
+.va-detail-json dd { margin:0; overflow-wrap:anywhere; }
+.va-pipeline-inbox { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:12px 14px; border-radius:10px; background:#eef6ff; color:#174a87; }
+@media (max-width: 680px) {
+  .va-detail-grid { grid-template-columns:1fr; }
+  .va-detail-json dl > div { grid-template-columns:1fr; gap:4px; }
+}
 .va-drawer-backdrop {
   position: fixed;
   inset: 0;

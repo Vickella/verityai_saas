@@ -109,3 +109,20 @@ class TestKnowledgeIngestion(FrappeTestCase):
 			with self.assertRaises(frappe.DuplicateEntryError):
 				ingestion.process_ingestion(second)
 		self.assertEqual(frappe.db.get_value("VerityAI Knowledge Ingestion", second, "status"), "Failed")
+
+	def test_owner_can_delete_finished_processing_record_only_in_own_workspace(self):
+		frappe.set_user(self.owner)
+		with patch("verityai_saas.services.ingestion._validate_public_url", side_effect=lambda url: url), patch("frappe.enqueue"):
+			ingestion_name = knowledge_api.ingest_url(self.workspace, "Disposable", "https://example.com/delete")["data"]["ingestion"]
+		deleted = knowledge_api.delete_processing(self.workspace, ingestion_name)
+		self.assertTrue(deleted["success"])
+		self.assertFalse(frappe.db.exists("VerityAI Knowledge Ingestion", ingestion_name))
+
+	def test_processing_record_cannot_be_deleted_while_running(self):
+		frappe.set_user(self.owner)
+		with patch("verityai_saas.services.ingestion._validate_public_url", side_effect=lambda url: url), patch("frappe.enqueue"):
+			ingestion_name = knowledge_api.ingest_url(self.workspace, "Running", "https://example.com/running")["data"]["ingestion"]
+		frappe.db.set_value("VerityAI Knowledge Ingestion", ingestion_name, "status", "Processing")
+		response = knowledge_api.delete_processing(self.workspace, ingestion_name)
+		self.assertFalse(response["success"])
+		self.assertEqual(response["code"], "VALIDATION_ERROR")

@@ -50,7 +50,9 @@ class TestStandaloneInstallation(FrappeTestCase):
 		try:
 			schema = json.loads(get_lead_capture_schema(name))
 			self.assertTrue(schema["success"])
-			self.assertEqual(schema["business_nature"], "Consultancy")
+			self.assertEqual(schema["assistant_owner_business_nature"], "Consultancy")
+			self.assertNotIn("business_nature", schema)
+			self.assertIn("prospect", schema["usage"].lower())
 			self.assertIn("current_challenge", {field["fieldname"] for field in schema["fields"]})
 		finally:
 			frappe.delete_doc("AI Tenant", name, ignore_permissions=True, force=True)

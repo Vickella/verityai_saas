@@ -2,7 +2,7 @@ import frappe
 
 from verityai_saas.api._response import endpoint
 from verityai_saas.services.admin_reauth import require_admin_reauthentication
-from verityai_saas.services.health import update_workspace_alert, workspace_health
+from verityai_saas.services.health import update_workspace_alert, workspace_alert_detail, workspace_health
 
 
 @frappe.whitelist()
@@ -16,3 +16,9 @@ def get(workspace, status=None, severity=None, limit=100):
 def update_alert(workspace, alert, status, note=None):
 	require_admin_reauthentication()
 	return update_workspace_alert(workspace, alert, status, note, allow_operator=True)
+
+
+@frappe.whitelist()
+@endpoint
+def alert_detail(workspace, alert):
+	return workspace_alert_detail(workspace, alert)

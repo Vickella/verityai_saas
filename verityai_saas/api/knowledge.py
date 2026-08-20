@@ -71,6 +71,13 @@ def refresh(workspace, ingestion_name):
 
 @frappe.whitelist(methods=["POST"])
 @endpoint
+def delete_processing(workspace, ingestion_name):
+	require_workspace_permission(workspace, "manage_knowledge")
+	return ingestion.delete_ingestion(workspace, ingestion_name)
+
+
+@frappe.whitelist(methods=["POST"])
+@endpoint
 def update(workspace, source, values):
 	require_workspace_permission(workspace, "manage_knowledge")
 	return {"source": engine.update_knowledge_source(workspace, source, json_value(values, {}))}
