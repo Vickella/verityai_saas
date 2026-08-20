@@ -76,17 +76,18 @@ class TestSecureIntegrations(FrappeTestCase):
 			frappe.delete_doc("VerityAI Plan", self.plan, ignore_permissions=True, force=True)
 		frappe.db.commit()
 
-	@patch("verityai_saas.services.integrations.socket.getaddrinfo", return_value=[(2, 1, 6, "", ("93.184.216.34", 443))])
+	@patch("verityai_saas.services.erpnext.socket.getaddrinfo", return_value=[(2, 1, 6, "", ("93.184.216.34", 443))])
 	def test_provider_and_erpnext_secrets_are_write_only(self, _dns):
 		provider = integrations.configure_provider(self.workspace, {"provider": "OpenAI-Compatible", "model": "safe-model", "base_url": "https://ai.example.com/v1", "api_key": "provider-secret"})
 		self.assertTrue(provider["api_key_present"])
 		self.assertNotIn("provider-secret", str(provider))
 		erp = integrations.configure_erpnext(self.workspace, {"enabled": 1, "url": "https://erp.example.com", "api_key": "erp-key", "api_secret": "erp-secret"})
-		self.assertTrue(erp["api_secret_present"])
+		self.assertTrue(erp["configured"])
 		self.assertNotIn("erp-secret", str(integrations.integration_status(self.workspace)))
 		config = engine.get_engine_configuration(self.workspace)
 		self.assertEqual(config.get_password("provider_api_key"), "provider-secret")
-		self.assertEqual(config.get_password("erpnext_api_secret"), "erp-secret")
+		connection = frappe.get_doc("VerityAI ERPNext Connection", {"workspace": self.workspace})
+		self.assertEqual(connection.get_password("api_secret"), "erp-secret")
 
 	def test_paynow_credentials_are_encrypted_and_write_only(self):
 		response = admin_api.configure_paynow({"integration_id": "test-integration", "integration_key": "paynow-secret", "environment": "Production"})

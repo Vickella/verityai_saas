@@ -217,7 +217,7 @@ class TestTenantNativeCommerce(FrappeTestCase):
 		self.assertTrue(engine_created["success"])
 		self.assertEqual(engine_created["estimated_total"], 100)
 		frappe.db.set_value("AI Configuration", config.name, "enable_erpnext_integration", 1)
-		self.assertIsNone(commerce.handle_ai_item_price(self.created["engine_tenant"], "CONSULT"))
+		self.assertTrue(commerce.handle_ai_item_price(self.created["engine_tenant"], "CONSULT")["handled"])
 
 	def test_ai_lead_appointments_and_desk_crm_are_mapped_to_native_sales(self):
 		from verity_ai.engine import tools as ai_tools

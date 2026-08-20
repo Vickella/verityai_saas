@@ -39,6 +39,8 @@ def _public_https_url(value, label, allow_empty=False):
 
 
 def integration_status(workspace):
+	from verityai_saas.services import erpnext
+
 	context = workspace_context(workspace_name=workspace)
 	config = engine.get_engine_configuration(workspace)
 	setting_name = frappe.db.get_value("VerityAI Notification Setting", {"workspace": workspace}, "name")
@@ -54,7 +56,7 @@ def integration_status(workspace):
 			"can_bring_own_ai_provider_key", "can_use_erpnext_integration", "can_use_custom_smtp", "can_use_api_access", "can_remove_branding",
 		)},
 		"provider": {"provider": config.ai_provider or "OpenAI", "model": config.model_name, "base_url": config.provider_api_base or "", "api_key_present": _password_present(config, "provider_api_key"), "semantic_search_enabled": bool(config.enable_semantic_knowledge_search), "embedding_model": config.knowledge_embedding_model or "text-embedding-3-small"},
-		"erpnext": {"enabled": bool(config.enable_erpnext_integration), "url": config.erpnext_url or "", "api_key_present": _password_present(config, "erpnext_api_key"), "api_secret_present": _password_present(config, "erpnext_api_secret")},
+		"erpnext": erpnext.status(workspace),
 		"smtp": {"enabled": bool(setting and setting.custom_smtp_enabled), "host": setting.smtp_host if setting else "", "port": setting.smtp_port if setting else 587, "use_tls": bool(setting and setting.smtp_use_tls), "username": setting.smtp_username if setting else "", "sender_email": setting.smtp_sender_email if setting else "", "password_present": bool(setting and _password_present(setting, "smtp_password"))},
 		"api_credentials": credentials,
 	}
@@ -95,24 +97,9 @@ def configure_provider(workspace, values):
 
 
 def configure_erpnext(workspace, values):
-	require_workspace_feature(workspace, "can_use_erpnext_integration", "ERPNext integration")
-	config = engine.get_engine_configuration(workspace)
-	enabled = bool(cint(values.get("enabled")))
-	if enabled:
-		config.erpnext_url = _public_https_url(values.get("url") or config.erpnext_url, "ERPNext URL")
-		api_key = (values.get("api_key") or "").strip()
-		api_secret = (values.get("api_secret") or "").strip()
-		if not api_key and not _password_present(config, "erpnext_api_key"):
-			frappe.throw("ERPNext API key is required.", frappe.ValidationError)
-		if not api_secret and not _password_present(config, "erpnext_api_secret"):
-			frappe.throw("ERPNext API secret is required.", frappe.ValidationError)
-		if api_key:
-			config.erpnext_api_key = api_key
-		if api_secret:
-			config.erpnext_api_secret = api_secret
-	config.enable_erpnext_integration = int(enabled)
-	config.save(ignore_permissions=True)
-	return integration_status(workspace)["erpnext"]
+	from verityai_saas.services import erpnext
+
+	return erpnext.configure(workspace, values)
 
 
 def _smtp_host(value):

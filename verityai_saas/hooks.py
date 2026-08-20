@@ -29,6 +29,7 @@ permission_query_conditions = {
 	"VerityAI Email Delivery Log": "verityai_saas.services.permissions.workspace_child_query_condition",
 	"VerityAI WhatsApp Setup": "verityai_saas.services.permissions.workspace_child_query_condition",
 	"VerityAI Integration Status": "verityai_saas.services.permissions.workspace_child_query_condition",
+	"VerityAI ERPNext Connection": "verityai_saas.services.permissions.workspace_child_query_condition",
 	"VerityAI Customer": "verityai_saas.services.permissions.workspace_child_query_condition",
 	"VerityAI Product": "verityai_saas.services.permissions.workspace_child_query_condition",
 	"VerityAI Product Price": "verityai_saas.services.permissions.workspace_child_query_condition",

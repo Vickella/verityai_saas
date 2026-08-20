@@ -428,6 +428,10 @@ def set_quotation_status(workspace, quotation, status):
 		frappe.throw(f"Quotation cannot move from {doc.status} to {status}.", frappe.ValidationError)
 	doc.status = status
 	doc.save(ignore_permissions=True)
+	if status == "Approved":
+		from verityai_saas.services import erpnext
+
+		erpnext.auto_sync_quotation(workspace, doc.name)
 	return get_quotation(workspace, doc.name)
 
 
@@ -488,7 +492,10 @@ def approve_and_send_quotation(workspace, quotation):
 		delivery = "Email queued"
 		if quote.status == "Approved":
 			quote = set_quotation_status(workspace, quotation, "Sent")
-	return {"quotation": get_quotation(workspace, quotation), "pdf_url": pdf_url, "delivery": delivery}
+	from verityai_saas.services import erpnext
+
+	sync = erpnext.auto_sync_quotation(workspace, quotation)
+	return {"quotation": get_quotation(workspace, quotation), "pdf_url": pdf_url, "delivery": delivery, "erpnext_sync": sync}
 
 
 def _ai_request_product(workspace, requested_label, rate=None):
@@ -754,8 +761,6 @@ def quotation_html(workspace, quotation):
 def _workspace_for_tenant(tenant_name):
 	workspace = frappe.db.get_value("VerityAI Workspace", {"engine_tenant": tenant_name, "status": ["in", ["Trial", "Active"]]}, "name")
 	if not workspace:
-		return None
-	if frappe.db.get_value("AI Configuration", {"tenant": tenant_name}, "enable_erpnext_integration"):
 		return None
 	return workspace
 

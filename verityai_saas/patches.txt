@@ -14,3 +14,4 @@ verityai_saas.patches.v0_10.reduce_trial_allowance
 verityai_saas.patches.v0_11.transactional_email
 verityai_saas.patches.v0_12.paynow_operating_mode
 verityai_saas.patches.v0_13.platform_ai_settings
+verityai_saas.patches.v0_14.remote_erpnext

@@ -17,6 +17,7 @@ SAAS_WORKSPACE_DOCTYPES = (
 	"VerityAI Conversation Handoff",
 	"VerityAI Email Delivery Log",
 	"VerityAI Integration Status",
+	"VerityAI ERPNext Connection",
 	"VerityAI WhatsApp Setup",
 	"VerityAI Notification Setting",
 	"VerityAI Onboarding Checklist",

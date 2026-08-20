@@ -500,6 +500,22 @@ def ensure_doctypes():
 		field("details", "Details", "Small Text"), field("reference_doctype", "Reference DocType"), field("reference_name", "Reference Name"),
 	], "VIS-.#####")
 
+	ensure_doctype("VerityAI ERPNext Connection", [
+		field("workspace", "Workspace", "Link", options="VerityAI Workspace", reqd=1, unique=1, in_list_view=1),
+		field("enabled", "Enabled", "Check"), field("erpnext_url", "ERPNext URL", reqd=1),
+		field("api_key", "API Key", "Password"), field("api_secret", "API Secret", "Password"),
+		field("company", "Company"), field("selling_price_list", "Selling Price List", default="Standard Selling"),
+		field("customer_group", "Customer Group", default="All Customer Groups"),
+		field("territory", "Territory", default="All Territories"),
+		field("sales_taxes_template", "Sales Taxes and Charges Template"),
+		field("auto_sync_quotations", "Sync Approved Quotations", "Check", default=1),
+		field("assistant_connector_enabled", "Use VerityAI ERPNext Connector", "Check"),
+		field("connection_status", "Connection Status", "Select", options="Not Configured\nNot Checked\nConnected\nFailed", default="Not Configured", read_only=1),
+		field("last_checked_on", "Last Checked On", "Datetime", read_only=1),
+		field("last_product_sync_on", "Last Product Sync On", "Datetime", read_only=1),
+		field("last_error", "Last Error", "Small Text", read_only=1),
+	], "VERPC-.#####")
+
 
 def ensure_default_plan():
 	if not frappe.db.exists("DocType", "VerityAI Plan"):
