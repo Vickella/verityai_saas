@@ -902,6 +902,52 @@ main { max-width: 1420px; padding: 26px clamp(22px, 3vw, 42px) 52px; }
   backdrop-filter: blur(2px);
 }
 .va-drawer-backdrop[hidden] { display: none; }
+
+.va-card-link {
+  color: inherit;
+  text-decoration: none;
+  transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease;
+}
+
+.va-card-link:hover,
+.va-card-link:focus-visible {
+  border-color: rgba(47, 116, 234, .42);
+  box-shadow: 0 12px 30px rgba(23, 43, 77, .1);
+  color: inherit;
+  transform: translateY(-2px);
+}
+
+.va-check {
+  align-items: center;
+  display: inline-flex;
+  gap: .65rem;
+  min-height: 2.75rem;
+}
+
+.va-check[hidden] { display: none; }
+.va-check input { height: 1.05rem; width: 1.05rem; }
+
+.va-transcript {
+  display: grid;
+  gap: .7rem;
+  margin-top: .85rem;
+}
+
+.va-transcript-message {
+  background: #f5f8fc;
+  border: 1px solid var(--va-border);
+  border-radius: 14px;
+  max-width: 86%;
+  padding: .75rem .9rem;
+}
+
+.va-transcript-message.assistant { justify-self: start; }
+.va-transcript-message.visitor {
+  background: #eaf2ff;
+  border-color: #cbdcff;
+  justify-self: end;
+}
+.va-transcript-message p { margin: .25rem 0 0; white-space: pre-wrap; }
 .va-drawer {
   width: min(620px, 100%);
   height: 100%;

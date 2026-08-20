@@ -285,6 +285,58 @@ def refresh_ingestion(workspace_name, ingestion_name):
 	return ingestion_name
 
 
+def update_ingestion(workspace_name, ingestion_name, values):
+	if not frappe.db.exists("VerityAI Knowledge Ingestion", {"name": ingestion_name, "workspace": workspace_name}):
+		frappe.throw("Knowledge processing record was not found.", frappe.DoesNotExistError)
+	doc = frappe.get_doc("VerityAI Knowledge Ingestion", ingestion_name)
+	if doc.status == "Processing":
+		frappe.throw("Wait for processing to finish before editing this source.", frappe.ValidationError)
+	was_pending = doc.status == "Pending"
+	title = str(values.get("title") or "").strip()
+	if not title:
+		frappe.throw("A knowledge source title is required.", frappe.ValidationError)
+	doc.title = title
+	refresh = False
+	if doc.source_type == "URL":
+		source_url = _validate_public_url(values.get("source_url") or doc.source_url)
+		refresh = source_url != doc.source_url or cint(values.get("refresh"))
+		doc.source_url = source_url
+	if doc.knowledge_source:
+		source_values = {"title": title}
+		if doc.source_type == "Text" and "content" in values:
+			source_values["content"] = values.get("content")
+		if "active" in values:
+			source_values["active"] = values.get("active")
+		engine.update_knowledge_source(workspace_name, doc.knowledge_source, source_values)
+	if doc.source_type == "Text" and "content" in values:
+		content = str(values.get("content") or "").strip()
+		doc.content_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
+		doc.bytes_processed = len(content.encode("utf-8"))
+		doc.pages_processed = 1
+		doc.last_refreshed_on = now_datetime()
+		doc.status = "Ready"
+		doc.error = None
+	if refresh:
+		doc.status = "Pending"
+		doc.error = None
+	doc.save(ignore_permissions=True)
+	if refresh and not was_pending:
+		frappe.enqueue(
+			"verityai_saas.services.ingestion.process_ingestion",
+			queue="long",
+			enqueue_after_commit=True,
+			ingestion_name=doc.name,
+		)
+	return {
+		"name": doc.name,
+		"knowledge_source": doc.knowledge_source,
+		"title": doc.title,
+		"source_type": doc.source_type,
+		"source_url": doc.source_url,
+		"status": doc.status,
+	}
+
+
 def list_ingestions(workspace_name):
 	return frappe.get_all("VerityAI Knowledge Ingestion", filters={"workspace": workspace_name}, fields=["name", "knowledge_source", "title", "source_type", "source_url", "file_url", "status", "pages_processed", "bytes_processed", "last_refreshed_on", "next_refresh_on", "error", "creation", "modified"], order_by="creation desc", limit=200)
 

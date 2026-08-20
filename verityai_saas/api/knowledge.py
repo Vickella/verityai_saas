@@ -22,6 +22,13 @@ def ingestion_status(workspace):
 	return ingestion.list_ingestions(workspace)
 
 
+@frappe.whitelist()
+@endpoint
+def detail(workspace, source):
+	require_workspace_permission(workspace, "manage_knowledge")
+	return engine.get_knowledge_source(workspace, source)
+
+
 @frappe.whitelist(methods=["POST"])
 @endpoint
 def create(workspace, title, content=None, file=None):
@@ -67,6 +74,13 @@ def ingest_url(workspace, title, url):
 def refresh(workspace, ingestion_name):
 	require_workspace_permission(workspace, "manage_knowledge")
 	return {"ingestion": ingestion.refresh_ingestion(workspace, ingestion_name), "status": "Pending"}
+
+
+@frappe.whitelist(methods=["POST"])
+@endpoint
+def update_processing(workspace, ingestion_name, values):
+	require_workspace_permission(workspace, "manage_knowledge")
+	return ingestion.update_ingestion(workspace, ingestion_name, json_value(values, {}))
 
 
 @frappe.whitelist(methods=["POST"])

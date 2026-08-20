@@ -4,7 +4,7 @@ from collections import defaultdict
 
 import frappe
 from frappe import _
-from frappe.utils import get_url, now_datetime
+from frappe.utils import cint, get_url, now_datetime
 
 from verity_ai.tenant_security import normalize_domain
 
@@ -204,15 +204,44 @@ def list_knowledge_sources(workspace_name):
 	return rows
 
 
+def get_knowledge_source(workspace_name, source_name):
+	tenant = get_workspace_engine_tenant(workspace_name)
+	if not frappe.db.exists("AI Knowledge Source", {"name": source_name, "tenant": tenant}):
+		frappe.throw(_("Knowledge source was not found."), frappe.DoesNotExistError)
+	return frappe.db.get_value(
+		"AI Knowledge Source",
+		source_name,
+		["name", "title", "content", "summary", "active", "source_file", "modified"],
+		as_dict=True,
+	)
+
+
 def update_knowledge_source(workspace_name, source_name, values):
 	tenant = get_workspace_engine_tenant(workspace_name)
 	if not frappe.db.exists("AI Knowledge Source", {"name": source_name, "tenant": tenant}):
 		frappe.throw(_("Knowledge source was not found."), frappe.DoesNotExistError)
 	doc = frappe.get_doc("AI Knowledge Source", source_name)
-	for key in ("title", "content", "summary", "active"):
-		if key in values:
-			setattr(doc, key, values[key])
+	if "title" in values:
+		title = str(values.get("title") or "").strip()
+		if not title:
+			frappe.throw(_("A knowledge source title is required."), frappe.ValidationError)
+		doc.title = title
+	if "content" in values:
+		content = str(values.get("content") or "").strip()
+		if not content:
+			frappe.throw(_("Knowledge content is required."), frappe.ValidationError)
+		doc.content = content
+	if "summary" in values:
+		doc.summary = str(values.get("summary") or "").strip()
+	if "active" in values:
+		doc.active = cint(values.get("active"))
 	doc.save(ignore_permissions=True)
+	for ingestion_name in frappe.get_all(
+		"VerityAI Knowledge Ingestion",
+		filters={"workspace": workspace_name, "knowledge_source": source_name},
+		pluck="name",
+	):
+		frappe.db.set_value("VerityAI Knowledge Ingestion", ingestion_name, "title", doc.title, update_modified=False)
 	return doc.name
 
 

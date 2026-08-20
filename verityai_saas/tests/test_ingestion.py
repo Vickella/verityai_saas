@@ -92,6 +92,51 @@ class TestKnowledgeIngestion(FrappeTestCase):
 		self.assertFalse(frappe.db.exists("AI Knowledge Source", source))
 		self.assertFalse(frappe.db.exists("AI Knowledge Chunk", {"knowledge_source": source}))
 
+	def test_workspace_owner_can_view_and_edit_text_source(self):
+		frappe.set_user(self.owner)
+		created = knowledge_api.create(self.workspace, "Original title", "Original support knowledge")
+		source = created["data"]["source"]
+		detail = knowledge_api.detail(self.workspace, source)
+		self.assertTrue(detail["success"])
+		self.assertEqual(detail["data"]["content"], "Original support knowledge")
+		updated = knowledge_api.update(
+			self.workspace,
+			source,
+			{"title": "Updated title", "content": "Updated support knowledge", "active": 1},
+		)
+		self.assertTrue(updated["success"])
+		doc = frappe.get_doc("AI Knowledge Source", source)
+		self.assertEqual(doc.title, "Updated title")
+		self.assertEqual(doc.content, "Updated support knowledge")
+		self.assertGreater(frappe.db.count("AI Knowledge Chunk", {"knowledge_source": source}), 0)
+		ingestion_title = frappe.db.get_value(
+			"VerityAI Knowledge Ingestion",
+			{"workspace": self.workspace, "knowledge_source": source},
+			"title",
+		)
+		self.assertEqual(ingestion_title, "Updated title")
+
+	def test_workspace_owner_can_edit_url_and_queue_reprocessing(self):
+		frappe.set_user(self.owner)
+		with patch("verityai_saas.services.ingestion._validate_public_url", side_effect=lambda url: url), patch("frappe.enqueue"):
+			ingestion_name = knowledge_api.ingest_url(self.workspace, "Website", "https://example.com/old")["data"]["ingestion"]
+		with patch("verityai_saas.services.ingestion.crawl_url", return_value=("Website knowledge", 1, 17)):
+			ingestion.process_ingestion(ingestion_name)
+		source = frappe.db.get_value("VerityAI Knowledge Ingestion", ingestion_name, "knowledge_source")
+		with patch("verityai_saas.services.ingestion._validate_public_url", side_effect=lambda url: url), patch("frappe.enqueue") as enqueue:
+			updated = knowledge_api.update_processing(
+				self.workspace,
+				ingestion_name,
+				{"title": "New website", "source_url": "https://example.com/new", "refresh": 1},
+			)
+		self.assertTrue(updated["success"])
+		enqueue.assert_called_once()
+		doc = frappe.get_doc("VerityAI Knowledge Ingestion", ingestion_name)
+		self.assertEqual(doc.title, "New website")
+		self.assertEqual(doc.source_url, "https://example.com/new")
+		self.assertEqual(doc.status, "Pending")
+		self.assertEqual(frappe.db.get_value("AI Knowledge Source", source, "title"), "New website")
+
 	def test_private_and_loopback_urls_are_rejected(self):
 		with patch("socket.getaddrinfo", return_value=[(2, 1, 6, "", ("127.0.0.1", 80))]):
 			with self.assertRaises(frappe.PermissionError):
