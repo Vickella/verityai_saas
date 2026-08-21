@@ -4,7 +4,7 @@ import frappe
 from frappe.utils import add_days, cint, flt, getdate, today
 
 from verityai_saas.api._response import endpoint, json_value
-from verityai_saas.services import paynow, platform_ai, platform_email
+from verityai_saas.services import credit_stock, paynow, platform_ai, platform_email
 from verityai_saas.services.admin_reauth import require_admin_reauthentication
 from verityai_saas.services.permissions import is_platform_admin, require_platform_admin
 
@@ -197,7 +197,45 @@ def dashboard():
 		"platform_ai": platform_ai.configuration_status(),
 		"support_email": platform_email.email_configuration_status(),
 		"commercial_metrics": commercial_metrics,
+		"credit_stock": credit_stock.summary(),
 	}
+
+
+@frappe.whitelist(methods=["POST"])
+@endpoint
+def record_credit_stock_entry(values):
+	require_platform_admin()
+	require_admin_reauthentication()
+	values = json_value(values, {})
+	doc = credit_stock.record_entry(
+		values.get("entry_type"), values.get("credits"), values.get("monetary_value"), values.get("direction"),
+		values.get("currency") or "USD", reference=values.get("reference"), notes=values.get("notes"),
+	)
+	return {"entry": doc.name, "summary": credit_stock.summary()}
+
+
+@frappe.whitelist(methods=["POST"])
+@endpoint
+def configure_credit_accounting(values):
+	require_platform_admin()
+	require_admin_reauthentication()
+	return credit_stock.configure_erpnext(json_value(values, {}))
+
+
+@frappe.whitelist(methods=["POST"])
+@endpoint
+def test_credit_accounting():
+	require_platform_admin()
+	require_admin_reauthentication()
+	return credit_stock.test_erpnext_connection()
+
+
+@frappe.whitelist(methods=["POST"])
+@endpoint
+def post_credit_ledger_entry(entry):
+	require_platform_admin()
+	require_admin_reauthentication()
+	return credit_stock.post_to_erpnext(entry)
 
 
 @frappe.whitelist(methods=["POST"])

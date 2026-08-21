@@ -368,6 +368,8 @@ def apply_status(payment_name, values):
 		ensure_receipt_for_payment(payment.name)
 		from verityai_saas.services.platform_email import send_payment_confirmation
 		send_payment_confirmation(payment.workspace, payment.name)
+		from verityai_saas.services.credit_stock import record_billing_allocation
+		record_billing_allocation(payment.name)
 	elif status_key in FINAL_FAILED_STATUSES:
 		was_completed = payment.status == "Completed"
 		if status_key == "refunded" and was_completed:

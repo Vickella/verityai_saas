@@ -419,7 +419,7 @@ def ensure_doctypes():
 		field("referred_account", "Referred Account", "Link", options="VerityAI Account", reqd=1),
 		field("referred_workspace", "Referred Workspace", "Link", options="VerityAI Workspace", reqd=1, in_list_view=1),
 		field("billing_event", "Qualifying Billing Event", "Link", options="VerityAI Billing Event", reqd=1, unique=1),
-		field("reward_credits", "Reward AI Credits", "Int", default=1000000),
+		field("reward_credits", "Reward AI Credits", "Int", default=50000),
 		field("status", "Status", "Select", options="Pending\nGranted\nReversed\nRejected", default="Pending", in_list_view=1),
 		field("eligible_on", "Eligible On", "Date"), field("granted_on", "Granted On", "Datetime"), field("expires_on", "Expires On", "Date"),
 		field("review_note", "Review Note", "Small Text"),
@@ -501,6 +501,39 @@ def ensure_doctypes():
 		field("details", "Details", "Small Text"), field("reference_doctype", "Reference DocType"), field("reference_name", "Reference Name"),
 	], "VIS-.#####")
 
+	ensure_doctype("VerityAI Credit Stock Ledger", [
+		field("posting_datetime", "Posting Date and Time", "Datetime", reqd=1, in_list_view=1),
+		field("entry_type", "Entry Type", "Select", options="Opening Balance\nPurchase\nAllocation\nReversal\nAdjustment", reqd=1, in_list_view=1),
+		field("direction", "Direction", "Select", options="Receipt\nIssue", reqd=1),
+		field("credits", "AI Credits", "Int", reqd=1, in_list_view=1),
+		field("unit_cost", "Unit Cost", "Currency", read_only=1),
+		field("inventory_value", "Inventory Value", "Currency", read_only=1),
+		field("revenue", "Revenue", "Currency", read_only=1),
+		field("cogs", "Cost of Sales", "Currency", read_only=1),
+		field("gross_profit", "Gross Profit", "Currency", read_only=1),
+		field("balance_credits", "Credit Balance", "Int", read_only=1, in_list_view=1),
+		field("balance_value", "Stock Value", "Currency", read_only=1),
+		field("currency", "Currency", "Link", options="Currency", default="USD", reqd=1),
+		field("workspace", "Workspace", "Link", options="VerityAI Workspace"),
+		field("billing_event", "Billing Event", "Link", options="VerityAI Billing Event"),
+		field("source_key", "Source Key", unique=1, read_only=1),
+		field("reference", "Reference"), field("notes", "Notes", "Small Text"),
+		field("erpnext_status", "ERPNext Status", "Select", options="Not Applicable\nPending\nPosted\nFailed", default="Not Applicable", read_only=1),
+		field("erpnext_journal_entry", "ERPNext Journal Entry", read_only=1),
+		field("erpnext_error", "ERPNext Error", "Small Text", read_only=1),
+	], "VCSTK-.########", permission_rows=platform_settings_permissions())
+
+	ensure_doctype("VerityAI ERPNext Accounting Settings", [
+		field("enabled", "Enabled", "Check"), field("auto_post", "Post Automatically", "Check"),
+		field("erpnext_url", "ERPNext URL"), field("api_key", "API Key", "Password"), field("api_secret", "API Secret", "Password"),
+		field("company", "Company"), field("currency", "Currency", "Link", options="Currency", default="USD"),
+		field("receivable_account", "Bank or Receivable Account"), field("sales_account", "Sales Account"),
+		field("inventory_account", "AI Credit Inventory Account"), field("cogs_account", "Cost of Sales Account"),
+		field("cost_center", "Cost Center"),
+		field("connection_status", "Connection Status", "Select", options="Not Configured\nNot Checked\nConnected\nFailed", default="Not Configured", read_only=1),
+		field("last_checked_on", "Last Checked On", "Datetime", read_only=1), field("last_error", "Last Error", "Small Text", read_only=1),
+	], issingle=True, permission_rows=platform_settings_permissions())
+
 	ensure_doctype("VerityAI ERPNext Connection", [
 		field("workspace", "Workspace", "Link", options="VerityAI Workspace", reqd=1, unique=1, in_list_view=1),
 		field("enabled", "Enabled", "Check"), field("erpnext_url", "ERPNext URL", reqd=1),
@@ -522,27 +555,27 @@ def ensure_default_plan():
 	if not frappe.db.exists("DocType", "VerityAI Plan"):
 		return
 	plans = (
-		{"plan_name": "Trial", "plan_code": "TRIAL", "monthly_price": 0, "annual_price": 0, "trial_days": 14,
-		 "monthly_token_limit": 10000, "max_tokens": 500, "max_workspaces": 1, "max_assistants": 1, "max_team_members": 1,
-		 "monthly_web_conversations": 15, "monthly_whatsapp_messages": 0, "monthly_email_sends": 100,
+		{"plan_name": "Trial", "plan_code": "TRIAL", "monthly_price": 0, "annual_price": 0, "trial_days": 7,
+		 "monthly_token_limit": 5000, "max_tokens": 400, "max_workspaces": 1, "max_assistants": 1, "max_team_members": 1,
+		 "monthly_web_conversations": 5, "monthly_whatsapp_messages": 0, "monthly_email_sends": 25,
 		 "max_knowledge_sources": 3, "max_allowed_domains": 1, "public_rate_limit_per_minute": 10,
 		 "max_public_message_chars": 2000, "can_use_whatsapp_button": 1, "can_use_email_notifications": 1, "support_level": "Community"},
-		{"plan_name": "Launch", "plan_code": "LAUNCH", "monthly_price": 12, "annual_price": 120, "trial_days": 0,
-		 "monthly_token_limit": 500000, "max_tokens": 700, "max_workspaces": 1, "max_assistants": 1, "max_team_members": 3,
-		 "monthly_web_conversations": 250, "monthly_whatsapp_messages": 0, "monthly_email_sends": 1000,
-		 "max_knowledge_sources": 15, "max_allowed_domains": 2, "public_rate_limit_per_minute": 30,
+		{"plan_name": "Launch", "plan_code": "LAUNCH", "monthly_price": 5, "annual_price": 50, "trial_days": 0,
+		 "monthly_token_limit": 100000, "max_tokens": 700, "max_workspaces": 1, "max_assistants": 1, "max_team_members": 1,
+		 "monthly_web_conversations": 50, "monthly_whatsapp_messages": 0, "monthly_email_sends": 250,
+		 "max_knowledge_sources": 5, "max_allowed_domains": 1, "public_rate_limit_per_minute": 30,
 		 "max_public_message_chars": 4000, "can_use_whatsapp_button": 1, "can_use_email_notifications": 1,
 		 "can_use_quotation_workflow": 1, "support_level": "Community"},
-		{"plan_name": "Growth", "plan_code": "GROWTH", "monthly_price": 24, "annual_price": 240, "trial_days": 0,
-		 "monthly_token_limit": 1500000, "max_tokens": 1000, "max_workspaces": 1, "max_assistants": 1, "max_team_members": 7,
-		 "monthly_web_conversations": 750, "monthly_whatsapp_messages": 250, "monthly_email_sends": 5000,
-		 "max_knowledge_sources": 60, "max_allowed_domains": 5, "public_rate_limit_per_minute": 60,
+		{"plan_name": "Growth", "plan_code": "GROWTH", "monthly_price": 12, "annual_price": 120, "trial_days": 0,
+		 "monthly_token_limit": 400000, "max_tokens": 1000, "max_workspaces": 1, "max_assistants": 1, "max_team_members": 3,
+		 "monthly_web_conversations": 200, "monthly_whatsapp_messages": 100, "monthly_email_sends": 1500,
+		 "max_knowledge_sources": 20, "max_allowed_domains": 3, "public_rate_limit_per_minute": 60,
 		 "max_public_message_chars": 6000, "can_remove_branding": 1, "can_use_whatsapp_button": 1, "can_use_whatsapp_ai": 1,
 		 "can_use_email_notifications": 1, "can_use_custom_smtp": 1, "can_use_quotation_workflow": 1, "support_level": "Standard"},
-		{"plan_name": "Scale", "plan_code": "SCALE", "monthly_price": 60, "annual_price": 600, "trial_days": 0,
-		 "monthly_token_limit": 6000000, "max_tokens": 1400, "max_workspaces": 3, "max_assistants": 3, "max_team_members": 15,
-		 "monthly_web_conversations": 3000, "monthly_whatsapp_messages": 1500, "monthly_email_sends": 20000,
-		 "max_knowledge_sources": 200, "max_allowed_domains": 20, "public_rate_limit_per_minute": 120,
+		{"plan_name": "Scale", "plan_code": "SCALE", "monthly_price": 20, "annual_price": 200, "trial_days": 0,
+		 "monthly_token_limit": 1000000, "max_tokens": 1400, "max_workspaces": 3, "max_assistants": 3, "max_team_members": 5,
+		 "monthly_web_conversations": 500, "monthly_whatsapp_messages": 300, "monthly_email_sends": 5000,
+		 "max_knowledge_sources": 60, "max_allowed_domains": 10, "public_rate_limit_per_minute": 120,
 		 "max_public_message_chars": 8000, "can_remove_branding": 1, "can_use_whatsapp_button": 1, "can_use_whatsapp_ai": 1,
 		 "can_use_email_notifications": 1, "can_use_custom_smtp": 1, "can_use_erpnext_integration": 1,
 		 "can_use_quotation_workflow": 1, "can_use_api_access": 1, "can_bring_own_ai_provider_key": 1, "support_level": "Priority"},
@@ -561,10 +594,14 @@ def ensure_default_plan():
 		doc.save(ignore_permissions=True) if name else doc.insert(ignore_permissions=True)
 
 	if frappe.db.exists("DocType", "VerityAI Credit Pack"):
+		current_pack_codes = {"CREDITS-200K", "CREDITS-500K", "CREDITS-1_2M"}
+		for old_pack in frappe.get_all("VerityAI Credit Pack", fields=["name", "pack_code"]):
+			if old_pack.pack_code not in current_pack_codes:
+				frappe.db.set_value("VerityAI Credit Pack", old_pack.name, "active", 0)
 		for values in (
-			{"pack_name": "1 Million AI Credits", "pack_code": "CREDITS-1M", "credits": 1000000, "price": 10, "sort_order": 10},
-			{"pack_name": "5 Million AI Credits", "pack_code": "CREDITS-5M", "credits": 5000000, "price": 35, "sort_order": 20},
-			{"pack_name": "15 Million AI Credits", "pack_code": "CREDITS-15M", "credits": 15000000, "price": 75, "sort_order": 30},
+			{"pack_name": "200,000 AI Credits", "pack_code": "CREDITS-200K", "credits": 200000, "price": 5, "sort_order": 10},
+			{"pack_name": "500,000 AI Credits", "pack_code": "CREDITS-500K", "credits": 500000, "price": 10, "sort_order": 20},
+			{"pack_name": "1,200,000 AI Credits", "pack_code": "CREDITS-1_2M", "credits": 1200000, "price": 20, "sort_order": 30},
 		):
 			name = frappe.db.get_value("VerityAI Credit Pack", {"pack_code": values["pack_code"]}, "name")
 			doc = frappe.get_doc("VerityAI Credit Pack", name) if name else frappe.get_doc({"doctype": "VerityAI Credit Pack"})

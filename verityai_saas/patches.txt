@@ -16,3 +16,4 @@ verityai_saas.patches.v0_12.paynow_operating_mode
 verityai_saas.patches.v0_13.platform_ai_settings
 verityai_saas.patches.v0_14.remote_erpnext
 verityai_saas.patches.v0_15.paynow_live_verification
+verityai_saas.patches.v0_16.hybrid_pricing_credit_stock

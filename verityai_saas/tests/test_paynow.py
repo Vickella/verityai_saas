@@ -167,7 +167,7 @@ class TestPaynowBilling(FrappeTestCase):
 
 	def test_customer_credit_pack_checkout_records_fulfilment_metadata(self):
 		billing.assign_plan(self.workspace, self.plan, "Active", "Monthly")
-		pack = frappe.db.get_value("VerityAI Credit Pack", {"pack_code": "CREDITS-1M"}, "name")
+		pack = frappe.db.get_value("VerityAI Credit Pack", {"pack_code": "CREDITS-500K"}, "name")
 		response_values = {
 			"Status": "Ok", "BrowserUrl": "https://www.paynow.co.zw/Payment/ConfirmPayment/topup",
 			"PollUrl": "https://www.paynow.co.zw/Interface/CheckPayment/?guid=topup",
@@ -181,7 +181,7 @@ class TestPaynowBilling(FrappeTestCase):
 			result = paynow.initiate_credit_checkout(self.workspace, pack)
 		event = frappe.get_doc("VerityAI Billing Event", result["payment"])
 		self.assertEqual(event.transaction_kind, "Credit Top-Up")
-		self.assertEqual(event.purchased_credits, 1_000_000)
+		self.assertEqual(event.purchased_credits, 500_000)
 		self.assertEqual(float(event.amount), 10)
 
 	def test_promotion_discount_is_reserved_against_the_payment(self):

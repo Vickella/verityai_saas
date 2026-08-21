@@ -4,7 +4,7 @@ import frappe
 from frappe.utils import add_days, cint, flt, getdate, now_datetime, today
 
 
-REFERRAL_REWARD_CREDITS = 1_000_000
+REFERRAL_REWARD_CREDITS = 50_000
 REFERRAL_DISCOUNT_PERCENT = 25
 REFERRAL_REVIEW_DAYS = 14
 PROMOTIONAL_CREDIT_DAYS = 90

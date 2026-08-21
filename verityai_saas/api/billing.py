@@ -21,7 +21,7 @@ def get(workspace):
 		"events": frappe.get_all("VerityAI Billing Event", filters={"workspace": workspace}, fields=["name", "event_type", "transaction_kind", "amount", "gross_amount", "discount_amount", "purchased_credits", "currency", "status", "provider", "gateway_status", "gateway_reference", "creation", "paid_on"], order_by="creation desc", limit=50),
 		"plans": frappe.get_all("VerityAI Plan", filters={"active": 1}, fields=["name", "plan_name", "plan_code", "monthly_price", "annual_price", "currency", "monthly_token_limit", "max_team_members", "monthly_web_conversations", "monthly_whatsapp_messages", "max_knowledge_sources", "max_allowed_domains", "can_remove_branding", "can_use_whatsapp_ai", "can_use_custom_smtp", "can_use_erpnext_integration", "can_use_api_access", "support_level"], order_by="monthly_price asc"),
 		"credit_packs": frappe.get_all("VerityAI Credit Pack", filters={"active": 1}, fields=["name", "pack_name", "pack_code", "credits", "price", "currency"], order_by="sort_order asc"),
-		"referral": {"code": referral_code, "reward_credits": 1000000, "referred_discount_percent": 25},
+		"referral": {"code": referral_code, "reward_credits": 50000, "referred_discount_percent": 25},
 		"documents": billing_documents.list_documents(workspace),
 		"paynow_configured": paynow.is_configured(),
 	}

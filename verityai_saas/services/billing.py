@@ -193,8 +193,10 @@ def add_top_up(workspace_name, tokens, amount=0, provider_reference=None, billin
 	workspace = frappe.get_doc("VerityAI Workspace", workspace_name)
 	wallet = frappe.get_doc("VerityAI Usage Wallet", wallet_name)
 	event = billing_event or create_billing_event(workspace_name, "Top-Up", amount, "Completed", provider_reference=provider_reference)
-	if billing_event:
-		frappe.db.set_value("VerityAI Billing Event", billing_event, {"status": "Completed", "paid_on": now_datetime(), "gateway_reference": provider_reference})
+	event_updates = {"status": "Completed", "paid_on": now_datetime(), "transaction_kind": "Credit Top-Up", "purchased_credits": tokens}
+	if provider_reference:
+		event_updates["gateway_reference"] = provider_reference
+	frappe.db.set_value("VerityAI Billing Event", event, event_updates)
 	from verityai_saas.services.billing_documents import ensure_document
 	ensure_document(event, "Receipt", status="Paid")
 	transaction = frappe.get_doc({
@@ -217,6 +219,8 @@ def add_top_up(workspace_name, tokens, amount=0, provider_reference=None, billin
 			"AI Configuration", config_name, "monthly_token_limit",
 			cint(wallet.opening_token_allowance) + cint(wallet.top_up_tokens) + cint(wallet.promotional_credits),
 		)
+	from verityai_saas.services.credit_stock import record_billing_allocation
+	record_billing_allocation(event)
 	return {"event": event, "transaction": transaction.name, "wallet": wallet.name}
 
 

@@ -14,8 +14,8 @@ class TestStandaloneInstallation(FrappeTestCase):
 	def test_public_plans_and_credit_packs_match_commercial_baseline(self):
 		ensure_default_plan()
 		expected = {
-			"TRIAL": (0, 10_000), "LAUNCH": (12, 500_000), "GROWTH": (24, 1_500_000),
-			"SCALE": (60, 6_000_000), "ENTERPRISE": (100, 12_000_000),
+			"TRIAL": (0, 5_000), "LAUNCH": (5, 100_000), "GROWTH": (12, 400_000),
+			"SCALE": (20, 1_000_000), "ENTERPRISE": (100, 12_000_000),
 		}
 		for code, (price, credits) in expected.items():
 			plan = frappe.db.get_value("VerityAI Plan", {"plan_code": code}, ["monthly_price", "monthly_token_limit", "active"], as_dict=True)
@@ -24,6 +24,10 @@ class TestStandaloneInstallation(FrappeTestCase):
 			self.assertEqual(plan.monthly_token_limit, credits)
 			self.assertEqual(bool(plan.active), code != "ENTERPRISE")
 		self.assertEqual(frappe.db.count("VerityAI Credit Pack", {"active": 1}), 3)
+		self.assertEqual(
+			set(frappe.get_all("VerityAI Credit Pack", {"active": 1}, pluck="pack_code")),
+			{"CREDITS-200K", "CREDITS-500K", "CREDITS-1_2M"},
+		)
 
 	def test_business_natures_are_comprehensive_and_idempotent(self):
 		seed_business_natures()

@@ -54,6 +54,11 @@ scheduler_events = {
 }
 
 doc_events = {
+	"VerityAI Credit Stock Ledger": {
+		"before_insert": "verityai_saas.services.credit_stock.protect_ledger_insert",
+		"before_save": "verityai_saas.services.credit_stock.protect_ledger_update",
+		"on_trash": "verityai_saas.services.credit_stock.protect_ledger_delete",
+	},
 	"AI Lead": {"after_insert": "verityai_saas.services.notifications.send_lead_notification"},
 	"AI Chat Session": {
 		"after_insert": "verityai_saas.services.whatsapp.record_channel_activity",
