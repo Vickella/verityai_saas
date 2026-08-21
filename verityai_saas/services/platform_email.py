@@ -1,5 +1,6 @@
 from html import escape
 import os
+from urllib.parse import quote
 
 import frappe
 from frappe.utils import cint, get_url, getdate, now_datetime, today
@@ -10,6 +11,7 @@ SUPPORT_ACCOUNT_NAME = "VerityAI Support"
 PASSWORD_RESET_TEMPLATE = "VerityAI Password Reset"
 DEFAULT_SMTP_SERVER = "mail.veritycore.co.zw"
 ALLOWED_SMTP_PORTS = {465, 587}
+WORKSPACE_INVITATION_EXPIRY_SECONDS = 3 * 24 * 60 * 60
 
 
 def _clean_text(value):
@@ -79,6 +81,49 @@ def ensure_system_email_templates():
 		)
 	if frappe.get_meta("System Settings").has_field("reset_password_template"):
 		frappe.db.set_single_value("System Settings", "reset_password_template", PASSWORD_RESET_TEMPLATE)
+	if frappe.get_meta("System Settings").has_field("reset_password_link_expiry_duration"):
+		frappe.db.set_single_value(
+			"System Settings",
+			"reset_password_link_expiry_duration",
+			WORKSPACE_INVITATION_EXPIRY_SECONDS,
+		)
+
+
+def send_workspace_invitation(workspace_name, recipient, role, activation_link=None):
+	workspace = frappe.get_doc("VerityAI Workspace", workspace_name)
+	workspace_label = workspace.workspace_name or workspace.business_name or workspace.name
+	workspace_path = f"/verityai?workspace={quote(workspace.name, safe='')}"
+	if activation_link:
+		paragraphs = [
+			f"You have been invited to join {workspace_label} as {role}.",
+			"Create your password to accept the invitation and open your workspace.",
+			"This secure invitation expires three days after it was sent. If a newer invitation is issued, this link will no longer work.",
+		]
+		action_url = activation_link
+		action_label = "Accept invitation"
+	else:
+		paragraphs = [
+			f"You have been invited to join {workspace_label} as {role}.",
+			"Sign in with your existing VerityAI account to open the workspace.",
+		]
+		action_url = get_url(
+			f"/verityai/signin?redirect-to={quote(workspace_path, safe='')}"
+		)
+		action_label = "Open workspace"
+	message = render_message(
+		f"Join {workspace_label}",
+		paragraphs,
+		action_url,
+		action_label,
+		f"You have been invited to join {workspace_label}.",
+	)
+	frappe.sendmail(
+		recipients=[recipient],
+		sender=f"VerityAI Support <{SUPPORT_EMAIL}>",
+		reply_to=SUPPORT_EMAIL,
+		subject=f"You are invited to join {workspace_label}",
+		message=message,
+	)
 
 
 def email_configuration_status():

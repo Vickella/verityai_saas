@@ -13,8 +13,10 @@ from verityai_saas.services.notifications import (
 from verityai_saas.services.onboarding import create_workspace
 from verityai_saas.services.platform_email import (
 	PASSWORD_RESET_TEMPLATE,
+	WORKSPACE_INVITATION_EXPIRY_SECONDS,
 	ensure_system_email_templates,
 	send_trial_lifecycle_emails,
+	send_workspace_invitation,
 	send_workspace_welcome,
 )
 from verityai_saas.tests.cleanup import cleanup_all_test_fixtures, cleanup_test_workspace
@@ -179,6 +181,26 @@ class TestNotificationManagement(FrappeTestCase):
 			frappe.db.get_single_value("System Settings", "reset_password_template"),
 			PASSWORD_RESET_TEMPLATE,
 		)
+		self.assertEqual(
+			int(frappe.db.get_single_value("System Settings", "reset_password_link_expiry_duration")),
+			WORKSPACE_INVITATION_EXPIRY_SECONDS,
+		)
+
+	def test_workspace_invitation_explains_expiry_and_uses_activation_link(self):
+		activation_link = "https://example.com/update-password?key=secure-test-key"
+		with patch("frappe.sendmail") as sendmail:
+			send_workspace_invitation(
+				self.workspace,
+				self.other,
+				"Support",
+				activation_link,
+			)
+
+		sendmail.assert_called_once()
+		message = sendmail.call_args.kwargs["message"]
+		self.assertIn("expires three days", message)
+		self.assertIn(activation_link, message)
+		self.assertEqual(sendmail.call_args.kwargs["recipients"], [self.other])
 
 	def test_welcome_and_trial_messages_are_deduplicated(self):
 		subscription = frappe.db.get_value("VerityAI Subscription", {"workspace": self.workspace}, "name")

@@ -6,6 +6,7 @@ from verityai_saas.services.workspace import (
 	add_member,
 	list_members,
 	remove_member,
+	resend_member_invitation,
 	update_member,
 	workspace_summary,
 )
@@ -54,6 +55,13 @@ def members(workspace):
 def invite(workspace, email, role="Viewer"):
 	require_workspace_permission(workspace, "manage_team")
 	return {"member": add_member(workspace, email, role)}
+
+
+@frappe.whitelist(methods=["POST"])
+@endpoint
+def resend_invite(workspace, member):
+	require_workspace_permission(workspace, "manage_team")
+	return {"member": resend_member_invitation(workspace, member)}
 
 
 @frappe.whitelist(methods=["POST"])

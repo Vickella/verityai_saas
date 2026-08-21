@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 import frappe
 from frappe.tests.utils import FrappeTestCase
 
@@ -5,7 +7,12 @@ from verityai_saas import setup_doctypes
 from verityai_saas.api import workspace as workspace_api
 from verityai_saas.services.onboarding import create_workspace
 from verityai_saas.services.billing import assign_plan
-from verityai_saas.services.workspace import add_member, remove_member, update_member
+from verityai_saas.services.workspace import (
+	add_member,
+	remove_member,
+	resend_member_invitation,
+	update_member,
+)
 from verityai_saas.tests.cleanup import cleanup_all_test_fixtures, cleanup_test_workspace
 
 
@@ -96,6 +103,9 @@ class TestWorkspaceTeamManagement(FrappeTestCase):
 		response = workspace_api.update(self.workspace, self.created["member"], role="Viewer")
 		self.assertFalse(response["success"])
 		self.assertEqual(response["code"], "WORKSPACE_FORBIDDEN")
+		response = workspace_api.resend_invite(self.workspace, self.created["member"])
+		self.assertFalse(response["success"])
+		self.assertEqual(response["code"], "WORKSPACE_FORBIDDEN")
 
 	def test_active_team_members_respect_plan_limit(self):
 		add_member(self.workspace, self.member_user, "Viewer")
@@ -106,3 +116,42 @@ class TestWorkspaceTeamManagement(FrappeTestCase):
 
 		with self.assertRaises(frappe.ValidationError):
 			add_member(self.workspace, third, "Sales")
+
+	@patch("verityai_saas.services.workspace.send_workspace_invitation")
+	def test_new_member_receives_secure_workspace_invitation(self, send_invitation):
+		email = f"team-invite-{frappe.generate_hash(length=8).lower()}@example.com"
+		self.extra_users.append(email)
+
+		member = add_member(self.workspace, email, "Support")
+
+		self.assertTrue(frappe.db.exists("VerityAI Workspace Member", member))
+		self.assertTrue(frappe.db.get_value("User", email, "reset_password_key"))
+		send_invitation.assert_called_once()
+		workspace_name, recipient, role, activation_link = send_invitation.call_args.args
+		self.assertEqual(workspace_name, self.workspace)
+		self.assertEqual(recipient, email)
+		self.assertEqual(role, "Support")
+		self.assertIn("/update-password?key=", activation_link)
+		self.assertIn("redirect_to=", activation_link)
+
+	@patch("verityai_saas.services.workspace.send_workspace_invitation")
+	def test_reactivated_member_receives_fresh_invitation(self, send_invitation):
+		member = add_member(self.workspace, self.member_user, "Viewer")
+		remove_member(self.workspace, member)
+		send_invitation.reset_mock()
+
+		add_member(self.workspace, self.member_user, "Sales")
+
+		send_invitation.assert_called_once_with(self.workspace, self.member_user, "Sales")
+
+	@patch("verityai_saas.services.workspace.send_workspace_invitation")
+	def test_active_member_invitation_can_be_resent(self, send_invitation):
+		member = add_member(self.workspace, self.member_user, "Viewer")
+		send_invitation.reset_mock()
+
+		resend_member_invitation(self.workspace, member)
+
+		send_invitation.assert_called_once()
+		workspace_name, recipient, role, activation_link = send_invitation.call_args.args
+		self.assertEqual((workspace_name, recipient, role), (self.workspace, self.member_user, "Viewer"))
+		self.assertIn("/update-password?key=", activation_link)

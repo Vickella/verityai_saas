@@ -1,8 +1,11 @@
+from urllib.parse import quote
+
 import frappe
 from frappe.utils import now_datetime, validate_email_address
 
 from verityai_saas.services import engine
 from verityai_saas.services.permissions import check_workspace_access
+from verityai_saas.services.platform_email import send_workspace_invitation
 from verityai_saas.services.user_roles import assign_workspace_role, sync_workspace_roles
 
 MEMBER_ROLES = {"Admin", "Sales", "Support", "Viewer", "Billing Manager"}
@@ -75,15 +78,17 @@ def add_member(workspace_name, email, role="Viewer"):
 		existing.status = "Active"
 		existing.save(ignore_permissions=True)
 		sync_workspace_roles(existing.user)
+		send_workspace_invitation(workspace_name, existing.user, role)
 		return existing.name
 	_check_team_limit(workspace_name)
-	if not frappe.db.exists("User", email):
+	is_new_user = not frappe.db.exists("User", email)
+	if is_new_user:
 		user = frappe.get_doc(
 			{
 				"doctype": "User",
 				"email": email,
 				"first_name": email.split("@", 1)[0],
-				"send_welcome_email": 1,
+				"send_welcome_email": 0,
 				"user_type": "Website User",
 			}
 		).insert(ignore_permissions=True)
@@ -99,7 +104,32 @@ def add_member(workspace_name, email, role="Viewer"):
 		}
 	).insert(ignore_permissions=True)
 	assign_workspace_role(user.name, role)
+	activation_link = None
+	if is_new_user:
+		activation_link = _workspace_activation_link(user, workspace_name)
+	send_workspace_invitation(workspace_name, user.name, role, activation_link)
 	return member.name
+
+
+def resend_member_invitation(workspace_name, member_name):
+	member = _member_doc(workspace_name, member_name)
+	if member.status != "Active":
+		frappe.throw("Reactivate this member before sending an invitation.", frappe.ValidationError)
+	user = frappe.get_doc("User", member.user)
+	activation_link = _workspace_activation_link(user, workspace_name)
+	send_workspace_invitation(
+		workspace_name,
+		user.name,
+		member.workspace_role,
+		activation_link,
+	)
+	return member.name
+
+
+def _workspace_activation_link(user, workspace_name):
+	activation_link = user._reset_password()
+	redirect_path = f"/verityai?workspace={quote(workspace_name, safe='')}"
+	return f"{activation_link}&redirect_to={quote(redirect_path, safe='')}"
 
 
 def update_member(workspace_name, member_name, role=None, permissions=None):
