@@ -698,6 +698,10 @@ pre.va-code {
   .va-actions .va-button { flex: 0 1 auto; }
 }
 
+@media (max-width: 520px) {
+  .va-credit-metrics-wide { grid-template-columns: 1fr; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; }
 }
@@ -1220,6 +1224,7 @@ article.va-member-row,
 .va-admin-attention strong { font-size: 25px; line-height: 1.2; }
 .va-admin-attention small { color: var(--ink-500); font-size: 10px; }
 .va-credit-metrics { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 10px; }
+.va-credit-metrics-wide { grid-template-columns: repeat(6,minmax(0,1fr)); }
 .va-credit-metrics > div { display: grid; gap: 2px; min-height: 88px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; background: #fff; box-shadow: var(--shadow-sm); }
 .va-credit-metrics span { color: var(--ink-500); font-size: 9px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
 .va-credit-metrics strong { font-size: clamp(18px,2vw,25px); line-height: 1.2; }
@@ -1227,6 +1232,17 @@ article.va-member-row,
 .va-credit-entry-form, .va-credit-accounting-form { padding: 16px; }
 .va-credit-entry-form .va-form-actions, .va-credit-accounting-form .va-form-actions { padding: 14px 0 0; }
 .va-credit-accounting-form .va-check-grid { margin-bottom: 14px; }
+.va-credit-command-grid { align-items: start; margin-top: 14px; }
+.va-credit-purchase-grid { display: grid; grid-template-columns: minmax(0,1.35fr) minmax(220px,.65fr); gap: 16px; }
+.va-credit-calculator { display: grid; align-content: start; gap: 9px; min-height: 100%; padding: 18px; border: 1px solid #cbdcf6; border-radius: 13px; background: linear-gradient(145deg,#0b2749,#174d8b); color: #fff; }
+.va-credit-calculator > span { color: #a9c9f2; font-size: 9px; font-weight: 850; letter-spacing: .08em; text-transform: uppercase; }
+.va-credit-calculator > strong { overflow-wrap: anywhere; font-size: clamp(23px,3vw,34px); line-height: 1.05; }
+.va-credit-calculator > div { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding-top: 9px; border-top: 1px solid rgba(255,255,255,.15); }
+.va-credit-calculator > div span { color: #bdd0e9; font-size: 9px; }
+.va-credit-calculator > div b { font-size: 10px; text-align: right; }
+.va-credit-adjustment { margin: 14px 0; overflow: hidden; border: 1px solid var(--line); border-radius: 13px; background: #fff; box-shadow: var(--shadow-sm); }
+.va-credit-adjustment > summary { padding: 14px 18px; color: var(--ink-700); cursor: pointer; font-size: 11px; font-weight: 800; }
+.va-credit-adjustment[open] > summary { border-bottom: 1px solid var(--line); }
 .va-admin-search { display: flex; align-items: end; justify-content: space-between; gap: 20px; padding: 15px 17px; border: 1px solid var(--line); border-radius: 13px; background: #fff; }
 .va-admin-search strong { display: block; font-size: 13px; }
 .va-admin-search > .va-field { width: min(390px,45vw); }
@@ -1285,6 +1301,8 @@ article.va-member-row,
 @media (max-width: 950px) {
   .va-admin-attention { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .va-credit-metrics { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .va-credit-metrics-wide { grid-template-columns: repeat(3,minmax(0,1fr)); }
+  .va-credit-purchase-grid { grid-template-columns: 1fr; }
 }
 
 .va-setup-resume { justify-content: space-between; margin-bottom: 16px; }
@@ -1466,6 +1484,7 @@ main { position: relative; }
 
 @media (max-width: 760px) {
   .va-credit-metrics { grid-template-columns: 1fr; }
+  .va-credit-metrics-wide { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .va-workspace-context { width: 100%; min-width: 0; }
   .va-user { display: flex; }
 }

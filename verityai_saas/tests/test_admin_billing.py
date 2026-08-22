@@ -51,6 +51,7 @@ class TestOperatorBillingConsole(FrappeTestCase):
 
 	def tearDown(self):
 		super().tearDown()
+		frappe.db.delete("VerityAI Credit Stock Ledger", {"workspace": self.workspace})
 		cleanup_test_workspace(
 			self.workspace,
 			users=[self.owner],
@@ -131,6 +132,8 @@ class TestOperatorBillingConsole(FrappeTestCase):
 		self.assertFalse(invalid_amount["success"])
 		self.assertFalse(invalid_reference["success"])
 
+		assigned = billing_api.assign_plan(self.workspace, self.plan, "Active", "Monthly")
+		self.assertTrue(assigned["success"])
 		response = billing_api.manual_event(self.workspace, "Payment", 40, "Completed", "PAY-VALID")
 		self.assertTrue(response["success"])
 		event = frappe.get_doc("VerityAI Billing Event", response["data"]["event"])
@@ -140,6 +143,15 @@ class TestOperatorBillingConsole(FrappeTestCase):
 			frappe.db.get_value("VerityAI Subscription", {"workspace": self.workspace}, "last_payment_reference"),
 			"PAY-VALID",
 		)
+		ledger = frappe.db.get_value(
+			"VerityAI Credit Stock Ledger",
+			{"billing_event": event.name},
+			["credits", "revenue", "workspace"],
+			as_dict=True,
+		)
+		self.assertEqual(int(ledger.credits), 400000)
+		self.assertEqual(float(ledger.revenue), 40)
+		self.assertEqual(ledger.workspace, self.workspace)
 
 	def test_operator_top_up_and_admin_page_access(self):
 		response = billing_api.top_up(self.workspace, 2500, 5, "OPS-TOPUP")

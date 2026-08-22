@@ -105,21 +105,30 @@
     const stock=data.credit_stock||{};
     const erp=stock.erpnext||{};
     const money=value=>`${esc(erp.currency||"USD")} ${Number(value||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
-    const metrics=`<div class="va-credit-metrics"><div><span>Available credits</span><strong>${number(stock.balance_credits)}</strong><small>${stock.low_stock?"Replenishment required":"Available for allocation"}</small></div><div><span>Stock value</span><strong>${money(stock.balance_value)}</strong><small>Weighted average cost</small></div><div><span>Recognised revenue</span><strong>${money(stock.revenue)}</strong><small>Paid credit allocations</small></div><div><span>Gross profit</span><strong>${money(stock.gross_profit)}</strong><small>Revenue less credit cost</small></div></div>`;
-    const entryForm=`<form id="credit-stock-entry-form" class="va-form va-credit-entry-form"><div class="va-fields"><div class="va-field"><label>Movement</label><select name="entry_type"><option>Purchase</option><option>Opening Balance</option><option>Adjustment</option><option>Reversal</option></select></div><div class="va-field"><label>Direction</label><select name="direction"><option>Receipt</option><option>Issue</option></select></div><div class="va-field"><label>AI credits</label><input name="credits" type="number" min="1" step="1" required></div><div class="va-field"><label>Monetary value</label><input name="monetary_value" type="number" min="0" step="0.01" value="0" required></div><div class="va-field"><label>Currency</label><input name="currency" maxlength="3" value="${esc(erp.currency||"USD")}" required></div><div class="va-field"><label>Reference</label><input name="reference" maxlength="140"></div><div class="va-field full"><label>Notes</label><textarea name="notes" rows="2"></textarea></div></div><div class="va-form-actions"><button class="va-button">Post movement</button></div></form>`;
+    const metrics=`<div class="va-credit-metrics va-credit-metrics-wide"><div><span>Credits in stock</span><strong>${number(stock.balance_credits)}</strong><small>${stock.low_stock?"Replenishment required":"Ready to allocate"}</small></div><div><span>Inventory value</span><strong>${money(stock.balance_value)}</strong><small>Cost of unallocated credits</small></div><div><span>Credits purchased</span><strong>${number(stock.received_credits)}</strong><small>Total provider capacity received</small></div><div><span>Credits allocated</span><strong>${number(stock.allocated_credits)}</strong><small>Subscriptions and top ups</small></div><div><span>Sales revenue</span><strong>${money(stock.revenue)}</strong><small>Completed credit sales</small></div><div><span>Gross profit</span><strong>${money(stock.gross_profit)}</strong><small>${money(stock.revenue)} less ${money(stock.cogs)} cost</small></div></div>`;
+    const purchaseForm=`<form id="credit-purchase-form" class="va-form va-credit-entry-form"><div class="va-credit-purchase-grid"><div class="va-fields"><div class="va-field"><label>Receipt type</label><select name="entry_type"><option>Purchase</option><option>Opening Balance</option></select></div><div class="va-field"><label>Currency</label><input name="currency" maxlength="3" value="${esc(erp.currency||"USD")}" required></div><div class="va-field"><label>Amount paid</label><input name="monetary_value" type="number" min="0.01" step="0.01" value="10.00" required></div><div class="va-field"><label>Provider credits per ${esc(erp.currency||"USD")}</label><input name="credits_per_currency_unit" type="number" min="0.000001" step="any" value="${esc(stock.purchase_rate||"")}" placeholder="100000000" required></div><div class="va-field full"><label>Provider reference</label><input name="reference" maxlength="140" placeholder="Invoice or purchase reference"></div></div><aside class="va-credit-calculator" aria-live="polite"><span>Credits to receive</span><strong id="credit-purchase-total">0</strong><div><span>Cost per million</span><b id="credit-cost-million">${money(0)}</b></div><div><span>Projected stock balance</span><b id="credit-projected-balance">${number(stock.balance_credits)}</b></div><div><span>Projected inventory value</span><b id="credit-projected-value">${money(stock.balance_value)}</b></div></aside></div><div class="va-form-actions"><button class="va-button">Add credit stock</button></div></form>`;
+    const adjustmentForm=`<details class="va-credit-adjustment"><summary>Manual stock adjustment</summary><form id="credit-stock-entry-form" class="va-form va-credit-entry-form"><div class="va-fields"><div class="va-field"><label>Movement</label><select name="entry_type"><option>Adjustment</option><option>Reversal</option></select></div><div class="va-field"><label>Direction</label><select name="direction"><option>Receipt</option><option>Issue</option></select></div><div class="va-field"><label>AI credits</label><input name="credits" type="number" min="1" step="1" required></div><div class="va-field"><label>Monetary value</label><input name="monetary_value" type="number" min="0" step="0.01" value="0" required></div><div class="va-field"><label>Currency</label><input name="currency" maxlength="3" value="${esc(erp.currency||"USD")}" required></div><div class="va-field"><label>Reference</label><input name="reference" maxlength="140" required></div></div><div class="va-form-actions"><button class="va-button secondary">Post adjustment</button></div></form></details>`;
     const ledger=table([
       ["Date",row=>esc(row.posting_datetime)],
       ["Movement",row=>`<strong>${esc(row.entry_type)}</strong><br><span class="muted">${esc(row.direction)}</span>`],
       ["Credits",row=>number(row.credits)],
-      ["Value",row=>money(Math.abs(Number(row.inventory_value||0)))],
-      ["Revenue",row=>money(row.revenue)],
-      ["COGS",row=>money(row.cogs)],
-      ["Balance",row=>`<strong>${number(row.balance_credits)}</strong><br><span class="muted">${money(row.balance_value)}</span>`],
+      ["Movement value",row=>money(row.direction==="Receipt"?Math.abs(Number(row.inventory_value||0)):row.revenue)],
+      ["Cost",row=>money(row.cogs)],
+      ["Profit",row=>money(row.gross_profit)],
+      ["Stock balance",row=>`<strong>${number(row.balance_credits)}</strong><br><span class="muted">${money(row.balance_value)} inventory</span>`],
       ["ERPNext",row=>`${pill(row.erpnext_status||"Not Applicable")}${row.erpnext_journal_entry?`<br><span class="muted">${esc(row.erpnext_journal_entry)}</span>`:""}`],
       ["Action",row=>["Pending","Failed"].includes(row.erpnext_status)?`<button class="va-button secondary" data-post-credit-entry="${esc(row.name)}">Post</button>`:"—"],
     ],stock.ledger||[],{title:"No credit movements",description:"Record your opening balance or first credit purchase."});
+    const economicsRows=stock.cost_basis_available?(stock.plan_economics||[]):[];
+    const planEconomics=table([
+      ["Plan",row=>`<strong>${esc(row.plan_name)}</strong><br><span class="muted">${esc(row.currency)} ${number(row.monthly_price)} monthly</span>`],
+      ["Credits allocated",row=>number(row.monthly_token_limit)],
+      ["Estimated cost",row=>money(row.estimated_cogs)],
+      ["Estimated gross profit",row=>`<strong>${money(row.estimated_gross_profit)}</strong>`],
+      ["Stock after one sale",row=>number(row.credits_after_sale)],
+    ],economicsRows,{title:"Add credit stock to calculate margins",description:"Plan economics appear when inventory has an acquisition cost."});
     const accountingForm=`<form id="credit-accounting-form" class="va-form va-credit-accounting-form"><div class="va-check-grid"><label><input type="checkbox" name="enabled" ${erp.enabled?"checked":""}> Enable ERPNext posting</label><label><input type="checkbox" name="auto_post" ${erp.auto_post?"checked":""}> Post completed sales automatically</label></div><div class="va-fields"><div class="va-field full"><label>ERPNext URL</label><input name="url" type="url" value="${esc(erp.url||"")}" placeholder="https://erp.example.com"></div><div class="va-field"><label>API key ${erp.configured?'<span class="va-field-state">Configured</span>':""}</label><input name="api_key" type="password" autocomplete="new-password"></div><div class="va-field"><label>API secret</label><input name="api_secret" type="password" autocomplete="new-password"></div><div class="va-field"><label>Company</label><input name="company" value="${esc(erp.company||"")}"></div><div class="va-field"><label>Currency</label><input name="currency" value="${esc(erp.currency||"USD")}" maxlength="3"></div><div class="va-field"><label>Bank or receivable account</label><input name="receivable_account" value="${esc(erp.receivable_account||"")}"></div><div class="va-field"><label>Sales account</label><input name="sales_account" value="${esc(erp.sales_account||"")}"></div><div class="va-field"><label>AI credit inventory account</label><input name="inventory_account" value="${esc(erp.inventory_account||"")}"></div><div class="va-field"><label>Cost of sales account</label><input name="cogs_account" value="${esc(erp.cogs_account||"")}"></div><div class="va-field"><label>Cost centre</label><input name="cost_center" value="${esc(erp.cost_center||"")}"></div></div><div class="va-form-actions"><button class="va-button">Save accounting setup</button><button type="button" class="va-button secondary" id="test-credit-accounting" ${erp.enabled?"":"disabled"}>Test connection</button>${pill(erp.connection_status||"Not Configured")}</div></form>`;
-    return `${metrics}<div class="va-grid two">${section("Record stock movement","Add purchased capacity, set an opening balance or post a controlled adjustment.",entryForm)}${section("ERPNext accounting","Map credit sales and cost of sales to a remote ERPNext company.",accountingForm)}</div>${section("Credit stock ledger","Permanent movements with running quantity, value, revenue and gross profit.",ledger)}`;
+    return `${metrics}<div class="va-grid two va-credit-command-grid">${section("Add provider credits","Record the amount paid and provider exchange rate. Credits and inventory cost are calculated automatically.",purchaseForm)}${section("Plan unit economics","Monthly allocations use the current weighted acquisition cost.",planEconomics)}</div>${adjustmentForm}${section("Credit stock ledger","Every purchase and completed sale updates credit quantity, monetary value, cost and profit.",ledger)}${section("ERPNext accounting","Map credit sales and cost of sales to a remote ERPNext company.",accountingForm)}`;
   }
   function managementPanel(workspace) {
     if (!workspace) return "";
@@ -166,6 +175,31 @@
     document.querySelector("#close-management")?.addEventListener("click",closeManagement);
     document.querySelector(".va-admin-drawer-backdrop")?.addEventListener("click",event=>{if(event.target===event.currentTarget)closeManagement();});
     document.onkeydown=event=>{if(event.key==="Escape"&&selectedWorkspace)closeManagement();};
+    const creditPurchaseForm=document.querySelector("#credit-purchase-form");
+    const refreshCreditPurchase=()=>{
+      if(!creditPurchaseForm)return;
+      const amount=Number(creditPurchaseForm.monetary_value.value||0);
+      const rate=Number(creditPurchaseForm.credits_per_currency_unit.value||0);
+      const credits=Math.max(Math.floor(amount*rate),0);
+      const currency=(creditPurchaseForm.currency.value||"USD").toUpperCase();
+      const formatMoney=value=>`${currency} ${Number(value||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:6})}`;
+      const total=document.querySelector("#credit-purchase-total");
+      const cost=document.querySelector("#credit-cost-million");
+      const balance=document.querySelector("#credit-projected-balance");
+      const value=document.querySelector("#credit-projected-value");
+      if(total)total.textContent=number(credits);
+      if(cost)cost.textContent=formatMoney(credits?amount/credits*1000000:0);
+      if(balance)balance.textContent=number(Number(data.credit_stock?.balance_credits||0)+credits);
+      if(value)value.textContent=formatMoney(Number(data.credit_stock?.balance_value||0)+amount);
+    };
+    creditPurchaseForm?.querySelectorAll("input").forEach(input=>input.addEventListener("input",refreshCreditPurchase));
+    refreshCreditPurchase();
+    creditPurchaseForm?.addEventListener("submit",async event=>{
+      event.preventDefault();const button=creditPurchaseForm.querySelector("button");button.disabled=true;button.textContent="Adding...";
+      const values=Object.fromEntries(new FormData(creditPurchaseForm).entries());
+      try{const result=await call("verityai_saas.api.admin.record_credit_purchase",{values});data.credit_stock=result.summary;alert(`${number(result.credits)} credits added to stock.`);render();}
+      catch(error){alert(error.message,true);button.disabled=false;button.textContent="Add credit stock";}
+    });
     const creditEntryForm=document.querySelector("#credit-stock-entry-form");
     creditEntryForm?.addEventListener("submit",async event=>{
       event.preventDefault();const button=creditEntryForm.querySelector("button");button.disabled=true;button.textContent="Posting...";

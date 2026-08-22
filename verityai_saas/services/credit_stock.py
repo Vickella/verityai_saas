@@ -1,5 +1,6 @@
 import ipaddress
 import socket
+from decimal import Decimal, InvalidOperation, ROUND_FLOOR
 from urllib.parse import quote, urljoin, urlsplit
 
 import frappe
@@ -10,6 +11,24 @@ from frappe.utils import cint, flt, now_datetime, nowdate
 LEDGER = "VerityAI Credit Stock Ledger"
 SETTINGS = "VerityAI ERPNext Accounting Settings"
 TIMEOUT = (5, 25)
+MAX_CREDITS = 9_000_000_000_000_000
+
+
+def calculate_credits(monetary_value, credits_per_currency_unit):
+	"""Convert provider spend to whole credits without binary floating-point drift."""
+	try:
+		amount = Decimal(str(monetary_value or 0))
+		rate = Decimal(str(credits_per_currency_unit or 0))
+	except (InvalidOperation, ValueError, TypeError):
+		frappe.throw("Enter a valid purchase amount and provider rate.", frappe.ValidationError)
+	if amount <= 0:
+		frappe.throw("Purchase amount must be greater than zero.", frappe.ValidationError)
+	if rate <= 0:
+		frappe.throw("Provider credits per currency unit must be greater than zero.", frappe.ValidationError)
+	credits = int((amount * rate).to_integral_value(rounding=ROUND_FLOOR))
+	if credits <= 0 or credits > MAX_CREDITS:
+		frappe.throw("Calculated credits are outside the supported range.", frappe.ValidationError)
+	return credits
 
 
 def _password_present(doc, fieldname):
@@ -56,13 +75,36 @@ def summary(limit=100):
 		as_dict=True,
 	)[0] if frappe.db.exists("DocType", LEDGER) else frappe._dict()
 	settings = frappe.get_single(SETTINGS) if frappe.db.exists("DocType", SETTINGS) else frappe._dict()
+	balance_credits = cint(last.balance_credits) if last else 0
+	balance_value = flt(last.balance_value, 2) if last else 0
+	average_unit_cost = (balance_value / balance_credits) if balance_credits > 0 else 0
+	plans = []
+	if frappe.db.exists("DocType", "VerityAI Plan"):
+		for plan in frappe.get_all(
+			"VerityAI Plan",
+			filters={"active": 1, "monthly_price": [">", 0]},
+			fields=["name", "plan_name", "currency", "monthly_price", "monthly_token_limit"],
+			order_by="monthly_price asc",
+		):
+			credits = cint(plan.monthly_token_limit)
+			estimated_cogs = flt(credits * average_unit_cost, 2)
+			plans.append({
+				**plan,
+				"estimated_cogs": estimated_cogs,
+				"estimated_gross_profit": flt(plan.monthly_price - estimated_cogs, 2),
+				"credits_after_sale": balance_credits - credits,
+			})
 	return {
-		"balance_credits": cint(last.balance_credits) if last else 0,
-		"balance_value": flt(last.balance_value, 2) if last else 0,
+		"balance_credits": balance_credits,
+		"balance_value": balance_value,
+		"average_unit_cost": average_unit_cost,
 		"received_credits": cint(aggregates.get("receipts")), "allocated_credits": cint(aggregates.get("issues")),
 		"revenue": flt(aggregates.get("revenue"), 2), "cogs": flt(aggregates.get("cogs"), 2),
 		"gross_profit": flt(aggregates.get("gross_profit"), 2),
 		"low_stock": bool(last and cint(last.balance_credits) < 0),
+		"cost_basis_available": bool(balance_credits > 0 and balance_value > 0),
+		"purchase_rate": flt(settings.get("credits_per_currency_unit"), 6),
+		"plan_economics": plans,
 		"ledger": frappe.get_all(LEDGER, fields=["name", "posting_datetime", "entry_type", "direction", "credits", "unit_cost", "inventory_value", "revenue", "cogs", "gross_profit", "balance_credits", "balance_value", "currency", "workspace", "billing_event", "reference", "erpnext_status", "erpnext_journal_entry", "erpnext_error"], order_by="posting_datetime desc, creation desc", limit=cint(limit or 100)) if frappe.db.exists("DocType", LEDGER) else [],
 		"erpnext": {
 			"enabled": bool(settings.get("enabled")), "auto_post": bool(settings.get("auto_post")),
@@ -74,6 +116,30 @@ def summary(limit=100):
 			"last_checked_on": settings.get("last_checked_on"), "last_error": settings.get("last_error") or "",
 		},
 	}
+
+
+def record_purchase(monetary_value, credits_per_currency_unit, currency="USD", reference=None, notes=None, entry_type="Purchase"):
+	if entry_type not in {"Purchase", "Opening Balance"}:
+		frappe.throw("Invalid credit receipt type.", frappe.ValidationError)
+	credits = calculate_credits(monetary_value, credits_per_currency_unit)
+	settings = frappe.get_single(SETTINGS)
+	settings.credits_per_currency_unit = flt(credits_per_currency_unit, 6)
+	if currency:
+		settings.currency = str(currency).strip().upper()[:3]
+	settings.save(ignore_permissions=True)
+	return record_entry(
+		entry_type,
+		credits,
+		monetary_value,
+		"Receipt",
+		settings.currency or "USD",
+		reference=reference,
+		notes=notes,
+		source_key=(
+			f"provider:{entry_type.lower().replace(' ', '-')}:{settings.currency or 'USD'}:{str(reference).strip()}"
+			if reference else None
+		),
+	)
 
 
 def record_entry(entry_type, credits, monetary_value=0, direction=None, currency="USD", workspace=None, billing_event=None, reference=None, notes=None, source_key=None):

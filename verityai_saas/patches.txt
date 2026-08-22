@@ -19,3 +19,4 @@ verityai_saas.patches.v0_15.paynow_live_verification
 verityai_saas.patches.v0_16.hybrid_pricing_credit_stock
 verityai_saas.patches.v0_17.workspace_invitation_expiry
 verityai_saas.patches.v0_18.paynow_gateway_test
+verityai_saas.patches.v0_19.credit_stock_unit_economics

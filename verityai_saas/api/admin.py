@@ -216,6 +216,20 @@ def record_credit_stock_entry(values):
 
 @frappe.whitelist(methods=["POST"])
 @endpoint
+def record_credit_purchase(values):
+	require_platform_admin()
+	require_admin_reauthentication()
+	values = json_value(values, {})
+	doc = credit_stock.record_purchase(
+		values.get("monetary_value"), values.get("credits_per_currency_unit"),
+		values.get("currency") or "USD", values.get("reference"), values.get("notes"),
+		values.get("entry_type") or "Purchase",
+	)
+	return {"entry": doc.name, "credits": cint(doc.credits), "summary": credit_stock.summary()}
+
+
+@frappe.whitelist(methods=["POST"])
+@endpoint
 def configure_credit_accounting(values):
 	require_platform_admin()
 	require_admin_reauthentication()

@@ -31,7 +31,24 @@ def get(workspace):
 @endpoint
 def manual_event(workspace, event_type, amount=0, status="Pending", reference=None):
 	require_admin_reauthentication()
-	return {"event": billing.create_billing_event(workspace, event_type, amount, status, provider_reference=reference)}
+	event = billing.create_billing_event(workspace, event_type, amount, status, provider_reference=reference)
+	if event_type == "Payment" and status == "Completed":
+		subscription = frappe.db.get_value(
+			"VerityAI Subscription",
+			{"workspace": workspace},
+			["plan", "billing_cycle"],
+			as_dict=True,
+			order_by="creation desc",
+		)
+		if subscription and subscription.plan:
+			frappe.db.set_value("VerityAI Billing Event", event, {
+				"transaction_kind": "Subscription",
+				"target_plan": subscription.plan,
+				"billing_cycle": subscription.billing_cycle or "Monthly",
+			})
+			from verityai_saas.services.credit_stock import record_billing_allocation
+			record_billing_allocation(event)
+	return {"event": event}
 
 
 @frappe.whitelist(methods=["POST"])

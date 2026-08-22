@@ -525,6 +525,8 @@ def ensure_doctypes():
 
 	ensure_doctype("VerityAI ERPNext Accounting Settings", [
 		field("enabled", "Enabled", "Check"), field("auto_post", "Post Automatically", "Check"),
+		field("credit_stock_section", "Credit Stock", "Section Break"),
+		field("credits_per_currency_unit", "Provider Credits per Currency Unit", "Float", default=0),
 		field("erpnext_url", "ERPNext URL"), field("api_key", "API Key", "Password"), field("api_secret", "API Secret", "Password"),
 		field("company", "Company"), field("currency", "Currency", "Link", options="Currency", default="USD"),
 		field("receivable_account", "Bank or Receivable Account"), field("sales_account", "Sales Account"),
