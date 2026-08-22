@@ -1,0 +1,28 @@
+# Python generated files
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Local audit and agent staging workspaces
+.task_stage/
+.codex_stage/
+.app-hardening/
+.production-audit/
+.seo-strengthening/
+
+# Browser automation profiles and reports
+edge-profile*/
+playwright-report/
+test-results/
+lighthouse-*.json
+production-*.png
+seo-*.png
+hero-blend*.png
+
+# Common local files
+.DS_Store
+Thumbs.db
+*.log
