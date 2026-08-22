@@ -381,7 +381,7 @@ def ensure_doctypes():
 		field("subscription", "Subscription", "Link", options="VerityAI Subscription"), field("event_type", "Event Type", "Select", options="Invoice\nPayment\nCredit\nAdjustment\nTop-Up\nRefund\nSubscription Activation", reqd=1),
 		field("amount", "Amount", "Currency"), field("currency", "Currency", "Link", options="Currency"), field("status", "Status", "Select", options="Pending\nCompleted\nFailed\nCancelled", default="Pending"),
 		field("provider", "Provider"), field("provider_reference", "Provider Reference"), field("period_start", "Period Start", "Date"), field("period_end", "Period End", "Date"),
-		field("transaction_kind", "Transaction Kind", "Select", options="Subscription\nCredit Top-Up", default="Subscription"),
+		field("transaction_kind", "Transaction Kind", "Select", options="Subscription\nCredit Top-Up\nGateway Test", default="Subscription"),
 		field("target_plan", "Target Plan", "Link", options="VerityAI Plan"), field("credit_pack", "Credit Pack", "Link", options="VerityAI Credit Pack"),
 		field("purchased_credits", "Purchased AI Credits", "Int"), field("gross_amount", "Gross Amount", "Currency"),
 		field("discount_amount", "Discount Amount", "Currency"), field("promotion", "Promotion", "Link", options="VerityAI Promotion"),

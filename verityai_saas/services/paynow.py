@@ -7,7 +7,7 @@ from urllib.parse import parse_qsl, urlencode, urlparse
 
 import frappe
 import requests
-from frappe.utils import add_to_date, cint, flt, get_url, now_datetime
+from frappe.utils import add_to_date, cint, flt, get_url, now_datetime, validate_email_address
 
 from verityai_saas.services import billing
 
@@ -207,12 +207,17 @@ def _verify_live_checkout(checkout_url):
 	return True
 
 
-def _public_urls(payment_reference, workspace):
+def _public_urls(payment_reference, workspace, operator_test=False):
 	base_url = get_url().rstrip("/")
-	return_query = urlencode({"workspace": workspace, "payment": payment_reference})
+	if operator_test:
+		return_query = urlencode({"paynow_test": payment_reference})
+		return_path = "/verityai/admin"
+	else:
+		return_query = urlencode({"workspace": workspace, "payment": payment_reference})
+		return_path = "/verityai/billing"
 	result_query = urlencode({"payment": payment_reference})
 	return (
-		f"{base_url}/verityai/billing?{return_query}",
+		f"{base_url}{return_path}?{return_query}",
 		f"{base_url}/api/method/verityai_saas.api.paynow.result?{result_query}",
 	)
 
@@ -221,15 +226,27 @@ def _response_snapshot(values):
 	return json.dumps({key: value for key, value in values.items() if key != "hash"}, sort_keys=True)
 
 
-def _initiate_gateway_event(workspace_name, event_type, amount, additional_info, metadata=None):
+def _initiate_gateway_event(
+	workspace_name,
+	event_type,
+	amount,
+	additional_info,
+	metadata=None,
+	*,
+	auth_email=None,
+	operator_test=False,
+):
 	integration_id, integration_key = _credentials()
 	payment = billing.create_billing_event(workspace_name, event_type, amount, "Pending", provider="Paynow")
 	frappe.db.set_value("VerityAI Billing Event", payment, {"gateway_status": "Created", **(metadata or {})})
-	return_url, result_url = _public_urls(payment, workspace_name)
+	return_url, result_url = _public_urls(payment, workspace_name, operator_test=operator_test)
 	payload = {
 		"id": integration_id, "reference": payment, "amount": f"{amount:.2f}", "additionalinfo": additional_info,
-		"returnurl": return_url, "resulturl": result_url, "merchanttrace": payment[:32], "status": "Message",
+		"returnurl": return_url, "resulturl": result_url,
 	}
+	if auth_email:
+		payload["authemail"] = auth_email
+	payload.update({"merchanttrace": payment[:32], "status": "Message"})
 	payload["hash"] = generate_hash(payload.values(), integration_key)
 	try:
 		response = requests.post(INITIATE_URL, data=payload, timeout=20, allow_redirects=False)
@@ -248,19 +265,49 @@ def _initiate_gateway_event(workspace_name, event_type, amount, additional_info,
 		raise
 	checkout_url = _safe_paynow_url(values.get("browserurl"), "checkout")
 	poll_url = _safe_paynow_url(values.get("pollurl"), "poll")
-	try:
-		_verify_live_checkout(checkout_url)
-	except frappe.ValidationError:
-		frappe.db.set_value(
-			"VerityAI Billing Event",
-			payment,
-			{"status": "Failed", "gateway_status": "Paynow Test Mode", "gateway_response_json": _response_snapshot(values)},
-		)
-		raise
-	frappe.db.set_value("VerityAI Billing Event", payment, {"checkout_url": checkout_url, "poll_url": poll_url, "gateway_status": values.get("status"), "gateway_response_json": _response_snapshot(values), "live_checkout_verified": 1})
-	from verityai_saas.services.billing_documents import ensure_invoice_for_payment
-	ensure_invoice_for_payment(payment)
+	if not operator_test:
+		try:
+			_verify_live_checkout(checkout_url)
+		except frappe.ValidationError:
+			frappe.db.set_value(
+				"VerityAI Billing Event",
+				payment,
+				{"status": "Failed", "gateway_status": "Paynow Test Mode", "gateway_response_json": _response_snapshot(values)},
+			)
+			raise
+	frappe.db.set_value("VerityAI Billing Event", payment, {
+		"checkout_url": checkout_url,
+		"poll_url": poll_url,
+		"gateway_status": values.get("status"),
+		"gateway_response_json": _response_snapshot(values),
+		"live_checkout_verified": 0 if operator_test else 1,
+	})
+	if not operator_test:
+		from verityai_saas.services.billing_documents import ensure_invoice_for_payment
+		ensure_invoice_for_payment(payment)
 	return {"payment": payment, "checkout_url": checkout_url, "status": "Pending"}
+
+
+def initiate_test_transaction(workspace_name, merchant_email):
+	"""Create a Paynow test-mode transaction that can never fulfil customer value."""
+	if operating_mode() != "Test":
+		frappe.throw("Switch Paynow to Test mode before starting an integration test.", frappe.ValidationError)
+	_credentials()
+	merchant_email = str(merchant_email or "").strip().lower()
+	if not validate_email_address(merchant_email):
+		frappe.throw("Enter the email address used to sign in to the Paynow merchant account.", frappe.ValidationError)
+	workspace = frappe.get_doc("VerityAI Workspace", workspace_name)
+	if (workspace.currency or "USD").upper() != "USD":
+		frappe.throw("Select a USD workspace for the Paynow integration test.", frappe.ValidationError)
+	return _initiate_gateway_event(
+		workspace.name,
+		"Payment",
+		1.00,
+		"VerityAI Paynow integration test",
+		{"transaction_kind": "Gateway Test", "gross_amount": 1.00, "billing_cycle": "Manual"},
+		auth_email=merchant_email,
+		operator_test=True,
+	)
 
 
 def initiate_checkout(workspace_name, plan_name, billing_cycle="Monthly", promotion_code=None):
@@ -350,6 +397,18 @@ def apply_status(payment_name, values):
 		updates["poll_url"] = _safe_paynow_url(values["pollurl"], "poll")
 	status_key = status.lower()
 	if status_key in PAID_STATUSES and payment.status not in {"Completed", "Cancelled"}:
+		if payment.transaction_kind == "Gateway Test":
+			# A successful fake payment proves callback and polling integrity only. It
+			# must never activate a subscription, allocate credits, issue a receipt,
+			# or send a customer payment confirmation.
+			updates.update({"status": "Completed", "paid_on": frappe.utils.now_datetime()})
+			frappe.db.set_value("VerityAI Billing Event", payment.name, updates)
+			return {
+				"payment": payment.name,
+				"status": "Completed",
+				"gateway_status": status,
+				"transaction_kind": "Gateway Test",
+			}
 		if operating_mode() != "Production" or not cint(payment.live_checkout_verified):
 			frappe.throw(
 				"Payment fulfilment was blocked because this transaction was not verified as a live Paynow checkout.",

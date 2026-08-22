@@ -133,6 +133,63 @@ class TestPaynowBilling(FrappeTestCase):
 		with self.assertRaisesRegex(frappe.ValidationError, "test mode"):
 			paynow.initiate_checkout(self.workspace, self.plan)
 
+	def test_operator_can_start_isolated_test_transaction(self):
+		settings = frappe.get_single("VerityAI Platform Settings")
+		settings.paynow_environment = "Test"
+		settings.save(ignore_permissions=True)
+		response_values = {
+			"Status": "Ok",
+			"BrowserUrl": "https://www.paynow.co.zw/Payment/ConfirmPayment/test-flow",
+			"PollUrl": "https://www.paynow.co.zw/Interface/CheckPayment/?guid=test-flow",
+		}
+		with (
+			patch.object(paynow, "_credentials", return_value=("1201", self.integration_key)),
+			patch.object(paynow, "get_url", return_value="https://app.example.com"),
+			patch.object(paynow.requests, "post", return_value=FakeResponse(self.signed_message(response_values))) as post,
+		):
+			result = paynow.initiate_test_transaction(self.workspace, "merchant@example.com")
+
+		payload = post.call_args.kwargs["data"]
+		self.assertEqual(payload["authemail"], "merchant@example.com")
+		self.assertIn("/verityai/admin?paynow_test=", payload["returnurl"])
+		payment = frappe.get_doc("VerityAI Billing Event", result["payment"])
+		self.assertEqual(payment.transaction_kind, "Gateway Test")
+		self.assertEqual(payment.status, "Pending")
+		self.assertEqual(payment.live_checkout_verified, 0)
+		self.assertFalse(payment.target_plan)
+
+	def test_gateway_test_success_never_fulfils_customer_value(self):
+		settings = frappe.get_single("VerityAI Platform Settings")
+		settings.paynow_environment = "Test"
+		settings.save(ignore_permissions=True)
+		before_plan = frappe.db.get_value("VerityAI Subscription", {"workspace": self.workspace}, "plan")
+		before_credits = frappe.db.get_value("VerityAI Usage Wallet", {"workspace": self.workspace}, "tokens_remaining")
+		payment = billing.create_billing_event(self.workspace, "Payment", 1, "Pending", provider="Paynow")
+		frappe.db.set_value("VerityAI Billing Event", payment, {
+			"transaction_kind": "Gateway Test",
+			"poll_url": "https://www.paynow.co.zw/interface/checkpayment/test",
+			"live_checkout_verified": 0,
+		})
+		result = paynow.apply_status(payment, {
+			"reference": payment,
+			"paynowreference": "TEST-FAKE-SUCCESS",
+			"amount": "1.00",
+			"status": "Paid",
+		})
+
+		self.assertEqual(result["status"], "Completed")
+		self.assertEqual(result["transaction_kind"], "Gateway Test")
+		self.assertEqual(frappe.db.get_value("VerityAI Subscription", {"workspace": self.workspace}, "plan"), before_plan)
+		self.assertEqual(frappe.db.get_value("VerityAI Usage Wallet", {"workspace": self.workspace}, "tokens_remaining"), before_credits)
+		self.assertFalse(frappe.db.exists("VerityAI Billing Document", {
+			"billing_event": payment,
+			"document_type": "Receipt",
+		}))
+
+	def test_operator_test_is_rejected_in_production_mode(self):
+		with self.assertRaisesRegex(frappe.ValidationError, "Switch Paynow to Test mode"):
+			paynow.initiate_test_transaction(self.workspace, "merchant@example.com")
+
 	def test_checkout_verifies_signature_before_returning_redirect(self):
 		response_values = {
 			"Status": "Ok",

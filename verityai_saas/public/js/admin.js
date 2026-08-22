@@ -6,6 +6,7 @@
   let adminView = "overview";
   let workspaceSearch = "";
   let searchTimer = null;
+  let paynowTestPayment = new URLSearchParams(window.location.search).get("paynow_test") || "";
 
   const esc = value => String(value ?? "").replace(/[&<>'"]/g, char => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[char]));
   const number = value => new Intl.NumberFormat().format(Number(value || 0));
@@ -72,7 +73,9 @@
     const configured=Boolean(gateway.configured);
     const live=Boolean(gateway.checkout_enabled);
     const gatewayForm=data.can_configure_platform?`<form id="admin-paynow-form" class="va-payment-gateway-form va-form"><div class="va-settings-block"><div class="va-fields"><div class="va-field"><label>Operating mode</label><select name="environment"><option ${gateway.environment!=="Production"?"selected":""}>Test</option><option ${gateway.environment==="Production"?"selected":""}>Production</option></select></div><div class="va-field"><label>Paynow integration ID</label><input name="integration_id" required maxlength="140" value="${esc(gateway.integration_id||"")}" autocomplete="off" placeholder="e.g. 12345"></div><div class="va-field"><label>Integration key ${configured?'<span class="va-field-state">Configured</span>':""}</label><input name="integration_key" type="password" ${configured?"":"required"} autocomplete="new-password" placeholder="${configured?"Leave blank to keep the current key":"Paste the key from Paynow"}"></div></div></div><div class="va-form-actions"><button class="va-button">${configured?"Save Paynow settings":"Connect Paynow"}</button></div></form>`:`<div class="va-callout warning"><strong>Platform administrator required</strong></div>`;
-    const gatewayCard=`<section class="va-payment-gateway-card"><div class="va-payment-gateway-brand"><div class="va-payment-mark" aria-hidden="true">P</div><div><p class="eyebrow">Payment gateway</p><h2>Paynow</h2><p>Accept secure hosted checkout without handling card numbers inside VerityAI.</p></div><div class="va-payment-connection"><span class="va-status-dot ${configured?"good":""}"></span>${pill(!configured?"Not configured":live?"Production":"Test")}</div></div><div class="va-payment-methods"><div><span class="va-method-icon">CARD</span><strong>Debit & credit cards</strong><small>Visa and Mastercard through Paynow hosted checkout</small></div><div><span class="va-method-icon">MOB</span><strong>Mobile & local methods</strong><small>Available methods are selected securely on Paynow</small></div></div>${gatewayForm}<footer><span>Credential source</span><strong>${esc(gateway.source||"Not configured")}</strong></footer></section>`;
+    const workspaceOptions=(data.workspaces||[]).filter(row=>(row.currency||"USD")==="USD").map(row=>`<option value="${esc(row.name)}">${esc(row.business_name||row.workspace_name||row.name)}</option>`).join("");
+    const testForm=configured&&gateway.environment==="Test"&&data.can_configure_platform?`<div class="va-settings-block"><h3>Integration test</h3><form id="admin-paynow-test-form" class="va-form"><div class="va-fields"><div class="va-field"><label>Test workspace</label><select name="workspace" required>${workspaceOptions}</select></div><div class="va-field"><label>Paynow merchant email</label><input name="merchant_email" type="email" required autocomplete="email" placeholder="Merchant account login email"></div></div><div class="va-form-actions"><button class="va-button">Start test transaction</button>${paynowTestPayment?`<button type="button" class="va-button secondary" id="poll-paynow-test">Check test result</button>`:""}</div></form></div>`:"";
+    const gatewayCard=`<section class="va-payment-gateway-card"><div class="va-payment-gateway-brand"><div class="va-payment-mark" aria-hidden="true">P</div><div><p class="eyebrow">Payment gateway</p><h2>Paynow</h2><p>Accept secure hosted checkout without handling card numbers inside VerityAI.</p></div><div class="va-payment-connection"><span class="va-status-dot ${configured?"good":""}"></span>${pill(!configured?"Not configured":live?"Production":"Test")}</div></div><div class="va-payment-methods"><div><span class="va-method-icon">CARD</span><strong>Debit & credit cards</strong><small>Visa and Mastercard through Paynow hosted checkout</small></div><div><span class="va-method-icon">MOB</span><strong>Mobile & local methods</strong><small>Available methods are selected securely on Paynow</small></div></div>${gatewayForm}${testForm}<footer><span>Credential source</span><strong>${esc(gateway.source||"Not configured")}</strong></footer></section>`;
     return `<div class="va-payment-admin-layout">${gatewayCard}<aside class="va-payment-readiness"><p class="eyebrow">Gateway status</p><h3>${live?"Production mode enabled":gateway.environment==="Production"?"Credentials required":"Test mode"}</h3><p>${live?"Customer checkout requests will be sent to Paynow. Merchant activation and available payment methods remain controlled by Paynow.":gateway.environment==="Production"?"Save valid Paynow credentials to enable checkout.":"Customer checkout remains disabled until Production mode is selected."}</p></aside></div>${section("Billing ledger","Recent payments, top-ups, refunds and provider updates.",eventTable,`<a class="va-button secondary" href="/api/method/verityai_saas.api.billing.reconciliation_export">Export reconciliation</a>`)}`;
   }
 
@@ -200,6 +203,18 @@
       const values=Object.fromEntries(new FormData(paynowForm).entries());
       try{const status=await call("verityai_saas.api.admin.configure_paynow",{values});data.paynow=status;data.paynow_configured=Boolean(status.checkout_enabled);alert(status.checkout_enabled?"Paynow production mode enabled.":"Paynow settings saved in test mode.");render();}
       catch(error){alert(error.message,true);button.disabled=false;button.textContent=data.paynow_configured?"Save gateway changes":"Connect Paynow";}
+    });
+    const paynowTestForm=document.querySelector("#admin-paynow-test-form");
+    paynowTestForm?.addEventListener("submit",async event=>{
+      event.preventDefault();const button=paynowTestForm.querySelector("button");button.disabled=true;button.textContent="Connecting...";
+      const values=Object.fromEntries(new FormData(paynowTestForm).entries());
+      try{const result=await call("verityai_saas.api.admin.start_paynow_test",values);paynowTestPayment=result.payment;window.location.assign(result.checkout_url);}
+      catch(error){alert(error.message,true);button.disabled=false;button.textContent="Start test transaction";}
+    });
+    document.querySelector("#poll-paynow-test")?.addEventListener("click",async event=>{
+      const button=event.currentTarget;button.disabled=true;button.textContent="Checking...";
+      try{const result=await call("verityai_saas.api.admin.poll_paynow_test",{payment:paynowTestPayment});alert(result.status==="Completed"?"Paynow integration test completed successfully.":`Paynow test status: ${result.gateway_status||result.status}.`);if(result.status==="Completed"){paynowTestPayment="";history.replaceState({},"",location.pathname);}await load(selectedWorkspace);}
+      catch(error){alert(error.message,true);button.disabled=false;button.textContent="Check test result";}
     });
     const supportEmailForm=document.querySelector("#admin-support-email-form");
     supportEmailForm?.addEventListener("submit",async event=>{

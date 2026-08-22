@@ -179,7 +179,7 @@ def dashboard():
 		),
 		"recent_events": frappe.get_all(
 			"VerityAI Billing Event",
-			fields=["name", "workspace", "event_type", "amount", "currency", "status", "provider", "gateway_status", "gateway_reference", "creation"],
+			fields=["name", "workspace", "event_type", "transaction_kind", "amount", "currency", "status", "provider", "gateway_status", "gateway_reference", "creation"],
 			order_by="creation desc",
 			limit=50,
 		),
@@ -245,6 +245,25 @@ def configure_paynow(values):
 	require_platform_admin()
 	require_admin_reauthentication()
 	return paynow.configure(json_value(values, {}))
+
+
+@frappe.whitelist(methods=["POST"])
+@endpoint
+def start_paynow_test(workspace, merchant_email):
+	"""Start an operator-only fake transaction without customer fulfilment."""
+	require_platform_admin()
+	require_admin_reauthentication()
+	return paynow.initiate_test_transaction(workspace, merchant_email)
+
+
+@frappe.whitelist(methods=["POST"])
+@endpoint
+def poll_paynow_test(payment):
+	require_platform_admin()
+	require_admin_reauthentication()
+	if frappe.db.get_value("VerityAI Billing Event", payment, "transaction_kind") != "Gateway Test":
+		frappe.throw("This is not a Paynow integration test.", frappe.PermissionError)
+	return paynow.poll_payment(payment)
 
 
 @frappe.whitelist(methods=["POST"])
