@@ -1,0 +1,25 @@
+# VerityAI
+
+> VerityAI is a configurable AI assistant and business automation platform developed by VerityCore Consultancy (Pvt) Ltd in Zimbabwe.
+
+## Official links
+
+- Product website: https://ai.veritycore.co.zw/
+- Create an account: https://saasai.veritypack.cloud/verityai/signup
+- Sign in: https://saasai.veritypack.cloud/verityai/signin
+- Company website: https://veritycore.co.zw/
+- Support: support@veritycore.co.zw
+
+## What VerityAI does
+
+VerityAI can answer website visitor questions using approved business knowledge, capture and qualify leads, organise conversations, manage opportunities and appointments, prepare quotations, and report AI credit usage. It can be tailored around an organisation's fields, questions, permissions, business rules and approved actions.
+
+Eligible implementations can add integrations and automations for supported systems. The exact actions VerityAI can perform depend on the configured permissions, connected systems and subscription plan.
+
+## Commercial information
+
+VerityAI offers a 14 day trial and paid Launch, Growth and Scale plans. Current plan details and checkout are available on the official product website. Payments are initiated through Paynow, and VerityAI does not store payment card details.
+
+## Company
+
+VerityAI is a product of VerityCore Consultancy (Pvt) Ltd, a Zimbabwean business technology company developing AI, business management and automation software.

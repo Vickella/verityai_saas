@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+  <url>
+    <loc>https://ai.veritycore.co.zw/</loc>
+    <lastmod>2026-08-15</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+    <image:image>
+      <image:loc>https://ai.veritycore.co.zw/assets/img/veritycore/verity-ai-showcase.webp</image:loc>
+      <image:title>VerityAI by VerityCore Consultancy</image:title>
+      <image:caption>Custom AI assistant and business automation platform for growing businesses</image:caption>
+    </image:image>
+  </url>
+</urlset>

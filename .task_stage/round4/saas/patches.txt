@@ -1,0 +1,16 @@
+[pre_model_sync]
+
+[post_model_sync]
+verityai_saas.patches.v0_1.bootstrap
+verityai_saas.patches.v0_2.customer_portal_route
+verityai_saas.patches.v0_3.paynow_billing
+verityai_saas.patches.v0_4.commercial_operations
+verityai_saas.patches.v0_5.secure_platform_configuration
+verityai_saas.patches.v0_6.business_natures_and_portal_polish
+verityai_saas.patches.v0_7.production_workspace_ux
+verityai_saas.patches.v0_8.ai_credits_commercial_hardening
+verityai_saas.patches.v0_9.hide_enterprise_plan
+verityai_saas.patches.v0_10.reduce_trial_allowance
+verityai_saas.patches.v0_11.transactional_email
+verityai_saas.patches.v0_12.paynow_operating_mode
+verityai_saas.patches.v0_13.platform_ai_settings

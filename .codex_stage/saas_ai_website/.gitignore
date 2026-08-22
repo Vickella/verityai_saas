@@ -1,0 +1,25 @@
+# The source folder contains the original multipage template. Publish only the
+# Production VerityCore AI landing page and the assets it actually uses.
+*
+!/.gitignore
+!/.htaccess
+!/README.md
+!/index.html
+!/robots.txt
+!/sitemap.xml
+!/site.webmanifest
+!/assets/
+/assets/*
+!/assets/css/
+/assets/css/*
+!/assets/css/verityai-landing.css
+!/assets/js/
+/assets/js/*
+!/assets/js/verityai-landing.js
+!/assets/img/
+/assets/img/*
+!/assets/img/veritycore/
+/assets/img/veritycore/*
+!/assets/img/veritycore/veritycore-icon-square.webp
+!/assets/img/veritycore/verity-ai-showcase.webp
+!/assets/img/veritycore/verity-ai-hero-v2.webp

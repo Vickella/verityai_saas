@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width,initial-scale=1">
+	<title>{{ title }}</title>
+	<link rel="stylesheet" href="/assets/verityai_saas/css/portal.css?v={{ asset_version }}">
+</head>
+<body class="va-admin-page{% if not admin_unlocked %} va-admin-locked-page{% endif %}">
+	{% if admin_unlocked %}
+	<main class="va-admin-main">
+		<header class="va-topbar">
+			<div><p class="eyebrow">VerityCore Operations</p><h1>Operator console</h1><p class="va-page-description">Monitor tenants, resolve operational risk and control commercial access.</p></div>
+			<div class="va-actions"><button type="button" id="va-admin-lock" class="va-button ghost">Lock console</button><a class="va-button secondary" href="/verityai">Open customer portal</a></div>
+		</header>
+		<div id="va-admin-notice" class="va-notice" hidden></div>
+		<div id="va-admin-content" class="va-content"><div class="va-loading" aria-live="polite"><span class="va-spinner" aria-hidden="true"></span><strong>Preparing operator console</strong><small>Loading secure platform data…</small></div></div>
+	</main>
+	{% else %}
+	<main class="va-admin-unlock-shell">
+		<section class="va-admin-unlock-card">
+			<a class="va-auth-brand" href="/verityai">VerityAI</a>
+			<div class="va-admin-lock-icon" aria-hidden="true">◇</div>
+			<div><p class="eyebrow">Restricted operations</p><h1>Confirm administrator access</h1></div>
+			<div id="va-admin-notice" class="va-notice" hidden></div>
+			<form id="va-admin-unlock-form" class="va-form">
+				<div class="va-field"><label>Administrator password</label><input type="password" name="password" required autocomplete="current-password" autofocus></div>
+				<button class="va-button">Unlock operator console</button>
+			</form>
+			<a class="va-button ghost" href="/verityai">Return to customer portal</a>
+		</section>
+	</main>
+	{% endif %}
+	<script>window.csrf_token={{ (csrf_token or '') | tojson }};</script>
+	<script src="/assets/verityai_saas/js/admin.js?v={{ asset_version }}"></script>
+</body>
+</html>

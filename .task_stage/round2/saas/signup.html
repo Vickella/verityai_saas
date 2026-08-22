@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>{{ title }}</title>
+	<link rel="stylesheet" href="/assets/verityai_saas/css/portal.css?v={{ asset_version }}">
+</head>
+<body>
+	<main class="va-auth">
+		<section class="va-card va-auth-card">
+			<header class="va-auth-header">
+				<a class="va-auth-brand" href="/verityai"><span>VerityAI</span></a>
+				<div><p class="eyebrow">Start your trial</p><h1>Create your AI workspace</h1><p>Set up your business account and assistant.</p></div>
+			</header>
+			<div id="signup-notice" class="va-notice" hidden></div>
+			<form id="signup-form" class="va-form">
+				<div class="va-fields">
+					<div class="va-field"><label for="full_name">Full name</label><input id="full_name" name="full_name" maxlength="120" autocomplete="name" required></div>
+					<div class="va-field"><label for="email">Work email</label><input id="email" name="email" type="email" maxlength="140" autocomplete="email" required></div>
+					<div class="va-field"><label for="business_name">Business name</label><input id="business_name" name="business_name" maxlength="140" required></div>
+					<div class="va-field"><label for="workspace_name">Workspace name</label><input id="workspace_name" name="workspace_name" maxlength="140" placeholder="Defaults to business name"></div>
+					<div class="va-field"><label for="password">Password</label><input id="password" name="password" type="password" minlength="8" maxlength="128" autocomplete="new-password" required><small>Use at least 8 characters and avoid a commonly used password.</small></div>
+					<div class="va-field"><label for="confirm_password">Confirm password</label><input id="confirm_password" name="confirm_password" type="password" minlength="8" maxlength="128" autocomplete="new-password" required></div>
+				</div>
+				<button class="va-button" type="submit">Create account and continue</button>
+			</form>
+			<footer class="va-auth-footer"><span>Already registered?</span><a id="signup-login" href="/verityai/signin">Sign in</a></footer>
+		</section>
+	</main>
+	<script>window.csrf_token={{ (csrf_token or '') | tojson }};</script>
+	<script src="/assets/verityai_saas/js/signup.js?v={{ asset_version }}"></script>
+</body>
+</html>
