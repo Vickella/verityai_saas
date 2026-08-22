@@ -42,20 +42,23 @@ class TestCreditStockLedger(FrappeTestCase):
 		self.assertEqual(first.name, second.name)
 
 	def test_provider_spend_calculates_whole_credits(self):
-		self.assertEqual(credit_stock.calculate_credits("10.00", "100000000"), 1_000_000_000)
+		self.assertEqual(credit_stock.calculate_provider_credits("10.00", "gpt-4.1-mini"), 23_809_523)
+		pricing = credit_stock.provider_pricing("gpt-4.1-mini")
+		self.assertAlmostEqual(pricing["credits_per_usd"], 2_380_952.380952, places=6)
+		self.assertEqual(pricing["blended_usd_per_million"], 0.42)
 		with self.assertRaises(frappe.ValidationError):
-			credit_stock.calculate_credits(10, 0)
+			credit_stock.calculate_provider_credits(10, "unsupported-model")
 
 	def test_purchase_records_money_and_calculated_credit_balance(self):
 		with patch("verityai_saas.services.credit_stock._last_entry", return_value=None):
 			purchase = credit_stock.record_purchase(
-				10, 100_000_000, reference="provider-invoice", notes="test",
+				10, reference="provider-invoice", notes="test",
 			)
-		self.assertEqual(int(purchase.credits), 1_000_000_000)
-		self.assertEqual(int(purchase.balance_credits), 1_000_000_000)
+		self.assertEqual(int(purchase.credits), 23_809_523)
+		self.assertEqual(int(purchase.balance_credits), 23_809_523)
 		self.assertAlmostEqual(float(purchase.balance_value), 10.0, places=2)
-		self.assertAlmostEqual(float(purchase.unit_cost), 0.00000001, places=10)
-		duplicate = credit_stock.record_purchase(10, 100_000_000, reference="provider-invoice")
+		self.assertAlmostEqual(float(purchase.unit_cost), 0.00000042, places=10)
+		duplicate = credit_stock.record_purchase(10, reference="provider-invoice")
 		self.assertEqual(duplicate.name, purchase.name)
 
 	@patch("verityai_saas.services.credit_stock._request")

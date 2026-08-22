@@ -12,6 +12,15 @@ LEDGER = "VerityAI Credit Stock Ledger"
 SETTINGS = "VerityAI ERPNext Accounting Settings"
 TIMEOUT = (5, 25)
 MAX_CREDITS = 9_000_000_000_000_000
+DEFAULT_PROVIDER_MODEL = "gpt-4.1-mini"
+MILLION = Decimal("1000000")
+
+# OpenAI's published blended price for GPT-4.1 mini is USD 0.42 per
+# one million tokens. Keep provider pricing server-side so an operator or
+# browser cannot accidentally overstate the credit stock received.
+PROVIDER_BLENDED_USD_PER_MILLION = {
+	"gpt-4.1-mini": Decimal("0.42"),
+}
 
 
 def calculate_credits(monetary_value, credits_per_currency_unit):
@@ -26,6 +35,49 @@ def calculate_credits(monetary_value, credits_per_currency_unit):
 	if rate <= 0:
 		frappe.throw("Provider credits per currency unit must be greater than zero.", frappe.ValidationError)
 	credits = int((amount * rate).to_integral_value(rounding=ROUND_FLOOR))
+	if credits <= 0 or credits > MAX_CREDITS:
+		frappe.throw("Calculated credits are outside the supported range.", frappe.ValidationError)
+	return credits
+
+
+def provider_pricing(model=None):
+	"""Return the controlled token conversion for the configured AI model."""
+	configured_model = str(model or "").strip()
+	if not configured_model and frappe.db.exists("DocType", "VerityAI Platform Settings"):
+		configured_model = str(frappe.get_single("VerityAI Platform Settings").get("ai_model") or "").strip()
+	configured_model = configured_model or DEFAULT_PROVIDER_MODEL
+	normalized = configured_model.lower()
+	pricing_model = next(
+		(key for key in PROVIDER_BLENDED_USD_PER_MILLION if normalized == key or normalized.startswith(f"{key}-")),
+		None,
+	)
+	if not pricing_model:
+		frappe.throw(
+			f"Automatic provider credit conversion is not configured for {configured_model}.",
+			frappe.ValidationError,
+		)
+	blended_cost = PROVIDER_BLENDED_USD_PER_MILLION[pricing_model]
+	credits_per_usd = MILLION / blended_cost
+	return {
+		"model": configured_model,
+		"pricing_model": pricing_model,
+		"currency": "USD",
+		"blended_usd_per_million": float(blended_cost),
+		"credits_per_usd": float(credits_per_usd),
+	}
+
+
+def calculate_provider_credits(monetary_value, model=None):
+	"""Calculate whole provider credits from USD spend using controlled pricing."""
+	try:
+		amount = Decimal(str(monetary_value or 0))
+	except (InvalidOperation, ValueError, TypeError):
+		frappe.throw("Enter a valid purchase amount.", frappe.ValidationError)
+	if amount <= 0:
+		frappe.throw("Purchase amount must be greater than zero.", frappe.ValidationError)
+	pricing = provider_pricing(model)
+	cost = Decimal(str(pricing["blended_usd_per_million"]))
+	credits = int((amount * MILLION / cost).to_integral_value(rounding=ROUND_FLOOR))
 	if credits <= 0 or credits > MAX_CREDITS:
 		frappe.throw("Calculated credits are outside the supported range.", frappe.ValidationError)
 	return credits
@@ -94,6 +146,7 @@ def summary(limit=100):
 				"estimated_gross_profit": flt(plan.monthly_price - estimated_cogs, 2),
 				"credits_after_sale": balance_credits - credits,
 			})
+	pricing = provider_pricing()
 	return {
 		"balance_credits": balance_credits,
 		"balance_value": balance_value,
@@ -103,7 +156,8 @@ def summary(limit=100):
 		"gross_profit": flt(aggregates.get("gross_profit"), 2),
 		"low_stock": bool(last and cint(last.balance_credits) < 0),
 		"cost_basis_available": bool(balance_credits > 0 and balance_value > 0),
-		"purchase_rate": flt(settings.get("credits_per_currency_unit"), 6),
+		"purchase_rate": flt(pricing["credits_per_usd"], 6),
+		"provider_pricing": pricing,
 		"plan_economics": plans,
 		"ledger": frappe.get_all(LEDGER, fields=["name", "posting_datetime", "entry_type", "direction", "credits", "unit_cost", "inventory_value", "revenue", "cogs", "gross_profit", "balance_credits", "balance_value", "currency", "workspace", "billing_event", "reference", "erpnext_status", "erpnext_journal_entry", "erpnext_error"], order_by="posting_datetime desc, creation desc", limit=cint(limit or 100)) if frappe.db.exists("DocType", LEDGER) else [],
 		"erpnext": {
@@ -118,25 +172,27 @@ def summary(limit=100):
 	}
 
 
-def record_purchase(monetary_value, credits_per_currency_unit, currency="USD", reference=None, notes=None, entry_type="Purchase"):
+def record_purchase(monetary_value, currency="USD", reference=None, notes=None, entry_type="Purchase"):
 	if entry_type not in {"Purchase", "Opening Balance"}:
 		frappe.throw("Invalid credit receipt type.", frappe.ValidationError)
-	credits = calculate_credits(monetary_value, credits_per_currency_unit)
+	currency = str(currency or "USD").strip().upper()
+	if currency != "USD":
+		frappe.throw("Provider credit purchases must be recorded in USD.", frappe.ValidationError)
+	pricing = provider_pricing()
+	credits = calculate_provider_credits(monetary_value, pricing["model"])
 	settings = frappe.get_single(SETTINGS)
-	settings.credits_per_currency_unit = flt(credits_per_currency_unit, 6)
-	if currency:
-		settings.currency = str(currency).strip().upper()[:3]
+	settings.credits_per_currency_unit = flt(pricing["credits_per_usd"], 6)
 	settings.save(ignore_permissions=True)
 	return record_entry(
 		entry_type,
 		credits,
 		monetary_value,
 		"Receipt",
-		settings.currency or "USD",
+		"USD",
 		reference=reference,
 		notes=notes,
 		source_key=(
-			f"provider:{entry_type.lower().replace(' ', '-')}:{settings.currency or 'USD'}:{str(reference).strip()}"
+			f"provider:{entry_type.lower().replace(' ', '-')}:USD:{str(reference).strip()}"
 			if reference else None
 		),
 	)
