@@ -200,7 +200,6 @@ class TestPaynowBilling(FrappeTestCase):
 		with (
 			patch.object(paynow, "_credentials", return_value=("1201", self.integration_key)),
 			patch.object(paynow, "get_url", return_value="https://app.example.com"),
-			patch.object(paynow, "_verify_live_checkout", return_value=True),
 			patch.object(paynow.requests, "post", return_value=response) as post,
 		):
 			result = paynow.initiate_checkout(self.workspace, self.plan)
@@ -232,7 +231,6 @@ class TestPaynowBilling(FrappeTestCase):
 		with (
 			patch.object(paynow, "_credentials", return_value=("1201", self.integration_key)),
 			patch.object(paynow, "get_url", return_value="https://app.example.com"),
-			patch.object(paynow, "_verify_live_checkout", return_value=True),
 			patch.object(paynow.requests, "post", return_value=FakeResponse(self.signed_message(response_values))),
 		):
 			result = paynow.initiate_credit_checkout(self.workspace, pack)
@@ -255,7 +253,6 @@ class TestPaynowBilling(FrappeTestCase):
 			with (
 				patch.object(paynow, "_credentials", return_value=("1201", self.integration_key)),
 				patch.object(paynow, "get_url", return_value="https://app.example.com"),
-				patch.object(paynow, "_verify_live_checkout", return_value=True),
 				patch.object(paynow.requests, "post", return_value=FakeResponse(self.signed_message(response_values))),
 			):
 				result = paynow.initiate_checkout(self.workspace, self.plan, promotion_code=promotion.code)
@@ -305,22 +302,23 @@ class TestPaynowBilling(FrappeTestCase):
 		):
 			paynow.initiate_checkout(self.workspace, self.plan)
 
-	def test_paynow_testing_checkout_is_rejected_before_redirect(self):
+	def test_signed_production_checkout_is_not_scraped_or_rejected(self):
 		response_values = {
-			"Status": "Ok", "BrowserUrl": "https://www.paynow.co.zw/Payment/ConfirmPayment/testing",
-			"PollUrl": "https://www.paynow.co.zw/Interface/CheckPayment/?guid=testing",
+			"Status": "Ok", "BrowserUrl": "https://www.paynow.co.zw/Payment/ConfirmPayment/production",
+			"PollUrl": "https://www.paynow.co.zw/Interface/CheckPayment/?guid=production",
 		}
 		with (
 			patch.object(paynow, "_credentials", return_value=("1201", self.integration_key)),
 			patch.object(paynow, "get_url", return_value="https://app.example.com"),
 			patch.object(paynow.requests, "post", return_value=FakeResponse(self.signed_message(response_values))),
-			patch.object(paynow.requests, "get", return_value=FakeResponse("<h1>TESTING: Faked Success</h1>")),
-			self.assertRaisesRegex(frappe.ValidationError, "still in testing"),
+			patch.object(paynow.requests, "get") as browser_get,
 		):
-			paynow.initiate_checkout(self.workspace, self.plan)
+			result = paynow.initiate_checkout(self.workspace, self.plan)
+		browser_get.assert_not_called()
+		self.assertEqual(result["checkout_url"], response_values["BrowserUrl"])
 		self.assertEqual(
-			frappe.db.get_value("VerityAI Billing Event", {"workspace": self.workspace, "provider": "Paynow"}, "status"),
-			"Failed",
+			frappe.db.get_value("VerityAI Billing Event", result["payment"], "live_checkout_verified"),
+			1,
 		)
 
 	def test_unverified_paid_status_never_fulfils_subscription(self):

@@ -157,6 +157,9 @@ class TestVerityAISaaS(FrappeTestCase):
 		self.assertNotIn("app-secret", serialized)
 		self.assertNotIn("verify-secret", serialized)
 		self.assertTrue(data["engine"]["access_token_present"])
+		self.assertEqual(data["whatsapp_phone_id"], "phone-id")
+		self.assertTrue(data["configuration_ready"])
+		self.assertEqual(data["setup_status"], "In Progress")
 
 	def test_customer_cannot_use_operator_dashboard(self):
 		frappe.set_user(self.owner)
@@ -182,7 +185,10 @@ class TestVerityAISaaS(FrappeTestCase):
 		}
 		with patch("requests.get", return_value=response) as graph_get:
 			result = whatsapp.test_connection(self.workspace)
-		self.assertTrue(result["connected"])
+		self.assertFalse(result["connected"])
+		self.assertTrue(result["meta_connected"])
+		self.assertTrue(result["configuration_ready"])
+		self.assertEqual(result["webhook_health"]["status"], "Awaiting Event")
 		self.assertNotIn("access-secret", frappe.as_json(result))
 		self.assertEqual(graph_get.call_args.kwargs["timeout"], 20)
 		whatsapp.record_channel_activity(frappe._dict({
@@ -190,4 +196,42 @@ class TestVerityAISaaS(FrappeTestCase):
 		}))
 		setup = whatsapp.safe_setup(self.workspace)
 		self.assertEqual(setup["webhook_health"]["status"], "Healthy")
+		self.assertEqual(setup["setup_status"], "Connected")
 		self.assertEqual(setup["last_webhook_event"], "wa-session-test")
+
+	def test_whatsapp_graph_test_does_not_claim_inbound_ready_without_webhook_secrets(self):
+		self.enable_full_whatsapp_for_test()
+		whatsapp.configure(self.workspace, {
+			"mode": "Full AI Automation", "whatsapp_phone_id": "phone-id",
+			"whatsapp_access_token": "access-secret", "verify_meta_signature": 1,
+		})
+		response = Mock(ok=True, content=b"{}", reason="OK")
+		response.json.return_value = {"id": "phone-id", "display_phone_number": "+263700000000"}
+		with patch("requests.get", return_value=response):
+			result = whatsapp.test_connection(self.workspace)
+		self.assertTrue(result["meta_connected"])
+		self.assertFalse(result["connected"])
+		self.assertFalse(result["configuration_ready"])
+		self.assertEqual(whatsapp.safe_setup(self.workspace)["setup_status"], "In Progress")
+
+	def test_whatsapp_resave_does_not_reset_a_receiving_channel(self):
+		self.enable_full_whatsapp_for_test()
+		whatsapp.configure(self.workspace, {
+			"mode": "Full AI Automation", "whatsapp_phone_id": "phone-id",
+			"whatsapp_access_token": "access-secret", "meta_verify_token": "verify-secret",
+			"meta_app_secret": "app-secret", "verify_meta_signature": 1,
+		})
+		whatsapp.record_channel_activity(frappe._dict({
+			"platform": "WhatsApp", "tenant": self.tenant, "name": "wa-session-existing",
+		}))
+
+		# The portal does not echo write-only secrets back during a normal save.
+		# Saving the same visible values must preserve confirmed webhook health.
+		result = whatsapp.configure(self.workspace, {
+			"mode": "Full AI Automation", "whatsapp_phone_id": "phone-id",
+			"verify_meta_signature": 1,
+		})
+
+		self.assertEqual(result["setup_status"], "Connected")
+		self.assertEqual(result["webhook_status"], "Receiving")
+		self.assertEqual(result["last_webhook_event"], "wa-session-existing")

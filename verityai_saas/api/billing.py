@@ -23,7 +23,10 @@ def get(workspace):
 		"credit_packs": frappe.get_all("VerityAI Credit Pack", filters={"active": 1}, fields=["name", "pack_name", "pack_code", "credits", "price", "currency"], order_by="sort_order asc"),
 		"referral": {"code": referral_code, "reward_credits": 50000, "referred_discount_percent": 25},
 		"documents": billing_documents.list_documents(workspace),
-		"paynow_configured": paynow.is_configured(),
+		# Customer checkout is intentionally unavailable in Test mode. The
+		# operator console owns Paynow's isolated fake-payment workflow.
+		"paynow_configured": paynow.checkout_enabled(),
+		"paynow": paynow.configuration_status(),
 	}
 
 

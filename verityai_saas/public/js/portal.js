@@ -502,12 +502,36 @@
   async function whatsapp() {
     const d = await call("verityai_saas.api.whatsapp.get", {workspace});
     const signature=d.engine?.signature_verification_enabled;
-    content.innerHTML = `<div class="va-status-strip"><div><span class="va-status-dot ${d.setup_status==="Connected"?"good":""}"></span><div><strong>WhatsApp channel</strong><p>${esc(d.webhook_health?.message||"Configure Meta Cloud API to activate this channel.")}</p></div></div><div class="va-actions">${pill(d.setup_status)}${pill(d.webhook_health?.status||"Not configured")}</div></div><div class="va-operations-grid"><form id="wa-form" class="va-section va-form-section"><header class="va-section-heading"><div><h2>Channel configuration</h2><p>Connect the business number and choose how the assistant participates.</p></div></header><div class="va-settings-block"><h3>Experience</h3><div class="va-fields"><div class="va-field"><label>Mode</label><select name="mode"><option ${d.mode==="Button Only"?"selected":""}>Button Only</option><option ${d.mode==="Lead Alerts"?"selected":""}>Lead Alerts</option><option ${d.mode==="Full AI Automation"?"selected":""}>Full AI Automation</option></select></div>${field("Business WhatsApp number","business_whatsapp_number",d.business_whatsapp_number)}${field("Meta phone number ID","whatsapp_phone_id",d.whatsapp_phone_id)}</div></div><details class="va-secret-panel"><summary>Meta credentials</summary><div class="va-fields">${field("Access token","whatsapp_access_token","","password")}${field("Verify token","meta_verify_token","","password")}${field("App secret","meta_app_secret","","password")}</div></details><label class="va-check"><input type="checkbox" name="verify_meta_signature" ${signature?"checked":""}> Verify every Meta webhook signature</label><div class="va-form-actions"><button type="button" id="wa-test" class="va-button secondary">Test connection</button><button class="va-button">Save channel</button></div></form><aside class="va-section va-callback-card"><header class="va-section-heading"><div><h2>Webhook endpoint</h2><p>Add this callback URL in your Meta application.</p></div></header><div class="va-settings-block"><pre class="va-code">${esc(d.engine?.callback_url)}</pre><button type="button" class="va-button ghost" data-copy="${esc(d.engine?.callback_url||"")}">Copy URL</button></div><div class="va-security-list"><div><span>Signature verification</span>${signature?pill("Active"):pill("Required")}</div><div><span>Webhook health</span>${pill(d.webhook_health?.status||"Unknown")}</div></div></aside></div>`;
+    const inboundHealthy=d.webhook_health?.status==="Healthy";
+    const configurationReady=Boolean(d.configuration_ready);
+    const metaConnected=d.meta_phone_number_id_status==="Verified"&&d.access_token_status==="Verified";
+    const channelStatus=inboundHealthy?"Receiving":metaConnected?"Meta verified":configurationReady?"Ready to test":"Setup required";
+    const missing=[];
+    if(!d.whatsapp_phone_id) missing.push("Meta phone number ID");
+    if(!d.engine?.access_token_present) missing.push("access token");
+    if(!d.engine?.verify_token_present) missing.push("verify token");
+    if(signature&&!d.engine?.app_secret_present) missing.push("app secret");
+    const statusMessage=inboundHealthy
+      ? d.webhook_health.message
+      : missing.length
+        ? `Complete ${missing.join(", ")} before testing the channel.`
+        : metaConnected
+          ? "Meta API verified. Send a WhatsApp message after subscribing this webhook to the messages field."
+          : "Save the channel, verify the Meta API, then send a WhatsApp message to confirm the webhook.";
+    content.innerHTML = `<div class="va-status-strip"><div><span class="va-status-dot ${inboundHealthy?"good":""}"></span><div><strong>WhatsApp channel</strong><p>${esc(statusMessage)}</p></div></div><div class="va-actions">${pill(channelStatus)}${pill(d.webhook_health?.status||"Not configured")}</div></div><div class="va-operations-grid"><form id="wa-form" class="va-section va-form-section"><header class="va-section-heading"><div><h2>Channel configuration</h2><p>Connect the business number and choose how the assistant participates.</p></div></header><div class="va-settings-block"><h3>Experience</h3><div class="va-fields"><div class="va-field"><label>Mode</label><select name="mode"><option ${d.mode==="Button Only"?"selected":""}>Button Only</option><option ${d.mode==="Lead Alerts"?"selected":""}>Lead Alerts</option><option ${d.mode==="Full AI Automation"?"selected":""}>Full AI Automation</option></select></div>${field("Business WhatsApp number","business_whatsapp_number",d.business_whatsapp_number)}${field("Meta phone number ID","whatsapp_phone_id",d.whatsapp_phone_id)}</div></div><details class="va-secret-panel"><summary>Meta credentials</summary><div class="va-fields">${field("Access token","whatsapp_access_token","","password")}${field("Verify token","meta_verify_token","","password")}${field("App secret","meta_app_secret","","password")}</div></details><label class="va-check"><input type="checkbox" name="verify_meta_signature" ${signature?"checked":""}> Verify every Meta webhook signature</label><div class="va-form-actions"><button type="button" id="wa-test" class="va-button secondary">Test Meta API</button><button class="va-button">Save channel</button></div></form><aside class="va-section va-callback-card"><header class="va-section-heading"><div><h2>Webhook endpoint</h2><p>Use this callback URL in Meta and subscribe the app to the messages field.</p></div></header><div class="va-settings-block"><pre class="va-code">${esc(d.engine?.callback_url)}</pre><button type="button" class="va-button ghost" data-copy="${esc(d.engine?.callback_url||"")}">Copy URL</button></div><div class="va-security-list"><div><span>Meta API</span>${pill(metaConnected?"Verified":"Not tested")}</div><div><span>Webhook configuration</span>${pill(configurationReady?"Ready":"Incomplete")}</div><div><span>Signature verification</span>${signature?pill("Active"):pill("Disabled")}</div><div><span>Inbound messages</span>${pill(inboundHealthy?"Receiving":"Awaiting event")}</div></div></aside></div>`;
     content.insertAdjacentHTML("afterbegin", `<div class="va-status-strip"><strong>WhatsApp AI</strong>${pill("Early Access")}</div>`);
     bind("wa-form", f => {const v=json(f);v.verify_meta_signature=f.verify_meta_signature.checked?1:0;return call("verityai_saas.api.whatsapp.update",{workspace,values:v});},whatsapp,"onboarding");
     document.querySelector("#wa-test").addEventListener("click", async event => {
       const button=event.currentTarget; button.disabled=true;
-      try { const result=await call("verityai_saas.api.whatsapp.test_connection",{workspace}); alert(`Meta connected${result.verified_name?`: ${result.verified_name}`:""}.`); await whatsapp(); }
+      try {
+        const form=document.querySelector("#wa-form");
+        const values=json(form);
+        values.verify_meta_signature=form.verify_meta_signature.checked?1:0;
+        await call("verityai_saas.api.whatsapp.update",{workspace,values});
+        const result=await call("verityai_saas.api.whatsapp.test_connection",{workspace});
+        alert(`Meta API verified${result.verified_name?`: ${result.verified_name}`:""}. Send a WhatsApp message to confirm inbound delivery.`);
+        await whatsapp();
+      }
       catch(err){alert(err.message,true);button.disabled=false;}
     });
     document.querySelector("[data-copy]").onclick=async event=>{try{await navigator.clipboard.writeText(event.currentTarget.dataset.copy);alert("Callback URL copied.");}catch(err){alert("Copy failed. Select and copy the URL manually.",true);}};

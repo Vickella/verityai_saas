@@ -20,12 +20,30 @@ def configure(workspace_name, values):
 	setup.update({"mode": mode, "business_whatsapp_number": values.get("business_whatsapp_number"), "whatsapp_button_enabled": int(bool(values.get("whatsapp_button_enabled", mode == "Button Only"))), "lead_alert_enabled": int(bool(values.get("lead_alert_enabled", mode == "Lead Alerts"))), "full_ai_enabled": int(mode == "Full AI Automation")})
 	if mode == "Full AI Automation":
 		config = get_engine_configuration(workspace_name)
+		connection_changed = False
 		for key in ("whatsapp_phone_id", "whatsapp_access_token", "meta_verify_token", "meta_app_secret", "verify_meta_signature"):
 			if key in values and values[key] not in (None, ""):
+				if key == "verify_meta_signature":
+					connection_changed = connection_changed or int(bool(values[key])) != int(bool(config.get(key)))
+				elif key == "whatsapp_phone_id":
+					connection_changed = connection_changed or str(values[key]).strip() != str(config.get(key) or "").strip()
+				else:
+					# Secret fields are write-only. A submitted value is therefore an
+					# intentional credential rotation even when its plaintext cannot be
+					# compared with the stored encrypted password.
+					connection_changed = True
 				setattr(config, key, values[key])
 		config.save(ignore_permissions=True)
 		status = whatsapp_status(workspace_name)
-		setup.update({"setup_status": "Connected" if status["phone_id_present"] and status["access_token_present"] else "In Progress", "meta_phone_number_id_status": "Present" if status["phone_id_present"] else "Missing", "access_token_status": "Present" if status["access_token_present"] else "Missing", "webhook_status": "Ready", "signature_verification_status": "Enabled" if status["signature_verification_enabled"] else "Warning"})
+		credentials_present = status["phone_id_present"] and status["access_token_present"]
+		if connection_changed or not credentials_present or setup.setup_status != "Connected":
+			setup.setup_status = "In Progress"
+		setup.update({
+			"meta_phone_number_id_status": "Present" if status["phone_id_present"] else "Missing",
+			"access_token_status": "Present" if status["access_token_present"] else "Missing",
+			"webhook_status": "Receiving" if setup.last_webhook_on else "Awaiting Event",
+			"signature_verification_status": "Enabled" if status["signature_verification_enabled"] else "Warning",
+		})
 	else:
 		setup.setup_status = "Connected" if setup.business_whatsapp_number else "In Progress"
 	if setup.get("__islocal"):
@@ -41,6 +59,13 @@ def safe_setup(workspace_name):
 	fields = ("mode", "business_whatsapp_number", "whatsapp_button_enabled", "lead_alert_enabled", "full_ai_enabled", "setup_status", "meta_phone_number_id_status", "access_token_status", "webhook_status", "signature_verification_status", "last_tested_on", "last_webhook_on", "last_webhook_event")
 	data = {key: setup.get(key) for key in fields} if setup else {}
 	data["engine"] = whatsapp_status(workspace_name)
+	data["whatsapp_phone_id"] = get_engine_configuration(workspace_name).whatsapp_phone_id or ""
+	data["configuration_ready"] = bool(
+		data["engine"]["phone_id_present"]
+		and data["engine"]["access_token_present"]
+		and data["engine"]["verify_token_present"]
+		and (not data["engine"]["signature_verification_enabled"] or data["engine"]["app_secret_present"])
+	)
 	data["webhook_health"] = webhook_health(data)
 	return data
 
@@ -65,6 +90,7 @@ def record_channel_activity(doc, method=None):
 	setup = frappe.db.get_value("VerityAI WhatsApp Setup", {"workspace": workspace}, "name") if workspace else None
 	if setup:
 		frappe.db.set_value("VerityAI WhatsApp Setup", setup, {
+			"setup_status": "Connected",
 			"last_webhook_on": now_datetime(),
 			"last_webhook_event": doc.name,
 			"webhook_status": "Receiving",
@@ -89,6 +115,8 @@ def test_connection(workspace_name):
 		setup.save(ignore_permissions=True)
 		frappe.throw("Meta phone number ID and access token are required.", frappe.ValidationError)
 	version = (frappe.conf.get("meta_graph_api_version") or "v23.0").strip()
+	if not version.startswith("v"):
+		version = f"v{version}"
 	url = f"https://graph.facebook.com/{version}/{phone_id}"
 	try:
 		response = requests.get(
@@ -110,13 +138,29 @@ def test_connection(workspace_name):
 		setup.webhook_status = "Connection Failed"
 		setup.save(ignore_permissions=True)
 		frappe.throw(f"Meta rejected the connection test: {(message or response.reason or 'Unknown error')[:200]}", frappe.ValidationError)
-	setup.setup_status = "Connected"
+	if str(payload.get("id") or "") != phone_id:
+		setup.setup_status = "Failed"
+		setup.webhook_status = "Connection Failed"
+		setup.save(ignore_permissions=True)
+		frappe.throw("Meta returned a different phone number ID.", frappe.ValidationError)
+	status = whatsapp_status(workspace_name)
+	inbound_ready = bool(
+		status["verify_token_present"]
+		and (not status["signature_verification_enabled"] or status["app_secret_present"])
+	)
+	webhook_receiving = bool(setup.last_webhook_on)
+	# A successful Graph API request proves the credentials and phone-number ID,
+	# but it does not prove that Meta can deliver inbound webhook events. Only an
+	# actual inbound WhatsApp session may move the channel to Connected.
+	setup.setup_status = "Connected" if inbound_ready and webhook_receiving else "In Progress"
 	setup.meta_phone_number_id_status = "Verified"
 	setup.access_token_status = "Verified"
-	setup.webhook_status = "Ready" if not setup.last_webhook_on else "Receiving"
+	setup.webhook_status = "Receiving" if setup.last_webhook_on else "Awaiting Event"
 	setup.save(ignore_permissions=True)
 	return {
-		"connected": True,
+		"connected": bool(inbound_ready and webhook_receiving),
+		"meta_connected": True,
+		"configuration_ready": inbound_ready,
 		"phone_number_id": payload.get("id") or phone_id,
 		"display_phone_number": payload.get("display_phone_number"),
 		"verified_name": payload.get("verified_name"),
