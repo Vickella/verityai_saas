@@ -201,6 +201,22 @@ class TestPaynowBilling(FrappeTestCase):
 			"document_type": "Receipt",
 		}))
 
+	def test_gateway_test_failed_scenario_reaches_a_final_state(self):
+		payment = billing.create_billing_event(self.workspace, "Payment", 1, "Pending", provider="Paynow")
+		frappe.db.set_value("VerityAI Billing Event", payment, {
+			"transaction_kind": "Gateway Test",
+			"poll_url": "https://www.paynow.co.zw/interface/checkpayment/test",
+			"live_checkout_verified": 0,
+		})
+		result = paynow.apply_status(payment, {
+			"reference": payment,
+			"paynowreference": "TEST-CANCELLED",
+			"amount": "1.00",
+			"status": "Failed",
+		})
+		self.assertEqual(result["status"], "Failed")
+		self.assertEqual(frappe.db.get_value("VerityAI Billing Event", payment, "status"), "Failed")
+
 	def test_operator_can_start_ecocash_simulated_success(self):
 		settings = frappe.get_single("VerityAI Platform Settings")
 		settings.paynow_environment = "Test"
@@ -217,19 +233,44 @@ class TestPaynowBilling(FrappeTestCase):
 			patch.object(paynow.requests, "post", return_value=FakeResponse(self.signed_message(response_values))) as post,
 		):
 			result = paynow.initiate_test_transaction(
-				self.workspace, "merchant@example.com", "ecocash", "0712345678",
+				self.workspace, "merchant@example.com", "ecocash", "0772222222",
 			)
 
 		payload = post.call_args.kwargs["data"]
 		self.assertEqual(post.call_args.args[0], paynow.REMOTE_INITIATE_URL)
 		self.assertEqual(payload["method"], "ecocash")
-		self.assertEqual(payload["phone"], "0771111111")
+		self.assertEqual(payload["phone"], "0772222222")
 		self.assertIsNone(result["checkout_url"])
 		self.assertEqual(result["test_method"], "ecocash")
 		self.assertEqual(
 			frappe.db.get_value("VerityAI Billing Event", result["payment"], "transaction_kind"),
 			"Gateway Test",
 		)
+
+	def test_operator_remote_test_rejects_non_simulator_number(self):
+		settings = frappe.get_single("VerityAI Platform Settings")
+		settings.paynow_environment = "Test"
+		settings.save(ignore_permissions=True)
+		with self.assertRaisesRegex(frappe.ValidationError, "documented Test-mode simulator"):
+			paynow.initiate_test_transaction(
+				self.workspace, "merchant@example.com", "ecocash", "0775555555",
+			)
+
+	def test_insufficient_balance_simulator_is_recorded_as_expected_failure(self):
+		settings = frappe.get_single("VerityAI Platform Settings")
+		settings.paynow_environment = "Test"
+		settings.save(ignore_permissions=True)
+		with (
+			patch.object(paynow, "_credentials", return_value=("1201", self.integration_key)),
+			patch.object(paynow, "get_url", return_value="https://app.example.com"),
+			patch.object(paynow.requests, "post", return_value=FakeResponse("Status=Error&Error=Insufficient+balance")),
+		):
+			result = paynow.initiate_test_transaction(
+				self.workspace, "merchant@example.com", "ecocash", "0774444444",
+			)
+		self.assertTrue(result["terminal"])
+		self.assertEqual(result["expected_result"], "Insufficient Balance")
+		self.assertEqual(frappe.db.get_value("VerityAI Billing Event", result["payment"], "status"), "Failed")
 
 	def test_operator_hosted_test_rejects_paynow_home_page(self):
 		settings = frappe.get_single("VerityAI Platform Settings")

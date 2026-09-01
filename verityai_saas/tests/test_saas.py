@@ -190,6 +190,14 @@ class TestVerityAISaaS(FrappeTestCase):
 		self.assertTrue(result["configuration_ready"])
 		self.assertEqual(result["webhook_health"]["status"], "Awaiting Event")
 		self.assertNotIn("access-secret", frappe.as_json(result))
+		self.assertEqual(graph_get.call_args.kwargs["timeout"], 20)
+		whatsapp.record_channel_activity(frappe._dict({
+			"platform": "WhatsApp", "tenant": self.tenant, "name": "wa-session-test",
+		}))
+		setup = whatsapp.safe_setup(self.workspace)
+		self.assertEqual(setup["webhook_health"]["status"], "Healthy")
+		self.assertEqual(setup["setup_status"], "Connected")
+		self.assertEqual(setup["last_webhook_event"], "wa-session-test")
 
 	def test_whatsapp_waba_subscription_acceptance_is_not_a_false_failure(self):
 		self.enable_full_whatsapp_for_test()
@@ -212,14 +220,28 @@ class TestVerityAISaaS(FrappeTestCase):
 		self.assertFalse(result["subscribed"])
 		self.assertEqual(result["status"], "Requested")
 		self.assertEqual(whatsapp.safe_setup(self.workspace)["waba_subscription_status"], "Requested")
-		self.assertEqual(graph_get.call_args.kwargs["timeout"], 20)
-		whatsapp.record_channel_activity(frappe._dict({
-			"platform": "WhatsApp", "tenant": self.tenant, "name": "wa-session-test",
-		}))
-		setup = whatsapp.safe_setup(self.workspace)
-		self.assertEqual(setup["webhook_health"]["status"], "Healthy")
-		self.assertEqual(setup["setup_status"], "Connected")
-		self.assertEqual(setup["last_webhook_event"], "wa-session-test")
+
+	def test_whatsapp_waba_listing_error_does_not_undo_accepted_subscription(self):
+		self.enable_full_whatsapp_for_test()
+		whatsapp.configure(self.workspace, {
+			"mode": "Full AI Automation", "whatsapp_phone_id": "phone-id",
+			"whatsapp_access_token": "access-secret", "meta_verify_token": "verify-secret",
+			"meta_app_secret": "app-secret", "verify_meta_signature": 1,
+			"meta_waba_id": "waba-id",
+		})
+		post_response = Mock(ok=True, content=b"{}", reason="OK")
+		post_response.json.return_value = {"success": True}
+		get_response = Mock(ok=False, content=b"{}", reason="Forbidden")
+		get_response.json.return_value = {"error": {"message": "Missing management permission"}}
+		with (
+			patch("requests.post", return_value=post_response),
+			patch("requests.get", return_value=get_response),
+		):
+			result = whatsapp.subscribe_waba(self.workspace)
+		self.assertTrue(result["accepted"])
+		self.assertFalse(result["subscribed"])
+		self.assertIn("Missing management permission", result["verification_warning"])
+		self.assertEqual(whatsapp.safe_setup(self.workspace)["waba_subscription_status"], "Requested")
 
 	def test_whatsapp_graph_test_does_not_claim_inbound_ready_without_webhook_secrets(self):
 		self.enable_full_whatsapp_for_test()

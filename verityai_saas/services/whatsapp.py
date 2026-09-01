@@ -160,18 +160,26 @@ def test_connection(workspace_name):
 	setup.setup_status = "Connected" if inbound_ready and webhook_receiving else "In Progress"
 	setup.meta_phone_number_id_status = "Verified"
 	setup.access_token_status = "Verified"
+	subscription_warning = None
 	if setup.meta_waba_id:
-		subscription = _get_waba_subscription(setup.meta_waba_id, access_token, version)
-		# Meta may acknowledge POST /subscribed_apps before the app appears in the
-		# corresponding GET response. Preserve an accepted pending state instead of
-		# incorrectly rolling it back to Not Subscribed during propagation.
-		setup.waba_subscription_status = (
-			"Subscribed"
-			if subscription["subscribed"]
-			else "Requested"
-			if setup.waba_subscription_status == "Requested"
-			else "Not Subscribed"
-		)
+		try:
+			subscription = _get_waba_subscription(setup.meta_waba_id, access_token, version)
+			# Meta may acknowledge POST /subscribed_apps before the app appears in the
+			# corresponding GET response. Preserve an accepted pending state instead of
+			# incorrectly rolling it back during propagation.
+			setup.waba_subscription_status = (
+				"Subscribed"
+				if subscription["subscribed"]
+				else "Requested"
+				if setup.waba_subscription_status == "Requested"
+				else "Not Subscribed"
+			)
+		except Exception as exc:
+			# Phone credentials and WABA listing use different Meta permissions. A
+			# listing failure must not turn a valid phone connection into a failed test.
+			subscription_warning = " ".join(str(exc).split())[:200]
+			if setup.waba_subscription_status != "Subscribed":
+				setup.waba_subscription_status = "Requested"
 		setup.last_subscription_check_on = checked_at
 	setup.webhook_status = "Receiving" if setup.last_webhook_on else "Awaiting Event"
 	setup.save(ignore_permissions=True)
@@ -184,6 +192,7 @@ def test_connection(workspace_name):
 		"verified_name": payload.get("verified_name"),
 		"quality_rating": payload.get("quality_rating"),
 		"waba_subscription_status": setup.waba_subscription_status,
+		"waba_subscription_warning": subscription_warning,
 		"checked_at": checked_at,
 		"webhook_health": webhook_health(safe_setup(workspace_name)),
 	}
@@ -214,15 +223,26 @@ def subscribe_waba(workspace_name):
 		message = error.get("message") if isinstance(error, dict) else None
 		frappe.throw(f"Meta rejected the WABA subscription: {(message or response.reason or 'Unknown error')[:200]}", frappe.ValidationError)
 	checked_at = now_datetime()
-	verification = _get_waba_subscription(waba_id, access_token, version)
-	setup.waba_subscription_status = "Subscribed" if verification["subscribed"] else "Requested"
+	# Persist Meta's accepted write before making the independent listing call.
+	# The listing endpoint can lag or require a broader management permission.
+	setup.waba_subscription_status = "Requested"
 	setup.last_subscription_check_on = checked_at
 	setup.save(ignore_permissions=True)
+	verification_warning = None
+	try:
+		verification = _get_waba_subscription(waba_id, access_token, version)
+	except Exception as exc:
+		verification = {"subscribed": False, "applications": []}
+		verification_warning = " ".join(str(exc).split())[:200]
+	if verification["subscribed"]:
+		setup.waba_subscription_status = "Subscribed"
+		setup.save(ignore_permissions=True)
 	return {
 		"accepted": True,
 		"subscribed": verification["subscribed"],
 		"status": setup.waba_subscription_status,
 		"applications": verification["applications"],
+		"verification_warning": verification_warning,
 		"checked_at": checked_at,
 	}
 

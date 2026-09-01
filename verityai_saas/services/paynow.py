@@ -16,9 +16,15 @@ INITIATE_URL = "https://www.paynow.co.zw/interface/initiatetransaction"
 REMOTE_INITIATE_URL = "https://www.paynow.co.zw/interface/remotetransaction"
 PAYNOW_HOSTS = {"paynow.co.zw", "www.paynow.co.zw", "staging.paynow.co.zw"}
 PAID_STATUSES = {"paid", "awaiting delivery", "delivered"}
-FINAL_FAILED_STATUSES = {"cancelled", "refunded"}
+FINAL_FAILED_STATUSES = {"cancelled", "failed", "refunded"}
 RISK_STATUSES = {"disputed"}
 SETTINGS_DOCTYPE = "VerityAI Platform Settings"
+PAYNOW_TEST_NUMBERS = {
+	"0771111111": "Success",
+	"0772222222": "Delayed Success",
+	"0773333333": "User Cancelled",
+	"0774444444": "Insufficient Balance",
+}
 
 
 def _settings_credentials():
@@ -246,6 +252,16 @@ def _initiate_gateway_event(
 	if unsigned_values.get("status", "").lower() != "ok":
 		frappe.db.set_value("VerityAI Billing Event", payment, {"status": "Failed", "gateway_status": "Error", "gateway_response_json": _response_snapshot(unsigned_values)})
 		detail = _gateway_error(unsigned_values)
+		if operator_test and remote_method and phone == "0774444444" and "insufficient" in detail.lower():
+			return {
+				"payment": payment,
+				"checkout_url": None,
+				"status": "Failed",
+				"test_method": remote_method,
+				"terminal": True,
+				"expected_result": PAYNOW_TEST_NUMBERS[phone],
+				"gateway_error": detail,
+			}
 		frappe.throw(
 			f"Paynow rejected the transaction: {detail}" if detail else "Paynow could not start the transaction. No error detail was returned.",
 			frappe.ValidationError,
@@ -296,9 +312,12 @@ def initiate_test_transaction(workspace_name, merchant_email, test_method="Hoste
 		frappe.throw("Choose Hosted fake success, EcoCash simulated success, or OneMoney simulated success.", frappe.ValidationError)
 	remote_method = None if test_method == "hosted" else test_method
 	if remote_method:
-		# Paynow documents this number as its immediate-success simulator. A real
-		# subscriber number must never be debited by the operator test path.
-		phone = "0771111111"
+		phone = "".join(character for character in str(phone or "") if character.isdigit())
+		if phone not in PAYNOW_TEST_NUMBERS:
+			frappe.throw(
+				"Choose one of Paynow's documented Test-mode simulator numbers.",
+				frappe.ValidationError,
+			)
 	return _initiate_gateway_event(
 		workspace.name,
 		"Payment",
@@ -436,7 +455,7 @@ def apply_status(payment_name, values):
 		if status_key == "refunded" and was_completed:
 			refund = billing.initiate_refund(payment.workspace, payment.name, payment.amount, "Paynow reported a completed refund")
 			billing.complete_refund(refund["refund"], values.get("paynowreference"))
-		updates["status"] = "Cancelled"
+		updates["status"] = "Cancelled" if status_key in {"cancelled", "refunded"} else "Failed"
 		frappe.db.set_value("VerityAI Billing Event", payment.name, updates)
 	elif status_key in RISK_STATUSES:
 		updates["status"] = "Pending"

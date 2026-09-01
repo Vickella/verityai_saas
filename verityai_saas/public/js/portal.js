@@ -538,7 +538,7 @@
         await call("verityai_saas.api.whatsapp.update",{workspace,values});
         const result=await call("verityai_saas.api.whatsapp.test_connection",{workspace});
         const subscription=result.waba_subscription_status||"Not checked";
-        alert(`Meta API verified${result.verified_name?`: ${result.verified_name}`:""}. WABA subscription: ${subscription}.`);
+        alert(`Meta API verified${result.verified_name?`: ${result.verified_name}`:""}. WABA subscription: ${subscription}.${result.waba_subscription_warning?` Listing warning: ${result.waba_subscription_warning}`:""}`);
         await whatsapp();
       }
       catch(err){alert(err.message,true);button.disabled=false;}
@@ -551,7 +551,7 @@
         values.verify_meta_signature=form.verify_meta_signature.checked?1:0;
         await call("verityai_saas.api.whatsapp.update",{workspace,values});
         const result=await call("verityai_saas.api.whatsapp.subscribe_waba",{workspace});
-        alert(result.subscribed?"WhatsApp Business Account subscribed. Send a WhatsApp message to verify inbound delivery.":"Meta accepted the WABA subscription request but its verification list has not updated yet. Your Meta dashboard toggle is authoritative for now; send an inbound message and test again shortly.");
+        alert(result.subscribed?"WhatsApp Business Account subscribed. Send a WhatsApp message to verify inbound delivery.":`Meta accepted the WABA subscription request. Its listing check is still pending${result.verification_warning?`: ${result.verification_warning}`:""}. Your Meta dashboard toggle is authoritative; send an inbound message to complete the health check.`);
         await whatsapp();
       }
       catch(err){alert(err.message,true);button.disabled=false;}
