@@ -2,289 +2,138 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>VerityCore AI — WhatsApp AI Setup Guide</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>VerityCore AI — Complete WhatsApp AI Setup Guide</title>
   <style>
-    @page { size: A4; margin: 0; }
-    * { box-sizing: border-box; }
-    :root { --navy:#08233f; --navy2:#123f70; --blue:#2474e8; --blue2:#6657e8; --ink:#0c1729; --muted:#5b6b82; --line:#d9e3ef; --soft:#f2f7fd; --green:#0aa36c; --amber:#bd7000; --red:#c7352a; }
-    html,body { margin:0; background:#dfe8f3; color:var(--ink); font-family:Arial,Helvetica,sans-serif; }
-    .page { position:relative; width:210mm; min-height:297mm; margin:0 auto; padding:15mm 16mm 14mm; overflow:hidden; background:#fff; page-break-after:always; }
-    .page:last-child { page-break-after:auto; }
-    .page::after { content:""; position:absolute; right:-32mm; top:-30mm; width:90mm; height:90mm; border-radius:50%; background:radial-gradient(circle,#dcebff 0,#edf5ff 55%,transparent 70%); z-index:0; }
-    .page > * { position:relative; z-index:1; }
-    .cover { color:#fff; background:linear-gradient(145deg,#071e38 0%,#123f70 62%,#2868d4 100%); }
-    .cover::after { right:-20mm; top:20mm; width:125mm; height:125mm; background:radial-gradient(circle,rgba(126,163,255,.5),rgba(102,87,232,.18) 50%,transparent 70%); }
-    .brand { display:flex; align-items:center; gap:10px; font-size:18px; font-weight:800; }
-    .logo { display:grid; place-items:center; width:40px; height:40px; border-radius:12px; background:linear-gradient(145deg,#2474e8,#6657e8); color:#fff; font-size:24px; font-weight:900; box-shadow:0 8px 20px rgba(24,67,158,.25); }
-    .cover h1 { max-width:150mm; margin:42mm 0 6mm; font-size:37px; line-height:1.05; letter-spacing:-1.2px; }
-    .cover .lead { max-width:138mm; color:#dbe8ff; font-size:17px; line-height:1.55; }
-    .cover-card { margin-top:25mm; padding:9mm; border:1px solid rgba(255,255,255,.24); border-radius:18px; background:rgba(255,255,255,.1); backdrop-filter:blur(8px); }
-    .cover-card strong { display:block; margin-bottom:3mm; font-size:17px; }
-    .cover-card p { margin:0; color:#dbe8ff; font-size:13px; line-height:1.55; }
-    .status-row { display:flex; gap:8px; margin-top:6mm; }
-    .status { padding:7px 11px; border-radius:999px; background:#dcf7eb; color:#087650; font-size:11px; font-weight:800; }
-    .cover .status { color:#fff; background:rgba(255,255,255,.14); }
-    .top { display:flex; align-items:center; justify-content:space-between; margin-bottom:8mm; }
-    .top .brand { color:var(--navy); font-size:14px; }
-    .step { color:var(--blue); font-size:11px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; }
-    h2 { margin:0 0 3mm; font-size:27px; letter-spacing:-.6px; }
-    h3 { margin:5mm 0 2mm; font-size:16px; }
-    p { margin:0 0 3mm; color:var(--muted); font-size:12px; line-height:1.55; }
-    .intro { max-width:170mm; font-size:14px; }
-    .callout { margin:5mm 0; padding:4.5mm 5mm; border-left:4px solid var(--blue); border-radius:9px; background:#edf5ff; color:#24496f; font-size:11px; line-height:1.55; }
-    .callout.warn { border-color:#ee9a20; background:#fff6e5; color:#774900; }
-    .callout.danger { border-color:#e34a3d; background:#fff0ee; color:#822a23; }
-    .checklist { display:grid; gap:3mm; margin:5mm 0; padding:0; list-style:none; }
-    .checklist li { display:flex; gap:3mm; align-items:flex-start; color:#35465d; font-size:12px; line-height:1.45; }
-    .checklist li::before { content:"✓"; flex:0 0 6mm; display:grid; place-items:center; width:6mm; height:6mm; border-radius:50%; background:#dcf7eb; color:#087650; font-size:11px; font-weight:900; }
-    .numbered { counter-reset:item; display:grid; gap:3mm; margin:5mm 0; padding:0; list-style:none; }
-    .numbered li { counter-increment:item; display:flex; gap:3mm; color:#35465d; font-size:12px; line-height:1.48; }
-    .numbered li::before { content:counter(item); flex:0 0 7mm; display:grid; place-items:center; width:7mm; height:7mm; border-radius:9px; background:var(--navy); color:#fff; font-size:11px; font-weight:800; }
-    code { padding:1px 4px; border-radius:4px; background:#eaf1fa; color:#173f6b; font-family:Consolas,monospace; font-size:10px; }
-    .shot { margin:5mm 0 0; border:1px solid #cad8e8; border-radius:14px; overflow:hidden; background:#f6f9fd; box-shadow:0 8px 22px rgba(12,44,82,.1); }
-    .shot figcaption { padding:3mm 5mm; border-top:1px solid #dce5ef; background:#fff; color:#60718a; font-size:9px; }
-    .browser { display:flex; gap:5px; align-items:center; height:10mm; padding:0 5mm; background:#e7ebf1; }
-    .dot { width:7px; height:7px; border-radius:50%; background:#aab4c2; }
-    .address { flex:1; height:6mm; margin-left:3mm; padding:1.4mm 3mm; border-radius:6px; background:#fff; color:#64748b; font-size:8px; }
-    .ui { padding:5mm; background:#fff; }
-    .ui-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:4mm; }
-    .ui-title { font-size:13px; font-weight:800; }
-    .meta { color:#1670e9; font-size:16px; font-weight:900; }
-    .panel { padding:4mm; border:1px solid #d7e1ec; border-radius:9px; background:#fff; }
-    .row { display:flex; align-items:center; justify-content:space-between; gap:4mm; padding:2.4mm 0; border-bottom:1px solid #edf1f6; }
-    .row:last-child { border-bottom:0; }
-    .label { color:#26364b; font-size:10px; font-weight:700; }
-    .hint { color:#738299; font-size:8px; }
-    .input { min-width:55mm; padding:2.5mm 3mm; border:1px solid #cbd7e5; border-radius:6px; color:#40516a; font-size:9px; background:#fbfdff; }
-    .input.secret { overflow:hidden; color:transparent; text-shadow:0 0 7px #172b47; user-select:none; }
-    .blur { display:inline-block; min-width:40mm; color:transparent; text-shadow:0 0 7px #172b47; user-select:none; }
-    .button { display:inline-block; padding:2.5mm 4mm; border-radius:6px; background:var(--blue); color:#fff; font-size:9px; font-weight:800; }
-    .button.ghost { border:1px solid #b9c8da; background:#fff; color:#29435f; }
-    .toggle { width:12mm; height:6mm; padding:1mm; border-radius:8mm; background:#2c77e5; }
-    .toggle::after { content:""; display:block; width:4mm; height:4mm; margin-left:6mm; border-radius:50%; background:#fff; }
-    .badge { display:inline-block; padding:1.7mm 3mm; border-radius:999px; color:#087650; background:#dcf7eb; font-size:8px; font-weight:800; }
-    .badge.blue { color:#1c58a9; background:#e5efff; }
-    .badge.amber { color:#855000; background:#fff0cd; }
-    .columns { display:grid; grid-template-columns:1fr 1fr; gap:5mm; }
-    .mini { padding:4mm; border:1px solid #d8e2ee; border-radius:10px; background:#f8fbff; }
-    .mini strong { display:block; margin-bottom:2mm; font-size:11px; }
-    .mini p { margin:0; font-size:9.5px; }
-    .flow { display:flex; align-items:center; gap:2mm; margin:6mm 0; }
-    .flow div { flex:1; padding:4mm 2mm; border:1px solid #cddbec; border-radius:9px; text-align:center; color:#28435f; background:#f5f9ff; font-size:10px; font-weight:800; }
-    .flow span { color:var(--blue); font-size:18px; font-weight:900; }
-    .table { width:100%; border-collapse:collapse; margin-top:4mm; font-size:9.5px; }
-    .table th,.table td { padding:2.7mm; border-bottom:1px solid #dfe7f0; text-align:left; vertical-align:top; }
-    .table th { color:#40516a; background:#f1f6fc; }
-    .footer { position:absolute; left:16mm; right:16mm; bottom:7mm; display:flex; justify-content:space-between; color:#8290a3; font-size:8px; }
-    .success-box { margin:8mm 0; padding:8mm; border:1px solid #bcebd7; border-radius:16px; background:linear-gradient(145deg,#f1fff9,#e6f8ff); text-align:center; }
-    .success-mark { display:grid; place-items:center; width:18mm; height:18mm; margin:0 auto 4mm; border-radius:50%; color:#fff; background:var(--green); font-size:28px; font-weight:900; }
-    .success-box h3 { margin:0 0 2mm; font-size:22px; }
-    .success-box p { margin:0 auto; max-width:130mm; }
-    @media print { html,body { background:#fff; } .page { margin:0; } }
+    @page{size:A4;margin:0}*{box-sizing:border-box}:root{--navy:#08233f;--blue:#2474e8;--ink:#101a2b;--muted:#52647c;--line:#d8e3ef;--green:#087b55}html,body{margin:0;background:#dfe8f3;color:var(--ink);font-family:Arial,Helvetica,sans-serif}.page{position:relative;width:210mm;height:297mm;margin:0 auto;padding:13mm 15mm 14mm;overflow:hidden;background:#fff;page-break-after:always}.page:last-child{page-break-after:auto}.cover{color:#fff;background:linear-gradient(145deg,#071e38 0%,#123f70 62%,#2868d4 100%)}.cover:after{content:"";position:absolute;right:-30mm;top:15mm;width:125mm;height:125mm;border-radius:50%;background:radial-gradient(circle,rgba(126,163,255,.52),rgba(102,87,232,.18) 50%,transparent 70%)}.brand{position:relative;z-index:1;display:flex;align-items:center;gap:10px;font-size:17px;font-weight:850}.logo{display:grid;place-items:center;width:38px;height:38px;border-radius:11px;background:linear-gradient(145deg,#2474e8,#6657e8);color:#fff;font-size:22px;font-weight:900}.cover h1{position:relative;z-index:1;max-width:160mm;margin:37mm 0 6mm;font-size:36px;line-height:1.06;letter-spacing:-1px}.cover .lead{position:relative;z-index:1;max-width:145mm;color:#dce9ff;font-size:17px;line-height:1.55}.cover-card{position:relative;z-index:1;margin-top:20mm;padding:8mm;border:1px solid rgba(255,255,255,.25);border-radius:17px;background:rgba(255,255,255,.1)}.cover-card strong{display:block;margin-bottom:3mm;font-size:17px}.cover-card p{color:#dce9ff}.top{display:flex;align-items:center;justify-content:space-between;margin-bottom:6mm}.top .brand{color:var(--navy);font-size:13px}.top .logo{width:30px;height:30px;border-radius:9px;font-size:17px}.step{color:var(--blue);font-size:10px;font-weight:850;letter-spacing:.13em;text-transform:uppercase}h2{margin:0 0 2.5mm;font-size:25px;line-height:1.12;letter-spacing:-.5px}h3{margin:4mm 0 2mm;font-size:14px}p{margin:0 0 2.5mm;color:var(--muted);font-size:11px;line-height:1.5}.intro{max-width:175mm;font-size:13px}.route{margin:4mm 0;padding:3.5mm 4mm;border:1px solid #c8daf0;border-radius:9px;background:#edf5ff;color:#173e6a;font-size:10.5px;font-weight:750;line-height:1.5}.route span{color:#6c7f98;font-weight:600}.url{display:block;margin-top:1.5mm;color:#0c5fc8;font-family:Consolas,monospace;font-size:9.5px;word-break:break-all}.callout{margin:4mm 0;padding:3.5mm 4mm;border-left:4px solid var(--blue);border-radius:8px;background:#edf5ff;color:#24496f;font-size:10px;line-height:1.5}.callout.warn{border-color:#ec981d;background:#fff5df;color:#754900}.callout.danger{border-color:#db4438;background:#fff0ee;color:#81251f}.checklist,.steps{display:grid;gap:2.4mm;margin:4mm 0;padding:0;list-style:none;counter-reset:item}.checklist li,.steps li{display:flex;gap:2.5mm;color:#34465e;font-size:10.5px;line-height:1.45}.checklist li:before{content:"✓";flex:0 0 5.5mm;display:grid;place-items:center;width:5.5mm;height:5.5mm;border-radius:50%;background:#dcf7eb;color:#087650;font-size:9px;font-weight:900}.steps li{counter-increment:item}.steps li:before{content:counter(item);flex:0 0 6mm;display:grid;place-items:center;width:6mm;height:6mm;border-radius:7px;background:var(--navy);color:#fff;font-size:9px;font-weight:850}code{padding:1px 4px;border-radius:4px;background:#e9f1fa;color:#153f6b;font:9px Consolas,monospace}.shot{margin:4mm 0 0;border:1px solid #bdcada;border-radius:10px;overflow:hidden;background:#f6f9fd;box-shadow:0 6px 18px rgba(12,44,82,.1)}.shot img{display:block;width:100%;height:auto}.shot figcaption{padding:2.6mm 3.5mm;border-top:1px solid #dce5ef;color:#52647c;background:#fff;font-size:8.5px;line-height:1.4}.legend{display:grid;grid-template-columns:repeat(3,1fr);gap:3mm;margin:4mm 0}.legend div{padding:3.5mm;border:1px solid var(--line);border-radius:9px;background:#f8fbff}.legend strong{display:block;margin-bottom:1.5mm;color:#173e6a;font-size:10px}.legend p{margin:0;font-size:8.8px}.table{width:100%;border-collapse:collapse;margin-top:3mm;font-size:8.8px}.table th,.table td{padding:2.4mm;border-bottom:1px solid #dfe7f0;text-align:left;vertical-align:top;line-height:1.4}.table th{color:#34465e;background:#f0f5fb}.status-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:4mm}.badge{padding:6px 10px;border-radius:999px;background:#dcf7eb;color:#087650;font-size:9px;font-weight:850}.footer{position:absolute;left:15mm;right:15mm;bottom:6mm;display:flex;justify-content:space-between;color:#8290a3;font-size:7.5px}.cover .footer{color:#d0ddf3}.success{margin:7mm 0;padding:7mm;border:1px solid #bcebd7;border-radius:14px;background:linear-gradient(145deg,#f1fff9,#e7f7ff);text-align:center}.success b{display:block;color:#087650;font-size:20px;margin-bottom:2mm}@media print{html,body{background:#fff}.page{margin:0}}
   </style>
 </head>
 <body>
   <section class="page cover">
     <div class="brand"><span class="logo">V</span>VerityCore AI</div>
-    <h1>WhatsApp AI<br>Setup Guide</h1>
-    <p class="lead">A simple, secure, step-by-step guide to connect your WhatsApp Business number and let your VerityCore AI assistant reply to customers.</p>
-    <div class="cover-card">
-      <strong>What you will achieve</strong>
-      <p>Your Meta app will deliver incoming WhatsApp messages to VerityCore AI. Your assistant will answer automatically using your approved business profile and knowledge sources.</p>
-      <div class="status-row"><span class="status">Receiving</span><span class="status">Healthy</span><span class="status">AI replies active</span></div>
-    </div>
-    <div class="footer"><span>Customer setup manual</span><span>Version 1.0 · September 2026</span></div>
+    <h1>Complete WhatsApp AI Setup Guide</h1>
+    <p class="lead">From the first browser URL to a live AI reply—every route, field, button and success check in one illustrated walkthrough.</p>
+    <div class="cover-card"><strong>Built from the working production setup</strong><p>This manual uses the real Meta and VerityCore AI screens. Security values are hidden, but navigation, labels, IDs and the configuration flow remain visible so you can follow them exactly.</p><div class="status-row"><span class="badge">Receiving</span><span class="badge">Healthy</span><span class="badge">AI replies active</span></div></div>
+    <div class="footer"><span>Customer setup manual</span><span>Version 2.0 · September 2026</span></div>
   </section>
 
   <section class="page">
-    <div class="top"><div class="brand"><span class="logo">V</span>VerityCore AI</div><span class="step">Before you start</span></div>
-    <h2>Prepare these items</h2>
-    <p class="intro">Allow about 20–40 minutes. Meta may take longer to review business details or a display name.</p>
-    <ul class="checklist">
-      <li>A Meta account with administrator access to your organisation’s Business Portfolio.</li>
-      <li>A Meta Developer app connected to the <strong>WhatsApp Business Platform</strong>.</li>
-      <li>A business phone number that can receive an SMS or voice verification code. Use the international format, for example <code>+263…</code>.</li>
-      <li>A VerityCore AI workspace where you can manage WhatsApp settings.</li>
-      <li>Your public website, privacy-policy URL, terms URL, data-deletion instructions, support email, and a square 1024 × 1024 app icon.</li>
-    </ul>
-    <div class="callout danger"><strong>Security first:</strong> never email, screenshot, or paste an access token or App Secret into a chat. In this guide, sensitive values are blurred or replaced by dots. If a token is exposed, revoke it and create a new one immediately.</div>
-    <h3>The connection in one picture</h3>
-    <div class="flow"><div>Customer<br>WhatsApp</div><span>→</span><div>Meta<br>Cloud API</div><span>→</span><div>VerityCore AI<br>Webhook</div><span>→</span><div>AI reply</div></div>
-    <div class="columns">
-      <div class="mini"><strong>Phone Number ID</strong><p>Identifies the registered WhatsApp number. It is not the telephone number itself.</p></div>
-      <div class="mini"><strong>WABA ID</strong><p>Identifies the WhatsApp Business Account that owns the number.</p></div>
-      <div class="mini"><strong>Verify token</strong><p>A secret phrase you create. The exact same phrase must be entered in Meta and VerityCore AI.</p></div>
-      <div class="mini"><strong>Access token + App Secret</strong><p>Private Meta credentials used to send messages and verify webhook signatures.</p></div>
-    </div>
-    <div class="footer"><span>VerityCore AI · WhatsApp AI Setup Guide</span><span>2</span></div>
+    <div class="top"><div class="brand"><span class="logo">V</span>VerityCore AI</div><span class="step">Read this first</span></div>
+    <h2>What you need before starting</h2><p class="intro">Allow 30–60 minutes for setup. Meta’s business or display-name review can take longer.</p>
+    <ul class="checklist"><li>A Meta/Facebook account with administrator access to your organisation’s Meta Business Portfolio.</li><li>A business website with real Privacy Policy, Terms of Service and Data Deletion pages.</li><li>A square 1024 × 1024 app icon and a monitored business contact email.</li><li>A phone number that can receive an SMS or voice verification code and can be registered on the WhatsApp Business Platform.</li><li>An active VerityCore AI workspace with permission to manage WhatsApp.</li></ul>
+    <div class="callout danger"><strong>Never share these three values:</strong> Meta Access Token, Meta App Secret and your Verify Token. Store them in a password manager. If one is exposed, revoke or rotate it immediately.</div>
+    <h3>The setup sequence</h3>
+    <table class="table"><thead><tr><th>Stage</th><th>Where</th><th>Result</th></tr></thead><tbody><tr><td>1. Create app</td><td>Meta for Developers</td><td>A Business app with the Connect on WhatsApp use case.</td></tr><tr><td>2. Complete app details</td><td>App settings → Basic</td><td>Valid business URLs, contact email, icon and category.</td></tr><tr><td>3. Register number</td><td>Use cases → Production setup</td><td>Registered phone, Phone Number ID and WABA ID.</td></tr><tr><td>4. Save credentials</td><td>VerityCore AI → WhatsApp</td><td>Channel saved with signature verification enabled.</td></tr><tr><td>5. Configure webhooks</td><td>Meta → Configure Webhooks</td><td>Verified callback, <code>messages</code> field and WABA subscription.</td></tr><tr><td>6. Publish and test</td><td>Meta + a different phone</td><td>VerityCore AI shows Receiving / Healthy and sends an AI reply.</td></tr></tbody></table>
+    <div class="callout warn"><strong>About identifiers:</strong> App ID, Phone Number ID and WABA ID are required for setup. This guide hides actual security credentials, not the operational IDs users need to recognise.</div>
+    <div class="footer"><span>VerityCore AI · Complete WhatsApp AI Setup Guide</span><span>2</span></div>
   </section>
 
   <section class="page">
     <div class="top"><div class="brand"><span class="logo">V</span>VerityCore AI</div><span class="step">Step 1</span></div>
-    <h2>Create and prepare your Meta app</h2>
-    <ol class="numbered">
-      <li>Open <strong>Meta for Developers</strong>, select <strong>My Apps</strong>, and create a Business app.</li>
-      <li>Add the <strong>WhatsApp / Connect on WhatsApp</strong> use case.</li>
-      <li>In <strong>App settings → Basic</strong>, add your app icon, contact email, website domain, privacy policy, terms, and user-data deletion URL.</li>
-      <li>Complete any items shown under <strong>Required actions</strong> and business verification.</li>
-      <li>When ready for real inbound messages, use <strong>Publish</strong> to switch the app to Live.</li>
-    </ol>
-    <div class="callout warn"><strong>Important:</strong> while a Meta app is unpublished, Meta normally sends only dashboard test webhooks. Real messages sent to your business number may show delivery ticks but never reach the AI.</div>
-    <figure class="shot">
-      <div class="browser"><span class="dot"></span><span class="dot"></span><span class="dot"></span><div class="address">developers.facebook.com/apps/••••••••/settings/basic</div></div>
-      <div class="ui"><div class="ui-head"><span class="meta">∞ Meta</span><span class="badge blue">App settings · Basic</span></div><div class="panel">
-        <div class="row"><div><div class="label">App ID</div><div class="hint">Public identifier</div></div><div class="input"><span class="blur">identifier hidden</span></div></div>
-        <div class="row"><div><div class="label">App secret</div><div class="hint">Never share this value</div></div><div class="input secret">super-secret-value</div></div>
-        <div class="row"><div><div class="label">Privacy policy and data deletion</div><div class="hint">Use pages on your own website</div></div><span class="badge">Complete</span></div>
-        <div class="row"><div><div class="label">App icon</div><div class="hint">Square 1024 × 1024 PNG or JPG</div></div><span class="badge">Uploaded</span></div>
-      </div></div><figcaption>Illustration 1 — Complete the Basic settings before publishing. All identifying values shown here are masked.</figcaption>
-    </figure>
-    <div class="footer"><span>VerityCore AI · WhatsApp AI Setup Guide</span><span>3</span></div>
+    <h2>Open Meta for Developers and create the app</h2>
+    <div class="route">Start URL<span> — type this into your browser:</span><a class="url" href="https://developers.facebook.com/">https://developers.facebook.com/</a></div>
+    <ol class="steps"><li>Click <strong>Log In</strong> and use the Meta account that administers your business.</li><li>Click <strong>My Apps</strong> in the top navigation.</li><li>Click <strong>Create App</strong>. Choose the Business use case and select <strong>Connect on WhatsApp</strong> when Meta asks what the app should do.</li><li>Enter a clear app name, choose the correct Business Portfolio, add your contact email and complete app creation.</li><li>Open the new app. Confirm that <strong>Connect on WhatsApp</strong> appears in the use-case selector.</li></ol>
+    <div class="route">Route after login<span>:</span><br>My Apps → Create App → Business → Connect on WhatsApp</div>
+    <h3>Do not continue until</h3><ul class="checklist"><li>The app is owned by or connected to the correct Business Portfolio.</li><li>You can see Dashboard, Required actions, Use cases, Publish and App settings in the left menu.</li><li>You know which WhatsApp Business Account and number belong to this workspace.</li></ul>
+    <div class="callout">Meta changes labels occasionally. If “Connect on WhatsApp” is not shown during creation, create a Business app first and add the WhatsApp use case from its dashboard.</div>
+    <div class="footer"><span>VerityCore AI · Complete WhatsApp AI Setup Guide</span><span>3</span></div>
   </section>
 
   <section class="page">
     <div class="top"><div class="brand"><span class="logo">V</span>VerityCore AI</div><span class="step">Step 2</span></div>
-    <h2>Register your WhatsApp number</h2>
-    <ol class="numbered">
-      <li>In your Meta app, open <strong>WhatsApp → API Setup</strong> or <strong>Production setup</strong>.</li>
-      <li>Select the correct Business Portfolio and WhatsApp Business Account (WABA).</li>
-      <li>Add your business phone number and complete the SMS or voice verification.</li>
-      <li>Wait until the number shows <strong>Registered</strong>. Copy the <strong>Phone Number ID</strong> and <strong>WhatsApp Business Account ID</strong>.</li>
-    </ol>
-    <figure class="shot">
-      <div class="browser"><span class="dot"></span><span class="dot"></span><span class="dot"></span><div class="address">Meta Developer Dashboard · Production setup</div></div>
-      <div class="ui"><div class="ui-head"><span class="meta">∞ Meta</span><span class="badge blue">Register your WhatsApp phone number</span></div><div class="panel">
-        <div class="row"><div><div class="label">Your Business</div><div class="hint">WhatsApp Business account ID: <span class="blur">identifier hidden</span></div></div><div class="toggle"></div></div>
-        <div class="row"><div><div class="label">+263 •• ••• ••••</div><div class="hint">Phone Number ID: <span class="blur">identifier hidden</span></div></div><span class="badge">Registered</span></div>
-        <div class="row"><div><div class="label">Subscribe webhooks</div><div class="hint">Turn this on for the correct WABA</div></div><div class="toggle"></div></div>
-      </div></div><figcaption>Illustration 2 — Register the number and use the IDs belonging to the same WABA. Values are deliberately blurred.</figcaption>
-    </figure>
-    <div class="callout"><strong>Tip:</strong> if Meta lists more than one WABA, double-check the business name, number, WABA ID, and Phone Number ID. Mixing IDs from different accounts prevents inbound replies.</div>
-    <div class="footer"><span>VerityCore AI · WhatsApp AI Setup Guide</span><span>4</span></div>
+    <h2>Complete the app’s Basic settings</h2><div class="route">Click path<span>:</span><br>My Apps → [your app] → App settings → Basic</div>
+    <ol class="steps"><li>Confirm the <strong>Display name</strong> and <strong>Contact email</strong>.</li><li>Add your SaaS domain under <strong>App domains</strong> without <code>https://</code> or a page path.</li><li>Enter real, public URLs from your own website for <strong>Privacy Policy</strong>, <strong>Terms of Service</strong> and <strong>User data deletion</strong>. Do not use Facebook’s homepage as a placeholder.</li><li>Upload a square <strong>1024 × 1024</strong> PNG or JPG app icon, select a category and click <strong>Save changes</strong>.</li><li>Copy the <strong>App Secret</strong> only when you are ready to paste it into VerityCore AI.</li></ol>
+    <figure class="shot"><img src="images/06-meta-app-basic-settings.png" alt="Meta App settings Basic page"><figcaption>Actual Meta screen: App settings → Basic. The App Secret is already masked. The screenshot shows incomplete/placeholder fields; your production app must use your own valid business URLs and icon.</figcaption></figure>
+    <div class="footer"><span>VerityCore AI · Complete WhatsApp AI Setup Guide</span><span>4</span></div>
   </section>
 
   <section class="page">
     <div class="top"><div class="brand"><span class="logo">V</span>VerityCore AI</div><span class="step">Step 3</span></div>
-    <h2>Create a secure access token</h2>
-    <p class="intro">Use a System User token for production. The short-lived token shown in Meta’s “Try it out” area is useful only for temporary testing.</p>
-    <ol class="numbered">
-      <li>Open <strong>Meta Business Settings → Users → System users</strong>.</li>
-      <li>Create or select an Admin system user. Assign your Meta app and WhatsApp Business Account with the required access.</li>
-      <li>Generate a token for the same Meta app. Enable <code>whatsapp_business_management</code> and <code>whatsapp_business_messaging</code>.</li>
-      <li>Copy the token once and store it in a password manager. Do not place it in documents or screenshots.</li>
-      <li>In Meta App settings, copy the <strong>App Secret</strong> privately. You will paste it into VerityCore AI later.</li>
-    </ol>
-    <figure class="shot">
-      <div class="browser"><span class="dot"></span><span class="dot"></span><span class="dot"></span><div class="address">business.facebook.com/settings/system-users</div></div>
-      <div class="ui"><div class="ui-head"><span class="meta">∞ Meta Business Settings</span><span class="badge blue">Generate new token</span></div><div class="panel">
-        <div class="row"><div><div class="label">Assigned app</div><div class="hint">Your WhatsApp integration app</div></div><span class="badge">Full control</span></div>
-        <div class="row"><div><div class="label">whatsapp_business_management</div><div class="hint">Manage WABA subscription and configuration</div></div><span class="badge">Selected</span></div>
-        <div class="row"><div><div class="label">whatsapp_business_messaging</div><div class="hint">Send WhatsApp replies</div></div><span class="badge">Selected</span></div>
-        <div class="row"><div><div class="label">Generated token</div><div class="hint">Secret—store it safely</div></div><div class="input secret">EAA••••••••••••••••••••••</div></div>
-      </div></div><figcaption>Illustration 3 — Generate a System User token with both WhatsApp permissions. The token is intentionally unreadable.</figcaption>
-    </figure>
-    <div class="footer"><span>VerityCore AI · WhatsApp AI Setup Guide</span><span>5</span></div>
+    <h2>Register your WhatsApp phone number</h2><div class="route">Click path<span>:</span><br>My Apps → [your app] → Use cases → Connect on WhatsApp → Customize → Basic setup → Step 2. Production setup</div>
+    <ol class="steps"><li>Under <strong>Register your WhatsApp phone number</strong>, choose the correct WhatsApp Business Account.</li><li>Add the business number, select SMS or voice verification, enter the code and finish registration.</li><li>Wait until the phone shows <strong>Registered</strong>.</li><li>Copy the <strong>Phone Number ID</strong> displayed below the number.</li><li>Copy the <strong>WhatsApp Business Account ID</strong> displayed below the business name. This is the WABA ID.</li><li>Turn on <strong>Subscribe webhooks</strong> for this exact WABA.</li></ol>
+    <figure class="shot"><img src="images/04-meta-register-number-and-waba.png" alt="Meta registered phone and WABA subscription"><figcaption>Actual Meta screen: the correct WABA shows the registered number, Phone Number ID and blue Subscribe webhooks toggle. If several WABAs appear, match the business and phone carefully.</figcaption></figure>
+    <div class="footer"><span>VerityCore AI · Complete WhatsApp AI Setup Guide</span><span>5</span></div>
   </section>
 
   <section class="page">
     <div class="top"><div class="brand"><span class="logo">V</span>VerityCore AI</div><span class="step">Step 4</span></div>
-    <h2>Save the channel in VerityCore AI</h2>
-    <ol class="numbered">
-      <li>Open your VerityCore AI workspace and go to <strong>WhatsApp</strong>.</li>
-      <li>Select <strong>Full AI Automation</strong> if you want the assistant to reply automatically.</li>
-      <li>Enter the business number in international format, then paste the Phone Number ID and WABA ID copied from Meta.</li>
-      <li>Open <strong>Meta credentials</strong>. Paste the access token and App Secret.</li>
-      <li>Create a long, random <strong>Verify token</strong>. Save it in your password manager—you must enter the exact same value in Meta.</li>
-      <li>Keep <strong>Verify every Meta webhook signature</strong> enabled, then click <strong>Save channel</strong>.</li>
-    </ol>
-    <figure class="shot">
-      <div class="browser"><span class="dot"></span><span class="dot"></span><span class="dot"></span><div class="address">your-site.com/verityai/whatsapp</div></div>
-      <div class="ui"><div class="ui-head"><span class="brand"><span class="logo">V</span>VerityCore AI</span><span class="badge blue">WhatsApp · Channel setup</span></div><div class="panel">
-        <div class="row"><span class="label">Mode</span><div class="input">Full AI Automation</div></div>
-        <div class="row"><span class="label">Business WhatsApp number</span><div class="input">+263 •• ••• ••••</div></div>
-        <div class="row"><span class="label">Phone Number ID / WABA ID</span><div class="input"><span class="blur">identifiers hidden</span></div></div>
-        <div class="row"><span class="label">Access token / Verify token / App Secret</span><div class="input secret">private credentials hidden</div></div>
-        <div class="row"><span class="label">Verify every Meta webhook signature</span><span class="badge">Enabled</span></div>
-        <div class="row"><span></span><span class="button">Save channel</span></div>
-      </div></div><figcaption>Illustration 4 — Save all IDs and credentials in one workspace. Secret fields stay masked after saving.</figcaption>
-    </figure>
-    <div class="footer"><span>VerityCore AI · WhatsApp AI Setup Guide</span><span>6</span></div>
+    <h2>Generate the Meta access token</h2><div class="route">Click path<span>:</span><br>Use cases → Connect on WhatsApp → Customize → Step 2. Production setup → Send Message → Generate token</div>
+    <ol class="steps"><li>Click <strong>Generate token</strong> and authorise the correct business and WABA.</li><li>For production, use a System User/permanent token—not a short-lived “Try it out” token.</li><li>The token needs <code>whatsapp_business_management</code> and <code>whatsapp_business_messaging</code>.</li><li>Copy it directly into a password manager, then into VerityCore AI. Never expose it in email, screenshots or chat.</li><li>The registered number shown here must match the number and Phone Number ID entered in VerityCore AI.</li></ol>
+    <figure class="shot"><img src="images/05-meta-generate-token-and-test.png" alt="Meta Generate token and Send Message section"><figcaption>Actual Meta screen: Generate token and customer-reply test area. No access-token value is visible.</figcaption></figure>
+    <div class="callout warn">A temporary token may work during setup and stop later. Before launch, confirm the production token belongs to the same app, has both WhatsApp permissions and has access to the correct WABA.</div>
+    <div class="footer"><span>VerityCore AI · Complete WhatsApp AI Setup Guide</span><span>6</span></div>
   </section>
 
   <section class="page">
     <div class="top"><div class="brand"><span class="logo">V</span>VerityCore AI</div><span class="step">Step 5</span></div>
-    <h2>Connect the Meta webhook</h2>
-    <ol class="numbered">
-      <li>On the VerityCore AI WhatsApp page, click <strong>Copy URL</strong> in the Webhook endpoint panel.</li>
-      <li>In Meta, open <strong>WhatsApp → Configuration → Configure Webhooks</strong>.</li>
-      <li>Paste the URL into <strong>Callback URL</strong>.</li>
-      <li>Enter the exact Verify token you created in VerityCore AI. It is case-sensitive.</li>
-      <li>Leave client-certificate attachment off unless your organisation specifically uses mTLS. Click <strong>Verify and save</strong>.</li>
-      <li>In <strong>Webhook fields</strong>, find <code>messages</code> and switch it to <strong>Subscribed</strong>.</li>
-    </ol>
-    <figure class="shot">
-      <div class="browser"><span class="dot"></span><span class="dot"></span><span class="dot"></span><div class="address">Meta Developer Dashboard · Configure Webhooks</div></div>
-      <div class="ui"><div class="ui-head"><span class="meta">∞ Meta</span><span class="badge blue">Configure Webhooks</span></div><div class="panel">
-        <div class="row"><div><div class="label">Callback URL</div><div class="hint">Copy this from VerityCore AI</div></div><div class="input">https://YOUR-SITE/api/method/…/webhook</div></div>
-        <div class="row"><div><div class="label">Verify token</div><div class="hint">Must exactly match VerityCore AI</div></div><div class="input secret">random-verification-secret</div></div>
-        <div class="row"><span class="label">Webhook field: messages</span><div class="toggle"></div></div>
-        <div class="row"><span></span><span class="button">Verify and save</span></div>
-      </div></div><figcaption>Illustration 5 — Verify the callback and explicitly subscribe the <strong>messages</strong> field.</figcaption>
-    </figure>
-    <div class="callout warn">A verified callback alone is not enough. The <code>messages</code> field must also be subscribed or the AI will never see customer messages.</div>
-    <div class="footer"><span>VerityCore AI · WhatsApp AI Setup Guide</span><span>7</span></div>
+    <h2>Sign in to VerityCore AI</h2><div class="route">Customer sign-in URL<span>:</span><a class="url" href="https://saasai.veritypack.cloud/verityai/signin">https://saasai.veritypack.cloud/verityai/signin</a></div>
+    <ol class="steps"><li>Open the URL above and sign in with your VerityCore AI account.</li><li>Select the workspace that owns the WhatsApp business number.</li><li>In the left menu, scroll to <strong>Operations</strong> and click <strong>WhatsApp</strong>.</li><li>You may use the direct route below after signing in. Replace <code>YOUR-WORKSPACE</code> with the workspace slug from your portal URL.</li></ol>
+    <div class="route">Direct WhatsApp route<span>:</span><span class="url">https://saasai.veritypack.cloud/verityai/whatsapp?workspace=YOUR-WORKSPACE</span></div>
+    <h3>Have these values ready</h3><div class="legend"><div><strong>Business number</strong><p>International format, such as +263…</p></div><div><strong>Phone Number ID</strong><p>From Meta Production setup.</p></div><div><strong>WABA ID</strong><p>WhatsApp Business Account ID.</p></div><div><strong>Access token</strong><p>Production/System User token.</p></div><div><strong>App Secret</strong><p>App settings → Basic.</p></div><div><strong>Verify token</strong><p>A random secret you create.</p></div></div>
+    <div class="callout"><strong>You create the Verify token.</strong> Meta does not issue it. Generate a long random value, keep it private and use the exact same value in VerityCore AI and Meta.</div>
+    <div class="footer"><span>VerityCore AI · Complete WhatsApp AI Setup Guide</span><span>7</span></div>
   </section>
 
   <section class="page">
     <div class="top"><div class="brand"><span class="logo">V</span>VerityCore AI</div><span class="step">Step 6</span></div>
-    <h2>Subscribe the WABA and test</h2>
-    <ol class="numbered">
-      <li>In Meta’s Production setup, turn on <strong>Subscribe webhooks</strong> for the correct WABA. You may also click <strong>Subscribe WABA</strong> in VerityCore AI.</li>
-      <li>Back in VerityCore AI, click <strong>Test Meta API</strong>. Resolve any token, permission, or ID error shown.</li>
-      <li>Use a <strong>different personal WhatsApp number</strong> to message your registered business number. Do not test by sending the business number to itself.</li>
-      <li>Send a simple message such as “Hello”. Wait a few seconds for the AI reply.</li>
-      <li>Refresh the VerityCore AI page. The channel should show <strong>Receiving</strong> and <strong>Healthy</strong>.</li>
-    </ol>
-    <figure class="shot">
-      <div class="browser"><span class="dot"></span><span class="dot"></span><span class="dot"></span><div class="address">VerityCore AI · WhatsApp</div></div>
-      <div class="ui"><div class="ui-head"><span class="brand"><span class="logo">V</span>WhatsApp channel</span><div><span class="badge">Receiving</span> <span class="badge">Healthy</span></div></div><div class="panel">
-        <div class="row"><span class="label">Meta API</span><span class="badge">Verified</span></div>
-        <div class="row"><span class="label">WABA subscription</span><span class="badge">Subscribed</span></div>
-        <div class="row"><span class="label">Webhook configuration</span><span class="badge">Ready</span></div>
-        <div class="row"><span class="label">Signature verification</span><span class="badge">Active</span></div>
-        <div class="row"><span class="label">Inbound messages</span><span class="badge">Receiving</span></div>
-      </div></div><figcaption>Illustration 6 — This is the target state. A recent inbound event confirms the entire route is working.</figcaption>
-    </figure>
-    <div class="callout"><strong>WhatsApp’s 24-hour window:</strong> after a customer messages you, the AI may reply normally during the customer-service window. Business-initiated messages outside that window generally require an approved message template.</div>
-    <div class="footer"><span>VerityCore AI · WhatsApp AI Setup Guide</span><span>8</span></div>
+    <h2>Complete the VerityCore AI channel</h2><div class="route">Click path<span>:</span><br>VerityCore AI → Operations → WhatsApp → Channel configuration</div>
+    <ol class="steps"><li>Set <strong>Mode</strong> to <strong>Full AI Automation</strong>.</li><li>Enter the <strong>Business WhatsApp number</strong>, <strong>Meta phone number ID</strong> and <strong>WhatsApp Business Account ID</strong>.</li><li>Open <strong>Meta credentials</strong>. Paste the Access Token, your random Verify Token and the App Secret.</li><li>Keep <strong>Verify every Meta webhook signature</strong> selected.</li><li>Click <strong>Save channel</strong>. Secret inputs clear after saving; this does not mean they were deleted.</li><li>On the right, click <strong>Copy URL</strong> under Webhook endpoint.</li></ol>
+    <figure class="shot"><img src="images/02-veritycore-whatsapp-channel.png" alt="VerityCore AI WhatsApp channel configuration"><figcaption>Actual VerityCore AI screen. Operational IDs remain visible; the credential inputs expose no security keys. Copy the callback URL from the right panel.</figcaption></figure>
+    <div class="footer"><span>VerityCore AI · Complete WhatsApp AI Setup Guide</span><span>8</span></div>
+  </section>
+
+  <section class="page">
+    <div class="top"><div class="brand"><span class="logo">V</span>VerityCore AI</div><span class="step">Step 7</span></div>
+    <h2>Verify the callback URL in Meta</h2><div class="route">Click path<span>:</span><br>Meta app → Use cases → Connect on WhatsApp → Customize → Basic setup → Step 2. Production setup → Configure Webhooks</div>
+    <ol class="steps"><li>Paste the URL copied from VerityCore AI into <strong>Callback URL</strong>. Do not type it manually.</li><li>Paste the exact same secret used in VerityCore AI into <strong>Verify token</strong>. It is case-sensitive.</li><li>Leave <strong>Attach a client certificate</strong> off unless your organisation configured mTLS.</li><li>Click <strong>Verify and save</strong>. Meta should accept the callback.</li><li>If it fails, save the VerityCore AI channel again and re-check the full URL and Verify token.</li></ol>
+    <figure class="shot"><img src="images/03-meta-callback-and-verify-token.png" alt="Meta Configure Webhooks callback and verify token"><figcaption>Actual Meta screen: Callback URL and masked Verify token. The warning confirms that an unpublished app does not receive real production data.</figcaption></figure>
+    <div class="footer"><span>VerityCore AI · Complete WhatsApp AI Setup Guide</span><span>9</span></div>
+  </section>
+
+  <section class="page">
+    <div class="top"><div class="brand"><span class="logo">V</span>VerityCore AI</div><span class="step">Step 8</span></div>
+    <h2>Subscribe the messages webhook field</h2><div class="route">Click path<span>:</span><br>Production setup → Configure Webhooks → Webhook fields → messages → Subscribe</div>
+    <ol class="steps"><li>After Meta verifies the callback, scroll down to <strong>Webhook fields</strong>.</li><li>Find the exact row <code>messages</code>. Do not confuse it with similarly named template/status fields.</li><li>Turn its <strong>Subscribe</strong> switch on.</li><li>Optional: click <strong>Test</strong> on the <code>messages</code> row to send a dashboard test payload.</li><li>Return to the registered-number section and confirm <strong>Subscribe webhooks</strong> remains blue/on for the correct WABA.</li></ol>
+    <figure class="shot"><img src="images/01-meta-webhook-configuration.png" alt="Meta webhook fields section"><figcaption>Actual Meta screen: scroll below Callback URL to Webhook fields and subscribe <strong>messages</strong>. The Verify token is already masked.</figcaption></figure>
+    <div class="callout danger"><strong>A verified callback is not enough.</strong> Without the <code>messages</code> subscription, customers can see delivery ticks while VerityCore AI receives nothing and cannot reply.</div>
+    <div class="footer"><span>VerityCore AI · Complete WhatsApp AI Setup Guide</span><span>10</span></div>
+  </section>
+
+  <section class="page">
+    <div class="top"><div class="brand"><span class="logo">V</span>VerityCore AI</div><span class="step">Step 9</span></div>
+    <h2>Confirm the WABA subscription</h2><div class="route">Meta route<span>:</span><br>Production setup → Register your WhatsApp phone number → Subscribe webhooks</div><div class="route">VerityCore AI route<span>:</span><br>Operations → WhatsApp → Subscribe WABA</div>
+    <ol class="steps"><li>In Meta, the correct WABA’s <strong>Subscribe webhooks</strong> switch should be blue/on.</li><li>In VerityCore AI, click <strong>Subscribe WABA</strong>. Meta may briefly report the request as pending even when its dashboard toggle is on.</li><li>Click <strong>Test Meta API</strong>. Success confirms the token, app, Phone Number ID and permissions can reach Meta.</li><li>If several WABAs are listed, confirm the enabled one contains your registered number.</li></ol>
+    <figure class="shot"><img src="images/04-meta-register-number-and-waba.png" alt="Meta WABA subscription enabled"><figcaption>Actual Meta screen: the correct registered number sits under the WABA whose Subscribe webhooks switch is on.</figcaption></figure>
+    <div class="callout warn">“Requested” is not the final test. A real inbound message and AI reply are the authoritative proof that the webhook route works.</div>
+    <div class="footer"><span>VerityCore AI · Complete WhatsApp AI Setup Guide</span><span>11</span></div>
+  </section>
+
+  <section class="page">
+    <div class="top"><div class="brand"><span class="logo">V</span>VerityCore AI</div><span class="step">Step 10</span></div>
+    <h2>Publish the Meta app</h2><div class="route">Click path<span>:</span><br>Meta app → Required actions → complete all items → Publish</div>
+    <ol class="steps"><li>Open <strong>Required actions</strong> and complete every blocker: real business URLs, app icon, contact details, business verification and any requested review.</li><li>Open <strong>Publish</strong> in the left menu and follow Meta’s prompts to set the app Live.</li><li>Return to Production setup and confirm the unpublished-app warning is gone.</li><li>Recheck that the callback is verified, <code>messages</code> is subscribed and the WABA toggle remains on.</li></ol>
+    <figure class="shot"><img src="images/01-meta-webhook-configuration.png" alt="Meta unpublished app warning"><figcaption>Actual Meta warning: while unpublished, the app receives dashboard test webhooks only. Real customer messages are not delivered to VerityCore AI.</figcaption></figure>
+    <div class="callout danger"><strong>This was the decisive production issue in the working setup.</strong> Delivery ticks do not prove that an unpublished Meta app delivered a webhook. Publish before the real customer-message test.</div>
+    <div class="footer"><span>VerityCore AI · Complete WhatsApp AI Setup Guide</span><span>12</span></div>
+  </section>
+
+  <section class="page">
+    <div class="top"><div class="brand"><span class="logo">V</span>VerityCore AI</div><span class="step">Step 11</span></div>
+    <h2>Run the end-to-end test</h2>
+    <ol class="steps"><li>Use a <strong>different personal WhatsApp number</strong>. Never message the registered business number from itself.</li><li>Send “Hello” to the registered business number.</li><li>Wait a few seconds. The VerityCore AI assistant should reply in WhatsApp.</li><li>Refresh the VerityCore AI WhatsApp page. It should show <strong>Receiving</strong> and <strong>Healthy</strong>.</li><li>Open <strong>Sales → Conversations</strong> and confirm the new conversation uses the workspace’s assistant and knowledge.</li></ol>
+    <figure class="shot"><img src="images/02-veritycore-whatsapp-channel.png" alt="Healthy VerityCore AI WhatsApp channel"><figcaption>Actual working state: a recent inbound event was processed and the channel shows Receiving / Healthy.</figcaption></figure>
+    <div class="success"><b>✓ Setup complete</b><p>A message from another phone received an AI reply, and the portal shows Receiving / Healthy.</p></div>
+    <div class="callout"><strong>24-hour service window:</strong> after a customer messages you, normal replies are allowed during the service window. Business-initiated messages outside it generally require an approved WhatsApp template.</div>
+    <div class="footer"><span>VerityCore AI · Complete WhatsApp AI Setup Guide</span><span>13</span></div>
   </section>
 
   <section class="page">
     <div class="top"><div class="brand"><span class="logo">V</span>VerityCore AI</div><span class="step">Troubleshooting</span></div>
-    <h2>If messages do not receive an AI reply</h2>
-    <table class="table">
-      <thead><tr><th>What you see</th><th>Likely cause</th><th>What to do</th></tr></thead>
-      <tbody>
-        <tr><td>WhatsApp shows two ticks, but VerityCore AI says “Awaiting event”.</td><td>Meta is not delivering inbound webhooks.</td><td>Publish the app, subscribe the <code>messages</code> field, and enable the correct WABA’s webhook toggle.</td></tr>
-        <tr><td>“Invalid verify token” or callback verification fails.</td><td>The two Verify token values do not match.</td><td>Re-enter the same case-sensitive value in Meta and VerityCore AI, save, then verify again.</td></tr>
-        <tr><td>Meta API test fails with a permissions error.</td><td>The access token lacks the required scopes or WABA asset access.</td><td>Create a System User token with both WhatsApp permissions and assign the correct app and WABA.</td></tr>
-        <tr><td>Webhook arrives, but signature verification fails.</td><td>The App Secret belongs to a different Meta app or was entered incorrectly.</td><td>Copy the App Secret from the same app that owns the webhook. Keep signature verification enabled.</td></tr>
-        <tr><td>Outbound replies stop later.</td><td>A temporary token expired.</td><td>Replace it with a System User token suitable for ongoing use.</td></tr>
-        <tr><td>One WABA works but another does not.</td><td>Phone Number ID and WABA ID were mixed between accounts.</td><td>Match the business, registered number, Phone Number ID, WABA ID, app, and token.</td></tr>
-      </tbody>
-    </table>
-    <div class="success-box"><div class="success-mark">✓</div><h3>You are ready</h3><p>When a message from another phone receives an AI reply and the portal shows <strong>Receiving / Healthy</strong>, your WhatsApp AI setup is complete.</p></div>
-    <h3>Final security checklist</h3>
-    <ul class="checklist">
-      <li>Use a production System User token and keep it in VerityCore AI only.</li>
-      <li>Keep webhook signature verification enabled.</li>
-      <li>Give Meta users and system users only the access they need.</li>
-      <li>Rotate any token or App Secret that appears in a screenshot, email, support ticket, or chat.</li>
-      <li>Review Meta alerts, token validity, and VerityCore AI channel health regularly.</li>
-    </ul>
-    <div class="callout">Need help? Contact your VerityCore AI administrator or support team. Never include access tokens or App Secrets in the request.</div>
-    <div class="footer"><span>VerityCore AI · WhatsApp AI Setup Guide</span><span>9</span></div>
+    <h2>Fix the common failure states</h2>
+    <table class="table"><thead><tr><th>What you see</th><th>Cause</th><th>Correction</th></tr></thead><tbody><tr><td>Two ticks, no AI reply, “Awaiting event”.</td><td>Inbound webhook was not delivered.</td><td>Publish the app; subscribe <code>messages</code>; enable the correct WABA toggle.</td></tr><tr><td>Callback verification fails.</td><td>Wrong callback or Verify token.</td><td>Copy the URL from VerityCore AI and use the same case-sensitive Verify token in both systems.</td></tr><tr><td>Meta API permissions error.</td><td>Wrong/expired token or missing access.</td><td>Create a production System User token with both permissions and correct app/WABA access.</td></tr><tr><td>Signature verification fails.</td><td>Wrong App Secret.</td><td>Use the App Secret from the same Meta app. Never leave signature verification disabled.</td></tr><tr><td>WABA stays Requested.</td><td>Listing delayed or IDs mismatch.</td><td>Check Meta’s toggle, confirm IDs, then send a real inbound message.</td></tr><tr><td>Replies worked, then stopped.</td><td>Temporary token expired.</td><td>Replace it with a production System User/permanent token.</td></tr><tr><td>Wrong business receives events.</td><td>Mixed Phone Number/WABA IDs.</td><td>Match business, number, Phone Number ID, WABA ID, app and token.</td></tr></tbody></table>
+    <h3>Security and handover checklist</h3><ul class="checklist"><li>Access Token, Verify Token and App Secret are stored only in a password manager and VerityCore AI.</li><li>Webhook signature verification remains enabled.</li><li>The Meta app is Live and all Required actions are complete.</li><li>The <code>messages</code> field and correct WABA are subscribed.</li><li>The production test came from another phone and resulted in Receiving / Healthy.</li></ul>
+    <div class="callout danger">When requesting support, include the workspace, approximate time and visible error—but never the Access Token, Verify Token or App Secret.</div>
+    <div class="footer"><span>VerityCore AI · Complete WhatsApp AI Setup Guide</span><span>14</span></div>
   </section>
 </body>
 </html>

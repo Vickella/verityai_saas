@@ -17,8 +17,19 @@ class TestWhatsAppSetupGuide(unittest.TestCase):
 		pdf = self.pdf_path.read_bytes()
 		self.assertEqual(pdf[:8], b"%PDF-1.4")
 		page_count = pdf.count(b"/Type /Page") - pdf.count(b"/Type /Pages")
-		self.assertEqual(page_count, 9)
+		self.assertEqual(page_count, 14)
 		self.assertGreater(len(pdf), 50_000)
+		for image_name in (
+			"01-meta-webhook-configuration.png",
+			"02-veritycore-whatsapp-channel.png",
+			"03-meta-callback-and-verify-token.png",
+			"04-meta-register-number-and-waba.png",
+			"05-meta-generate-token-and-test.png",
+			"06-meta-app-basic-settings.png",
+		):
+			image = self.guide_root / "images" / image_name
+			self.assertTrue(image.is_file())
+			self.assertEqual(image.read_bytes()[:8], b"\x89PNG\r\n\x1a\n")
 
 	def test_guide_covers_the_working_inbound_flow(self):
 		html = self.html_path.read_text(encoding="utf-8")
@@ -41,7 +52,10 @@ class TestWhatsAppSetupGuide(unittest.TestCase):
 		self.assertIsNone(re.search(r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}", html))
 		self.assertIsNone(re.search(r"\b\d{13,}\b", html))
 		self.assertIsNone(re.search(r"EAA[A-Za-z0-9]{20,}", html))
-		self.assertIn('class="input secret"', html)
+		self.assertIn("App Secret is already masked", html)
+		self.assertIn("No access-token value is visible", html)
+		self.assertIn("The Verify token is already masked", html)
+		self.assertEqual(html.count("<img src=\"images/"), 9)
 
 	def test_whatsapp_page_links_to_the_pdf(self):
 		portal_js = (
