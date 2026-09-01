@@ -214,6 +214,30 @@ class TestVerityAISaaS(FrappeTestCase):
 		self.assertFalse(result["configuration_ready"])
 		self.assertEqual(whatsapp.safe_setup(self.workspace)["setup_status"], "In Progress")
 
+	def test_whatsapp_waba_subscription_is_created_and_verified(self):
+		self.enable_full_whatsapp_for_test()
+		whatsapp.configure(self.workspace, {
+			"mode": "Full AI Automation", "whatsapp_phone_id": "phone-id",
+			"whatsapp_access_token": "access-secret", "meta_verify_token": "verify-secret",
+			"meta_app_secret": "app-secret", "verify_meta_signature": 1,
+			"meta_waba_id": "waba-id",
+		})
+		post_response = Mock(ok=True, content=b"{}", reason="OK")
+		post_response.json.return_value = {"success": True}
+		get_response = Mock(ok=True, content=b"{}", reason="OK")
+		get_response.json.return_value = {"data": [{"id": "app-id", "name": "VerityCore AI"}]}
+		with (
+			patch("requests.post", return_value=post_response) as graph_post,
+			patch("requests.get", return_value=get_response) as graph_get,
+		):
+			result = whatsapp.subscribe_waba(self.workspace)
+		self.assertTrue(result["subscribed"])
+		self.assertEqual(result["applications"][0]["id"], "app-id")
+		self.assertIn("waba-id/subscribed_apps", graph_post.call_args.args[0])
+		self.assertIn("waba-id/subscribed_apps", graph_get.call_args.args[0])
+		self.assertEqual(whatsapp.safe_setup(self.workspace)["waba_subscription_status"], "Subscribed")
+		self.assertNotIn("access-secret", frappe.as_json(result))
+
 	def test_whatsapp_resave_does_not_reset_a_receiving_channel(self):
 		self.enable_full_whatsapp_for_test()
 		whatsapp.configure(self.workspace, {

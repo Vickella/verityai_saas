@@ -33,3 +33,14 @@ def test_connection(workspace):
 	else:
 		require_workspace_permission(workspace, "manage_whatsapp")
 	return whatsapp.test_connection(workspace)
+
+
+@frappe.whitelist(methods=["POST"])
+@endpoint
+def subscribe_waba(workspace):
+	if is_operator() and workspace not in get_user_workspaces():
+		require_admin_reauthentication()
+		check_workspace_access(workspace, allow_operator=True)
+	else:
+		require_workspace_permission(workspace, "manage_whatsapp")
+	return whatsapp.subscribe_waba(workspace)

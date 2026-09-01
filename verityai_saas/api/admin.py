@@ -129,10 +129,23 @@ def dashboard():
 		wallet = workspace.wallet
 		if wallet:
 			allowance = int(wallet.opening_token_allowance or 0) + int(wallet.top_up_tokens or 0) + int(wallet.promotional_credits or 0)
-			usage_percent = round((int(wallet.tokens_used or 0) / max(allowance, 1)) * 100, 1)
-			workspace["usage_percent"] = usage_percent
-			if usage_percent >= 80:
-				high_usage.append({"workspace": workspace.name, "business_name": workspace.business_name, "usage_percent": usage_percent, "tokens_remaining": wallet.tokens_remaining})
+			tokens_used = int(wallet.tokens_used or 0)
+			actual_usage_percent = round((tokens_used / max(allowance, 1)) * 100, 1)
+			# Usage accumulated before enforcement or from reconciled provider data can
+			# exceed the current allowance. The meter is bounded at 100%; retain the
+			# actual value and overage separately for diagnosis and enforcement.
+			workspace["usage_percent"] = min(actual_usage_percent, 100.0)
+			workspace["usage_percent_actual"] = actual_usage_percent
+			workspace["overage_tokens"] = max(tokens_used - allowance, 0)
+			if actual_usage_percent >= 80:
+				high_usage.append({
+					"workspace": workspace.name,
+					"business_name": workspace.business_name,
+					"usage_percent": min(actual_usage_percent, 100.0),
+					"usage_percent_actual": actual_usage_percent,
+					"overage_tokens": max(tokens_used - allowance, 0),
+					"tokens_remaining": max(int(wallet.tokens_remaining or 0), 0),
+				})
 
 	provider_failures = frappe.get_all(
 		"AI Monitoring Alert",
@@ -262,11 +275,11 @@ def configure_paynow(values):
 
 @frappe.whitelist(methods=["POST"])
 @endpoint
-def start_paynow_test(workspace, merchant_email):
+def start_paynow_test(workspace, merchant_email, test_method="Hosted", phone=None):
 	"""Start an operator-only fake transaction without customer fulfilment."""
 	require_platform_admin()
 	require_admin_reauthentication()
-	return paynow.initiate_test_transaction(workspace, merchant_email)
+	return paynow.initiate_test_transaction(workspace, merchant_email, test_method, phone)
 
 
 @frappe.whitelist(methods=["POST"])

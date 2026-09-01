@@ -90,6 +90,23 @@ class TestOperatorBillingConsole(FrappeTestCase):
 		self.assertNotIn("poll_url", frappe.as_json(data))
 		self.assertNotIn("gateway_response_json", frappe.as_json(data))
 
+	def test_usage_meter_caps_display_and_preserves_historical_overage(self):
+		wallet = frappe.db.get_value("VerityAI Usage Wallet", {"workspace": self.workspace}, "name")
+		frappe.db.set_value("VerityAI Usage Wallet", wallet, {
+			"opening_token_allowance": 100,
+			"tokens_used": 149,
+			"tokens_remaining": 0,
+			"status": "Exhausted",
+		})
+		data = admin_api.dashboard()["data"]
+		workspace = next(row for row in data["workspaces"] if row.name == self.workspace)
+		self.assertEqual(workspace.usage_percent, 100)
+		self.assertEqual(workspace.usage_percent_actual, 149)
+		self.assertEqual(workspace.overage_tokens, 49)
+		high_usage = next(row for row in data["high_usage"] if row["workspace"] == self.workspace)
+		self.assertEqual(high_usage["usage_percent"], 100)
+		self.assertEqual(high_usage["overage_tokens"], 49)
+
 	def test_non_operator_cannot_read_or_mutate_operator_billing(self):
 		frappe.set_user(self.owner)
 		responses = [

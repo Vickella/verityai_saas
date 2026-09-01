@@ -13,6 +13,7 @@ from verityai_saas.services import billing
 
 
 INITIATE_URL = "https://www.paynow.co.zw/interface/initiatetransaction"
+REMOTE_INITIATE_URL = "https://www.paynow.co.zw/interface/remotetransaction"
 PAYNOW_HOSTS = {"paynow.co.zw", "www.paynow.co.zw", "staging.paynow.co.zw"}
 PAID_STATUSES = {"paid", "awaiting delivery", "delivered"}
 FINAL_FAILED_STATUSES = {"cancelled", "refunded"}
@@ -154,11 +155,17 @@ def verify_message(raw_message, integration_key):
 	return values
 
 
-def _safe_paynow_url(url, label):
+def _safe_paynow_url(url, label, operator_test=False):
 	parsed = urlparse(url or "")
 	if parsed.scheme != "https" or (parsed.hostname or "").lower() not in PAYNOW_HOSTS:
 		frappe.throw(f"Paynow did not return a valid transaction {label} URL.", frappe.ValidationError)
 	if label == "checkout" and parsed.path.lower().rstrip("/") in {"", "/home", "/home/home"}:
+		if operator_test:
+			frappe.throw(
+				"Paynow returned its Home page instead of a test transaction. Confirm the integration ID/key, "
+				"then sign in to Paynow with the merchant account that owns this integration, or use the EcoCash simulated-success test.",
+				frappe.ValidationError,
+			)
 		frappe.throw(
 			"Paynow accepted the request but this merchant account is still in testing and cannot take payments. "
 			"Ask Paynow to activate the integration before accepting customer orders.",
@@ -186,6 +193,14 @@ def _response_snapshot(values):
 	return json.dumps({key: value for key, value in values.items() if key != "hash"}, sort_keys=True)
 
 
+def _gateway_error(values):
+	"""Return Paynow's documented error field without echoing request credentials."""
+	error = str((values or {}).get("error") or "").strip()
+	# Keep the operator message readable and prevent response control characters
+	# from being rendered into the console alert.
+	return " ".join(error.split())[:240]
+
+
 def _initiate_gateway_event(
 	workspace_name,
 	event_type,
@@ -195,6 +210,8 @@ def _initiate_gateway_event(
 	*,
 	auth_email=None,
 	operator_test=False,
+	remote_method=None,
+	phone=None,
 ):
 	integration_id, integration_key = _credentials()
 	payment = billing.create_billing_event(workspace_name, event_type, amount, "Pending", provider="Paynow")
@@ -206,10 +223,21 @@ def _initiate_gateway_event(
 	}
 	if auth_email:
 		payload["authemail"] = auth_email
-	payload.update({"merchanttrace": payment[:32], "status": "Message"})
+	if remote_method:
+		payload["phone"] = phone
+		payload["method"] = remote_method
+	# Paynow documents merchanttrace as an optional, unique recovery identifier
+	# for initiation timeouts. It is signed with the rest of the request.
+	payload["merchanttrace"] = payment[:32]
+	payload["status"] = "Message"
 	payload["hash"] = generate_hash(payload.values(), integration_key)
 	try:
-		response = requests.post(INITIATE_URL, data=payload, timeout=20, allow_redirects=False)
+		response = requests.post(
+			REMOTE_INITIATE_URL if remote_method else INITIATE_URL,
+			data=payload,
+			timeout=20,
+			allow_redirects=False,
+		)
 		response.raise_for_status()
 	except requests.RequestException:
 		frappe.db.set_value("VerityAI Billing Event", payment, {"status": "Failed", "gateway_status": "Connection Error"})
@@ -217,18 +245,25 @@ def _initiate_gateway_event(
 	_, unsigned_values = parse_message(response.text)
 	if unsigned_values.get("status", "").lower() != "ok":
 		frappe.db.set_value("VerityAI Billing Event", payment, {"status": "Failed", "gateway_status": "Error", "gateway_response_json": _response_snapshot(unsigned_values)})
-		frappe.throw("Paynow could not start the transaction.", frappe.ValidationError)
+		detail = _gateway_error(unsigned_values)
+		frappe.throw(
+			f"Paynow rejected the transaction: {detail}" if detail else "Paynow could not start the transaction. No error detail was returned.",
+			frappe.ValidationError,
+		)
 	try:
 		values = verify_message(response.text, integration_key)
 	except frappe.PermissionError:
 		frappe.db.set_value("VerityAI Billing Event", payment, {"status": "Failed", "gateway_status": "Invalid Signature"})
 		raise
-	checkout_url = _safe_paynow_url(values.get("browserurl"), "checkout")
+	checkout_url = None
+	if not remote_method:
+		checkout_url = _safe_paynow_url(values.get("browserurl"), "checkout", operator_test=operator_test)
 	poll_url = _safe_paynow_url(values.get("pollurl"), "poll")
 	frappe.db.set_value("VerityAI Billing Event", payment, {
 		"checkout_url": checkout_url,
 		"poll_url": poll_url,
 		"gateway_status": values.get("status"),
+		"gateway_reference": values.get("paynowreference"),
 		"gateway_response_json": _response_snapshot(values),
 		# Customer value is only eligible for fulfilment when the operator has
 		# explicitly selected Production. Gateway tests remain permanently
@@ -238,10 +273,16 @@ def _initiate_gateway_event(
 	if not operator_test:
 		from verityai_saas.services.billing_documents import ensure_invoice_for_payment
 		ensure_invoice_for_payment(payment)
-	return {"payment": payment, "checkout_url": checkout_url, "status": "Pending"}
+	return {
+		"payment": payment,
+		"checkout_url": checkout_url,
+		"status": "Pending",
+		"test_method": remote_method or "hosted",
+		"instructions": values.get("instructions") if remote_method else None,
+	}
 
 
-def initiate_test_transaction(workspace_name, merchant_email):
+def initiate_test_transaction(workspace_name, merchant_email, test_method="Hosted", phone=None):
 	"""Create a Paynow test-mode transaction that can never fulfil customer value."""
 	if operating_mode() != "Test":
 		frappe.throw("Switch Paynow to Test mode before starting an integration test.", frappe.ValidationError)
@@ -250,8 +291,14 @@ def initiate_test_transaction(workspace_name, merchant_email):
 	if not validate_email_address(merchant_email):
 		frappe.throw("Enter the email address used to sign in to the Paynow merchant account.", frappe.ValidationError)
 	workspace = frappe.get_doc("VerityAI Workspace", workspace_name)
-	if (workspace.currency or "USD").upper() != "USD":
-		frappe.throw("Select a USD workspace for the Paynow integration test.", frappe.ValidationError)
+	test_method = str(test_method or "Hosted").strip().lower()
+	if test_method not in {"hosted", "ecocash", "onemoney"}:
+		frappe.throw("Choose Hosted fake success, EcoCash simulated success, or OneMoney simulated success.", frappe.ValidationError)
+	remote_method = None if test_method == "hosted" else test_method
+	if remote_method:
+		# Paynow documents this number as its immediate-success simulator. A real
+		# subscriber number must never be debited by the operator test path.
+		phone = "0771111111"
 	return _initiate_gateway_event(
 		workspace.name,
 		"Payment",
@@ -260,6 +307,8 @@ def initiate_test_transaction(workspace_name, merchant_email):
 		{"transaction_kind": "Gateway Test", "gross_amount": 1.00, "billing_cycle": "Manual"},
 		auth_email=merchant_email,
 		operator_test=True,
+		remote_method=remote_method,
+		phone=phone,
 	)
 
 

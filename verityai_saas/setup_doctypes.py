@@ -491,6 +491,7 @@ def ensure_doctypes():
 		field("workspace", "Workspace", "Link", options="VerityAI Workspace", reqd=1, unique=1, in_list_view=1), field("mode", "Mode", "Select", options="Button Only\nLead Alerts\nFull AI Automation", default="Button Only"),
 		field("business_whatsapp_number", "Business WhatsApp Number"), field("whatsapp_button_enabled", "WhatsApp Button Enabled", "Check", default=1),
 		field("lead_alert_enabled", "Lead Alert Enabled", "Check"), field("full_ai_enabled", "Full AI Enabled", "Check"), field("setup_status", "Setup Status", "Select", options="Not Configured\nIn Progress\nConnected\nFailed", default="Not Configured"),
+		field("meta_waba_id", "WhatsApp Business Account ID"), field("waba_subscription_status", "WABA Subscription Status"), field("last_subscription_check_on", "Last Subscription Check On", "Datetime"),
 		field("meta_phone_number_id_status", "Meta Phone Number ID Status"), field("access_token_status", "Access Token Status"), field("webhook_status", "Webhook Status"),
 		field("signature_verification_status", "Signature Verification Status"), field("last_tested_on", "Last Tested On", "Datetime"), field("last_webhook_on", "Last Webhook On", "Datetime"), field("last_webhook_event", "Last Webhook Event"),
 	], "VWA-.#####")
