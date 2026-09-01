@@ -162,7 +162,16 @@ def test_connection(workspace_name):
 	setup.access_token_status = "Verified"
 	if setup.meta_waba_id:
 		subscription = _get_waba_subscription(setup.meta_waba_id, access_token, version)
-		setup.waba_subscription_status = "Subscribed" if subscription["subscribed"] else "Not Subscribed"
+		# Meta may acknowledge POST /subscribed_apps before the app appears in the
+		# corresponding GET response. Preserve an accepted pending state instead of
+		# incorrectly rolling it back to Not Subscribed during propagation.
+		setup.waba_subscription_status = (
+			"Subscribed"
+			if subscription["subscribed"]
+			else "Requested"
+			if setup.waba_subscription_status == "Requested"
+			else "Not Subscribed"
+		)
 		setup.last_subscription_check_on = checked_at
 	setup.webhook_status = "Receiving" if setup.last_webhook_on else "Awaiting Event"
 	setup.save(ignore_permissions=True)
@@ -206,11 +215,13 @@ def subscribe_waba(workspace_name):
 		frappe.throw(f"Meta rejected the WABA subscription: {(message or response.reason or 'Unknown error')[:200]}", frappe.ValidationError)
 	checked_at = now_datetime()
 	verification = _get_waba_subscription(waba_id, access_token, version)
-	setup.waba_subscription_status = "Subscribed" if verification["subscribed"] else "Not Subscribed"
+	setup.waba_subscription_status = "Subscribed" if verification["subscribed"] else "Requested"
 	setup.last_subscription_check_on = checked_at
 	setup.save(ignore_permissions=True)
 	return {
+		"accepted": True,
 		"subscribed": verification["subscribed"],
+		"status": setup.waba_subscription_status,
 		"applications": verification["applications"],
 		"checked_at": checked_at,
 	}

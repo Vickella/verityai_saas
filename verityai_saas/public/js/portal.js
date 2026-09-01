@@ -506,7 +506,8 @@
     const configurationReady=Boolean(d.configuration_ready);
     const metaConnected=d.meta_phone_number_id_status==="Verified"&&d.access_token_status==="Verified";
     const wabaSubscribed=d.waba_subscription_status==="Subscribed";
-    const channelStatus=inboundHealthy?"Receiving":wabaSubscribed?"Awaiting message":metaConnected?"Subscription required":configurationReady?"Ready to test":"Setup required";
+    const wabaRequested=d.waba_subscription_status==="Requested";
+    const channelStatus=inboundHealthy?"Receiving":wabaSubscribed?"Awaiting message":wabaRequested?"Subscription requested":metaConnected?"Subscription required":configurationReady?"Ready to test":"Setup required";
     const missing=[];
     if(!d.whatsapp_phone_id) missing.push("Meta phone number ID");
     if(!d.engine?.access_token_present) missing.push("access token");
@@ -520,6 +521,8 @@
           ? "Meta credentials are valid. Subscribe this app to the WhatsApp Business Account to receive messages."
           : wabaSubscribed
             ? "WhatsApp Business Account subscribed. Send a message to confirm inbound delivery."
+            : wabaRequested
+              ? "Meta accepted the WABA subscription. Send a message to confirm inbound delivery while Meta finishes reporting the subscription."
             : metaConnected
               ? "Meta credentials are valid. Complete the WhatsApp Business Account subscription."
           : "Save the channel, verify the Meta API, then send a WhatsApp message to confirm the webhook.";
@@ -548,8 +551,7 @@
         values.verify_meta_signature=form.verify_meta_signature.checked?1:0;
         await call("verityai_saas.api.whatsapp.update",{workspace,values});
         const result=await call("verityai_saas.api.whatsapp.subscribe_waba",{workspace});
-        if(!result.subscribed) throw new Error("Meta accepted the request but did not report an active WABA subscription.");
-        alert("WhatsApp Business Account subscribed. Send a WhatsApp message to verify inbound delivery.");
+        alert(result.subscribed?"WhatsApp Business Account subscribed. Send a WhatsApp message to verify inbound delivery.":"Meta accepted the WABA subscription request but its verification list has not updated yet. Your Meta dashboard toggle is authoritative for now; send an inbound message and test again shortly.");
         await whatsapp();
       }
       catch(err){alert(err.message,true);button.disabled=false;}
