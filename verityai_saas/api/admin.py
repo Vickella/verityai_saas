@@ -4,7 +4,7 @@ import frappe
 from frappe.utils import add_days, cint, flt, getdate, today
 
 from verityai_saas.api._response import endpoint, json_value
-from verityai_saas.services import credit_stock, paynow, platform_ai, platform_email
+from verityai_saas.services import credit_stock, paynow, platform_ai, platform_email, setup_guide
 from verityai_saas.services.admin_reauth import require_admin_reauthentication
 from verityai_saas.services.permissions import is_platform_admin, require_platform_admin
 
@@ -211,7 +211,18 @@ def dashboard():
 		"support_email": platform_email.email_configuration_status(),
 		"commercial_metrics": commercial_metrics,
 		"credit_stock": credit_stock.summary(),
+		"whatsapp_setup_guide": setup_guide.status(),
 	}
+
+
+@frappe.whitelist(methods=["POST"])
+@endpoint
+def upload_whatsapp_setup_guide():
+	"""Replace the public customer guide from the secured operator console."""
+	require_platform_admin()
+	require_admin_reauthentication()
+	uploaded_file = (getattr(frappe.request, "files", None) or {}).get("guide")
+	return setup_guide.upload(uploaded_file)
 
 
 @frappe.whitelist(methods=["POST"])

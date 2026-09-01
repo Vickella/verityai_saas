@@ -181,6 +181,8 @@ def ensure_platform_settings():
 			field("paynow_environment", "Operating Mode", "Select", options="Test\nProduction", default="Test"),
 			field("paynow_integration_id", "Integration ID"),
 			field("paynow_integration_key", "Integration Key", "Password"),
+			field("whatsapp_guide_section", "Customer Guides", "Section Break"),
+			field("whatsapp_setup_guide", "WhatsApp Setup Guide", "Attach"),
 		],
 		issingle=True,
 		permission_rows=platform_settings_permissions(),

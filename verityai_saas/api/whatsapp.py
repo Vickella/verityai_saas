@@ -1,7 +1,7 @@
 import frappe
 
 from verityai_saas.api._response import endpoint, json_value
-from verityai_saas.services import whatsapp
+from verityai_saas.services import setup_guide, whatsapp
 from verityai_saas.services.admin_reauth import require_admin_reauthentication
 from verityai_saas.services.onboarding import set_step
 from verityai_saas.services.permissions import check_workspace_access, get_user_workspaces, is_operator, require_workspace_permission
@@ -11,7 +11,9 @@ from verityai_saas.services.permissions import check_workspace_access, get_user_
 @endpoint
 def get(workspace):
 	check_workspace_access(workspace)
-	return whatsapp.safe_setup(workspace)
+	data = whatsapp.safe_setup(workspace)
+	data["setup_guide"] = setup_guide.status()
+	return data
 
 
 @frappe.whitelist(methods=["POST"])

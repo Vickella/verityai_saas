@@ -1,4 +1,3 @@
-import re
 import unittest
 from pathlib import Path
 
@@ -7,64 +6,45 @@ class TestWhatsAppSetupGuide(unittest.TestCase):
 	@classmethod
 	def setUpClass(cls):
 		cls.repository_root = Path(__file__).resolve().parents[2]
-		cls.guide_root = cls.repository_root / "verityai_saas" / "public" / "guides"
-		cls.html_path = cls.guide_root / "veritycore-ai-whatsapp-setup-guide.html"
-		cls.pdf_path = cls.guide_root / "veritycore-ai-whatsapp-setup-guide.pdf"
+		cls.package_root = cls.repository_root / "verityai_saas"
 
-	def test_guide_assets_are_publishable(self):
-		self.assertTrue(self.html_path.is_file())
-		self.assertTrue(self.pdf_path.is_file())
-		pdf = self.pdf_path.read_bytes()
-		self.assertEqual(pdf[:8], b"%PDF-1.4")
-		page_count = pdf.count(b"/Type /Page") - pdf.count(b"/Type /Pages")
-		self.assertEqual(page_count, 14)
-		self.assertGreater(len(pdf), 50_000)
-		for image_name in (
-			"01-meta-webhook-configuration.png",
-			"02-veritycore-whatsapp-channel.png",
-			"03-meta-callback-and-verify-token.png",
-			"04-meta-register-number-and-waba.png",
-			"05-meta-generate-token-and-test.png",
-			"06-meta-app-basic-settings.png",
-		):
-			image = self.guide_root / "images" / image_name
-			self.assertTrue(image.is_file())
-			self.assertEqual(image.read_bytes()[:8], b"\x89PNG\r\n\x1a\n")
+	def test_customer_guide_is_not_bundled_with_source(self):
+		guide_root = self.package_root / "public" / "guides"
+		self.assertFalse(guide_root.exists())
 
-	def test_guide_covers_the_working_inbound_flow(self):
-		html = self.html_path.read_text(encoding="utf-8")
-		for required_text in (
-			"Publish",
-			"whatsapp_business_management",
-			"whatsapp_business_messaging",
-			"Phone Number ID",
-			"WhatsApp Business Account ID",
-			"Verify every Meta webhook signature",
-			"messages",
-			"Subscribe WABA",
-			"Receiving",
-			"Healthy",
-		):
-			self.assertIn(required_text, html)
+	def test_customer_download_uses_uploaded_file_url(self):
+		portal_js = (self.package_root / "public" / "js" / "portal.js").read_text(encoding="utf-8")
+		self.assertIn("d.setup_guide", portal_js)
+		self.assertIn("guide.available&&guide.url", portal_js)
+		self.assertNotIn("/assets/verityai_saas/guides/", portal_js)
 
-	def test_guide_contains_no_customer_credentials(self):
-		html = self.html_path.read_text(encoding="utf-8")
-		self.assertIsNone(re.search(r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}", html))
-		self.assertIsNone(re.search(r"\b\d{13,}\b", html))
-		self.assertIsNone(re.search(r"EAA[A-Za-z0-9]{20,}", html))
-		self.assertIn("App Secret is already masked", html)
-		self.assertIn("No access-token value is visible", html)
-		self.assertIn("The Verify token is already masked", html)
-		self.assertEqual(html.count("<img src=\"images/"), 9)
+	def test_operator_console_has_pdf_upload_flow(self):
+		admin_js = (self.package_root / "public" / "js" / "admin.js").read_text(encoding="utf-8")
+		self.assertIn('accept="application/pdf,.pdf"', admin_js)
+		self.assertIn("upload_whatsapp_setup_guide", admin_js)
+		self.assertIn('["guides","Guides"]', admin_js)
 
-	def test_whatsapp_page_links_to_the_pdf(self):
-		portal_js = (
-			self.repository_root / "verityai_saas" / "public" / "js" / "portal.js"
-		).read_text(encoding="utf-8")
-		self.assertIn(
-			'/assets/verityai_saas/guides/veritycore-ai-whatsapp-setup-guide.pdf',
-			portal_js,
-		)
+	def test_upload_service_enforces_security_boundaries(self):
+		service = (self.package_root / "services" / "setup_guide.py").read_text(encoding="utf-8")
+		self.assertIn("MAX_FILE_SIZE = 20 * 1024 * 1024", service)
+		self.assertIn('content.startswith(b"%PDF-")', service)
+		self.assertIn('b"/JavaScript"', service)
+		self.assertIn("reader.is_encrypted", service)
+		self.assertIn("is_private=0", service)
+		self.assertIn("set_single_value", service)
+
+	def test_install_adds_the_platform_guide_attachment_field(self):
+		setup = (self.package_root / "setup_doctypes.py").read_text(encoding="utf-8")
+		patches = (self.package_root / "patches.txt").read_text(encoding="utf-8")
+		self.assertIn('field("whatsapp_setup_guide", "WhatsApp Setup Guide", "Attach")', setup)
+		self.assertIn("v0_21.whatsapp_setup_guide_upload", patches)
+
+	def test_upload_api_requires_platform_admin_and_reauthentication(self):
+		admin_api = (self.package_root / "api" / "admin.py").read_text(encoding="utf-8")
+		start = admin_api.index("def upload_whatsapp_setup_guide")
+		body = admin_api[start:start + 500]
+		self.assertIn("require_platform_admin()", body)
+		self.assertIn("require_admin_reauthentication()", body)
 
 
 if __name__ == "__main__":
