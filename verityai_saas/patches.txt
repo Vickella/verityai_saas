@@ -22,3 +22,4 @@ verityai_saas.patches.v0_18.paynow_gateway_test
 verityai_saas.patches.v0_19.credit_stock_unit_economics
 verityai_saas.patches.v0_20.whatsapp_waba_subscription
 verityai_saas.patches.v0_21.whatsapp_setup_guide_upload
+verityai_saas.patches.v0_22.growth_foundation

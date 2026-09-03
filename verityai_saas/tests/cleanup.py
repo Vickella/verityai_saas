@@ -2,6 +2,7 @@ import frappe
 
 
 SAAS_WORKSPACE_DOCTYPES = (
+	"VerityAI Growth Event",
 	"VerityAI CRM Activity",
 	"VerityAI Appointment",
 	"VerityAI Sales Opportunity",

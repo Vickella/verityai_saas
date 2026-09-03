@@ -128,6 +128,10 @@ def workspace_child_query_condition(user=None):
 	return f"`workspace` in ({sql_names(get_user_workspaces(user))})"
 
 
+def operator_query_condition(user=None):
+	return "" if is_operator(user) else "1=0"
+
+
 def require_operator(user=None):
 	user = require_login(user)
 	if not is_operator(user):

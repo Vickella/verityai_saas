@@ -38,6 +38,11 @@ permission_query_conditions = {
 	"VerityAI Appointment": "verityai_saas.services.permissions.workspace_child_query_condition",
 	"VerityAI CRM Activity": "verityai_saas.services.permissions.workspace_child_query_condition",
 	"VerityAI Promotion Redemption": "verityai_saas.services.permissions.workspace_child_query_condition",
+	"VerityAI Growth Channel": "verityai_saas.services.permissions.operator_query_condition",
+	"VerityAI Growth Campaign": "verityai_saas.services.permissions.operator_query_condition",
+	"VerityAI Growth Event": "verityai_saas.services.permissions.operator_query_condition",
+	"VerityAI Consent Record": "verityai_saas.services.permissions.operator_query_condition",
+	"VerityAI Suppression Record": "verityai_saas.services.permissions.operator_query_condition",
 }
 
 role_home_page = {
@@ -54,6 +59,10 @@ scheduler_events = {
 }
 
 doc_events = {
+	"VerityAI Growth Event": {
+		"before_save": "verityai_saas.services.growth.protect_event_update",
+		"on_trash": "verityai_saas.services.growth.protect_event_delete",
+	},
 	"VerityAI Credit Stock Ledger": {
 		"before_insert": "verityai_saas.services.credit_stock.protect_ledger_insert",
 		"before_save": "verityai_saas.services.credit_stock.protect_ledger_update",

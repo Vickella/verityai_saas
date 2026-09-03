@@ -5,6 +5,16 @@
 **Prepared:** 2 September 2026
 **Updated:** 3 September 2026
 
+**Current delivery status:** Implementation is in progress on the isolated feature branch; production-facing
+capabilities remain disabled.
+
+### Implementation checkpoint
+
+The first control-plane slice now covers the channel and campaign registry, canonical immutable events,
+privacy-preserving consent and suppression records, independent feature flags, and an operator Growth view.
+Website Doctor, Website Builder, partner access, white-labelling and outbound delivery remain disabled until
+their own implementation, security, runtime and acceptance gates pass.
+
 ## 1. Executive decision
 
 Build the Big 5 as one connected acquisition and expansion system, not five independent products:
