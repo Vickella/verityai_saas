@@ -76,3 +76,4 @@ verity_ai_commerce_capability_handler = ["verityai_saas.services.commerce.handle
 verity_ai_catalog_search_handler = ["verityai_saas.services.commerce.handle_ai_catalog_search"]
 verity_ai_lead_capture_handler = ["verityai_saas.services.commerce.handle_ai_lead_capture"]
 verity_ai_sales_crm_handler = ["verityai_saas.services.commerce.handle_ai_sales_crm"]
+verity_ai_whatsapp_inbound = ["verityai_saas.services.whatsapp.record_inbound_webhook"]
