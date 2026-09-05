@@ -51,6 +51,7 @@ class TestGrowthFoundation(FrappeTestCase):
 	def test_feature_releases_are_independent(self):
 		updated = growth.configure_feature_flags({
 			"growth_foundation_enabled": 1,
+			"website_doctor_internal_enabled": 1,
 			"public_audits_enabled": 1,
 			"website_builder_enabled": 0,
 			"partner_portal_enabled": 0,
@@ -58,6 +59,7 @@ class TestGrowthFoundation(FrappeTestCase):
 			"outbound_enabled": 0,
 		})
 		self.assertTrue(updated["growth_foundation_enabled"])
+		self.assertTrue(updated["website_doctor_internal_enabled"])
 		self.assertTrue(updated["public_audits_enabled"])
 		self.assertFalse(updated["website_builder_enabled"])
 		self.assertFalse(updated["outbound_enabled"])
@@ -184,6 +186,9 @@ class TestGrowthFoundation(FrappeTestCase):
 		self.assertIn("growth-suppression-form", script)
 		self.assertIn("Product conversion funnel", script)
 		self.assertIn("Website project foundation", script)
+		self.assertIn("Website Doctor operations", script)
+		self.assertIn("website-audit-pilot-form", script)
+		self.assertIn(".va-inline-action", stylesheet)
 		self.assertIn(".va-growth-hero", stylesheet)
 
 	def test_product_channels_share_conversation_to_crm_attribution(self):

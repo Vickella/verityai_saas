@@ -188,6 +188,7 @@ def ensure_platform_settings():
 			field("whatsapp_setup_guide", "WhatsApp Setup Guide", "Attach"),
 			field("growth_section", "Growth Platform", "Section Break"),
 			field("growth_foundation_enabled", "Growth Foundation Enabled", "Check", default=1),
+			field("website_doctor_internal_enabled", "Internal Website Doctor Enabled", "Check", default=0),
 			field("public_audits_enabled", "Public Website Doctor Enabled", "Check", default=0),
 			field("website_builder_enabled", "Website Builder Enabled", "Check", default=0),
 			field("partner_portal_enabled", "Partner Portal Enabled", "Check", default=0),
@@ -308,6 +309,43 @@ def ensure_website_doctypes():
 		field("published_version", "Published Version", "Link", options="VerityAI Website Definition Version", read_only=1),
 	], "WPRJ-.########")
 
+
+def ensure_website_audit_doctypes():
+	ensure_doctype("VerityAI Website Audit", [
+		field("workspace", "Workspace", "Link", options="VerityAI Workspace", in_list_view=1, search_index=1),
+		field("target_url", "Target URL", reqd=1),
+		field("target_host", "Target Host", reqd=1, in_list_view=1, search_index=1),
+		field("request_kind", "Request Kind", "Select", options="Public\nWorkspace\nOperator", reqd=1, in_list_view=1),
+		field("status", "Status", "Select", options="Requested\nRunning\nCompleted\nFailed", default="Requested", reqd=1, in_list_view=1),
+		field("requested_by_user", "Requested By", "Link", options="User", read_only=1),
+		field("correlation_id", "Correlation ID", reqd=1, unique=1, search_index=1),
+		field("public_token_hash", "Public Token Hash", read_only=1),
+		field("observed_at", "Observed At", "Datetime", read_only=1),
+		field("completed_at", "Completed At", "Datetime", read_only=1),
+		field("overall_score", "Overall Score", "Float", read_only=1),
+		field("pages_checked", "Pages Checked", "Int", default=0, read_only=1),
+		field("response_bytes", "Response Bytes", "Int", default=0, read_only=1),
+		field("fetch_duration_ms", "Fetch Duration (ms)", "Int", default=0, read_only=1),
+		field("provider_duration_ms", "Provider Duration (ms)", "Int", default=0, read_only=1),
+		field("provider_cost_usd", "Provider Cost (USD)", "Currency", precision=6, default=0, read_only=1),
+		field("result_json", "Safe Result", "Code", options="JSON", read_only=1),
+		field("error_code", "Error Code", read_only=1),
+		field("error_reference", "Error Reference", read_only=1, search_index=1),
+		field("error_message", "Safe Error Message", "Small Text", read_only=1),
+	], "AUD-.########")
+	ensure_doctype("VerityAI Website Audit Evidence", [
+		field("audit", "Website Audit", "Link", options="VerityAI Website Audit", reqd=1, in_list_view=1, search_index=1),
+		field("workspace", "Workspace", "Link", options="VerityAI Workspace", search_index=1),
+		field("category", "Category", "Select", options="Performance\nTechnical SEO\nMetadata\nMobile Readiness\nAccessibility\nSecurity\nContent Quality\nConversion\nAI Readiness\nStructured Data\nPage Architecture", reqd=1, in_list_view=1),
+		field("check_code", "Check Code", reqd=1, in_list_view=1, search_index=1),
+		field("status", "Status", "Select", options="Pass\nWarning\nFail\nUnavailable", reqd=1, in_list_view=1),
+		field("source", "Evidence Source", "Select", options="Deterministic\nPageSpeed", reqd=1),
+		field("summary", "Observed Result", "Small Text", reqd=1),
+		field("evidence_json", "Measured Evidence", "Code", options="JSON", reqd=1, read_only=1),
+		field("observed_at", "Observed At", "Datetime", reqd=1, read_only=1),
+	], "AEV-.########")
+
+
 def ensure_doctypes():
 	ensure_platform_settings()
 
@@ -341,6 +379,7 @@ def ensure_doctypes():
 		field("default_workspace", "Default Workspace", "Link", options="VerityAI Workspace"),
 	])
 	ensure_website_doctypes()
+	ensure_website_audit_doctypes()
 
 	ensure_doctype("VerityAI Workspace Member", [
 		field("workspace", "Workspace", "Link", options="VerityAI Workspace", reqd=1, in_list_view=1),

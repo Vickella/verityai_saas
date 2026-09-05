@@ -24,3 +24,4 @@ verityai_saas.patches.v0_20.whatsapp_waba_subscription
 verityai_saas.patches.v0_21.whatsapp_setup_guide_upload
 verityai_saas.patches.v0_22.growth_foundation
 verityai_saas.patches.v0_23.website_project_foundation
+verityai_saas.patches.v0_24.website_doctor_foundation

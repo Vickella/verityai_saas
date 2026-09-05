@@ -9,6 +9,7 @@ from frappe.utils import cint, flt, get_datetime, now_datetime
 
 FEATURE_FLAGS = (
 	"growth_foundation_enabled",
+	"website_doctor_internal_enabled",
 	"public_audits_enabled",
 	"website_builder_enabled",
 	"partner_portal_enabled",
@@ -564,6 +565,20 @@ def website_project_summary():
 	return rows
 
 
+def website_audit_summary():
+	if not frappe.db.exists("DocType", "VerityAI Website Audit"):
+		return []
+	return frappe.get_all(
+		"VerityAI Website Audit",
+		fields=[
+			"name", "target_host", "request_kind", "workspace", "status", "overall_score", "pages_checked",
+			"fetch_duration_ms", "provider_duration_ms", "provider_cost_usd", "error_reference", "creation", "completed_at",
+		],
+		order_by="creation desc",
+		limit_page_length=100,
+	)
+
+
 def summary():
 	channels = frappe.get_all("VerityAI Growth Channel", fields=[
 		"name", "channel_name", "channel_code", "channel_type", "delivery_mode", "risk_class", "status",
@@ -582,18 +597,22 @@ def summary():
 		if row.status == "Active" and row.expires_on and get_datetime(row.expires_on) < current_time:
 			row.status = "Expired"
 	website_projects = website_project_summary()
+	website_audits = website_audit_summary()
 	return {
 		"feature_flags": feature_flags(),
 		"channels": channels,
 		"campaigns": campaigns,
 		"channel_funnel": channel_funnel(),
 		"website_projects": website_projects,
+		"website_audits": website_audits,
 		"metrics": {
 			"active_channels": sum(row.status == "Active" for row in channels),
 			"active_campaigns": sum(row.status == "Active" for row in campaigns),
 			"events": frappe.db.count("VerityAI Growth Event"),
 			"active_suppressions": sum(row.status == "Active" for row in suppressions),
 			"website_projects": sum(row.status != "Archived" for row in website_projects),
+			"website_audits": len(website_audits),
+			"website_audit_cost_usd": sum(flt(row.provider_cost_usd or 0) for row in website_audits),
 		},
 		"recent_events": frappe.get_all("VerityAI Growth Event", fields=[
 			"name", "event_type", "occurred_at", "channel", "campaign", "workspace", "source", "medium", "correlation_id",

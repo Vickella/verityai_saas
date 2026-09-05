@@ -918,10 +918,12 @@ For every implemented slice, Done means:
 
 ## 24. Branch and implementation policy
 
-This branch contains the approved first control-plane slice: growth channels/campaigns, canonical events, consent,
-suppression, feature flags and operator controls. Public Website Doctor, Website Builder, partner, white-label and
-outbound capabilities remain disabled. Each next slice requires its implementation specification and phase gate before
-code is added.
+This branch contains the growth control plane and the completed Phase 3 Website Project foundation. Phase 4 now has
+an internal Website Doctor evidence slice: opaque audit access, bounded and IP-pinned retrieval, deterministic checks,
+an optional PageSpeed adapter, cost/error telemetry and operator visibility. Public Website Doctor remains disabled by
+default until its report, lead-capture and staging acceptance gates pass. Website publishing, partner, white-label and
+outbound capabilities also remain disabled. Each next slice requires its implementation specification and phase gate
+before code is added.
 
 `main` remains untouched. Matching feature branches should be created in `verity_ai` and `saas_ai_website` only for work
 those repositories actually own. Changes merge in small vertical slices behind disabled-by-default feature flags; the
