@@ -27,6 +27,8 @@ PERMISSION_FIELDS = (
 	"can_manage_catalog",
 	"can_view_quotes",
 	"can_manage_quotes",
+	"can_view_website",
+	"can_manage_website",
 )
 
 

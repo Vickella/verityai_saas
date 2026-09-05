@@ -272,6 +272,42 @@ def ensure_growth_doctypes():
 	], "hash")
 
 
+def ensure_website_doctypes():
+	project_fields = [
+		field("workspace", "Workspace", "Link", options="VerityAI Workspace", reqd=1, in_list_view=1, search_index=1),
+		field("project_name", "Project Name", reqd=1, in_list_view=1, search_index=1),
+		field("project_slug", "Project Slug", reqd=1, unique=1, in_list_view=1),
+		field("business_name", "Business Name", reqd=1),
+		field("template_key", "Template Key", reqd=1, default="starter-v1"),
+		field("status", "Status", "Select", options="Draft\nReady\nPublished\nArchived", default="Draft", reqd=1, in_list_view=1),
+		field("verity_subdomain", "Reserved Verity Subdomain", read_only=1, unique=1),
+		field("custom_domain", "Custom Domain", read_only=1),
+		field("domain_status", "Domain Status", "Select", options="Unconfigured\nPending\nVerified\nActive\nFailed", default="Unconfigured", read_only=1),
+		field("widget_enabled", "Widget Enabled", "Check", default=0),
+		field("whatsapp_enabled", "WhatsApp Enabled", "Check", default=0),
+		field("crm_enabled", "CRM Enabled", "Check", default=1),
+		field("created_by_user", "Created By", "Link", options="User", read_only=1),
+	]
+	# Create the project first so the immutable version can link back to it.
+	ensure_doctype("VerityAI Website Project", project_fields, "WPRJ-.########")
+	ensure_doctype("VerityAI Website Definition Version", [
+		field("workspace", "Workspace", "Link", options="VerityAI Workspace", reqd=1, in_list_view=1, search_index=1),
+		field("project", "Website Project", "Link", options="VerityAI Website Project", reqd=1, in_list_view=1, search_index=1),
+		field("version_number", "Version", "Int", reqd=1, in_list_view=1),
+		field("schema_version", "Schema Version", "Int", reqd=1, default=1),
+		field("status", "Status", "Select", options="Validated\nSuperseded", default="Validated", reqd=1, in_list_view=1),
+		field("source", "Source", "Select", options="Manual\nWebsite Doctor\nAI Generation\nImport", default="Manual"),
+		field("definition_json", "Structured Definition", "Code", options="JSON", reqd=1),
+		field("definition_hash", "Definition Hash", reqd=1, search_index=1),
+		field("created_by_user", "Created By", "Link", options="User", read_only=1),
+		field("validated_on", "Validated On", "Datetime", read_only=1),
+	], "WVER-.########")
+	ensure_doctype("VerityAI Website Project", [
+		*project_fields,
+		field("current_version", "Current Version", "Link", options="VerityAI Website Definition Version", read_only=1),
+		field("published_version", "Published Version", "Link", options="VerityAI Website Definition Version", read_only=1),
+	], "WPRJ-.########")
+
 def ensure_doctypes():
 	ensure_platform_settings()
 
@@ -304,6 +340,7 @@ def ensure_doctypes():
 	ensure_doctype("VerityAI Account", [
 		field("default_workspace", "Default Workspace", "Link", options="VerityAI Workspace"),
 	])
+	ensure_website_doctypes()
 
 	ensure_doctype("VerityAI Workspace Member", [
 		field("workspace", "Workspace", "Link", options="VerityAI Workspace", reqd=1, in_list_view=1),
@@ -319,6 +356,7 @@ def ensure_doctypes():
 			("can_view_customers", "Can View Customers"), ("can_manage_customers", "Can Manage Customers"),
 			("can_view_catalog", "Can View Catalogue"), ("can_manage_catalog", "Can Manage Catalogue"),
 			("can_view_quotes", "Can View SaaS Quotes"), ("can_manage_quotes", "Can Manage SaaS Quotes"),
+			("can_view_website", "Can View Website Projects"), ("can_manage_website", "Can Manage Website Projects"),
 		)],
 	], "hash")
 

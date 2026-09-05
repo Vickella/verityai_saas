@@ -183,6 +183,7 @@ class TestGrowthFoundation(FrappeTestCase):
 		self.assertIn("growth-consent-form", script)
 		self.assertIn("growth-suppression-form", script)
 		self.assertIn("Product conversion funnel", script)
+		self.assertIn("Website project foundation", script)
 		self.assertIn(".va-growth-hero", stylesheet)
 
 	def test_product_channels_share_conversation_to_crm_attribution(self):

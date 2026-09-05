@@ -38,6 +38,8 @@ permission_query_conditions = {
 	"VerityAI Appointment": "verityai_saas.services.permissions.workspace_child_query_condition",
 	"VerityAI CRM Activity": "verityai_saas.services.permissions.workspace_child_query_condition",
 	"VerityAI Promotion Redemption": "verityai_saas.services.permissions.workspace_child_query_condition",
+	"VerityAI Website Project": "verityai_saas.services.permissions.workspace_child_query_condition",
+	"VerityAI Website Definition Version": "verityai_saas.services.permissions.workspace_child_query_condition",
 	"VerityAI Growth Channel": "verityai_saas.services.permissions.operator_query_condition",
 	"VerityAI Growth Campaign": "verityai_saas.services.permissions.operator_query_condition",
 	"VerityAI Growth Event": "verityai_saas.services.permissions.operator_query_condition",
@@ -85,6 +87,15 @@ doc_events = {
 	"VerityAI Sales Opportunity": {
 		"after_insert": "verityai_saas.services.growth.record_opportunity_created",
 		"on_update": "verityai_saas.services.growth.record_opportunity_stage",
+	},
+	"VerityAI Website Project": {
+		"validate": "verityai_saas.websites.projects.validate_project_document",
+		"on_trash": "verityai_saas.websites.projects.protect_project_delete",
+	},
+	"VerityAI Website Definition Version": {
+		"before_save": "verityai_saas.websites.projects.protect_definition_update",
+		"validate": "verityai_saas.websites.projects.validate_definition_document",
+		"on_trash": "verityai_saas.websites.projects.protect_definition_delete",
 	},
 	"AI Quotation Request": {"after_insert": "verityai_saas.services.notifications.send_quote_request_notification"},
 	"AI Monitoring Alert": {"after_insert": "verityai_saas.services.notifications.send_provider_failure_notification"},

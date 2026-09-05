@@ -550,6 +550,20 @@ def channel_funnel():
 	return sorted(rows.values(), key=lambda row: row["channel_code"])
 
 
+def website_project_summary():
+	if not frappe.db.exists("DocType", "VerityAI Website Project"):
+		return []
+	rows = frappe.get_all(
+		"VerityAI Website Project",
+		fields=["name", "workspace", "project_name", "project_slug", "status", "current_version", "domain_status", "modified"],
+		order_by="modified desc",
+		limit_page_length=100,
+	)
+	for row in rows:
+		row["version_count"] = frappe.db.count("VerityAI Website Definition Version", {"project": row.name})
+	return rows
+
+
 def summary():
 	channels = frappe.get_all("VerityAI Growth Channel", fields=[
 		"name", "channel_name", "channel_code", "channel_type", "delivery_mode", "risk_class", "status",
@@ -567,16 +581,19 @@ def summary():
 	for row in suppressions:
 		if row.status == "Active" and row.expires_on and get_datetime(row.expires_on) < current_time:
 			row.status = "Expired"
+	website_projects = website_project_summary()
 	return {
 		"feature_flags": feature_flags(),
 		"channels": channels,
 		"campaigns": campaigns,
 		"channel_funnel": channel_funnel(),
+		"website_projects": website_projects,
 		"metrics": {
 			"active_channels": sum(row.status == "Active" for row in channels),
 			"active_campaigns": sum(row.status == "Active" for row in campaigns),
 			"events": frappe.db.count("VerityAI Growth Event"),
 			"active_suppressions": sum(row.status == "Active" for row in suppressions),
+			"website_projects": sum(row.status != "Archived" for row in website_projects),
 		},
 		"recent_events": frappe.get_all("VerityAI Growth Event", fields=[
 			"name", "event_type", "occurred_at", "channel", "campaign", "workspace", "source", "medium", "correlation_id",
