@@ -25,6 +25,21 @@ SUBJECT_TYPES = {"Visitor", "User", "Lead", "Customer", "Partner"}
 CONSENT_STATUSES = {"Granted", "Withdrawn", "Expired"}
 CODE_PATTERN = re.compile(r"^[A-Z0-9][A-Z0-9_-]{1,39}$")
 EVENT_PATTERN = re.compile(r"^[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*){1,4}$")
+PLATFORM_CHANNELS = {"web": "WIDGET", "whatsapp": "WHATSAPP", "desk": "CRM"}
+LEAD_STATUS_EVENTS = {
+	"Contacted": "lead.contacted",
+	"Qualified": "lead.qualified",
+	"Won": "lead.won",
+	"Lost": "lead.lost",
+}
+OPPORTUNITY_STAGE_EVENTS = {
+	"Qualified": "opportunity.qualified",
+	"Proposal": "opportunity.proposal",
+	"Negotiation": "opportunity.negotiation",
+	"Won": "opportunity.won",
+	"Lost": "opportunity.lost",
+}
+ATTRIBUTION_FIELDS = ("source", "medium", "content", "term", "referral_code")
 
 DEFAULT_CHANNELS = (
 	("WEBSITE", "Verity website", "Owned", "Public", "Low", "landing pages, forms, campaign attribution"),
@@ -224,6 +239,189 @@ def record_event(event_type, **values):
 	}).insert(ignore_permissions=True)
 
 
+def record_lifecycle_event(event_type, **values):
+	"""Growth evidence must never interrupt a customer conversation or CRM action."""
+	try:
+		return record_event(event_type, **values)
+	except Exception:
+		frappe.log_error(frappe.get_traceback(), f"Growth lifecycle event failed: {event_type}")
+		return None
+
+
+def _tracking_available():
+	"""Keep engine hooks harmless during install, migrations, and disabled releases."""
+	try:
+		return (
+			frappe.db.exists("DocType", "VerityAI Growth Event")
+			and frappe.db.exists("DocType", "VerityAI Growth Channel")
+			and feature_flags().get("growth_foundation_enabled")
+		)
+	except Exception:
+		return False
+
+
+def _workspace_context(tenant=None, workspace=None):
+	if workspace:
+		return frappe.db.get_value("VerityAI Workspace", workspace, ["name", "account"], as_dict=True)
+	if not tenant:
+		return None
+	return frappe.db.get_value(
+		"VerityAI Workspace", {"engine_tenant": tenant}, ["name", "account"], as_dict=True
+	)
+
+
+def _channel(platform):
+	code = PLATFORM_CHANNELS.get(_clean(platform).casefold())
+	if not code:
+		return None
+	return frappe.db.get_value("VerityAI Growth Channel", {"channel_code": code}, "name")
+
+
+def _safe_attribution(raw):
+	if not raw:
+		return {}
+	if isinstance(raw, str):
+		try:
+			raw = json.loads(raw)
+		except (TypeError, ValueError):
+			return {}
+	if not isinstance(raw, dict):
+		return {}
+	container = raw.get("attribution") if isinstance(raw.get("attribution"), dict) else raw
+	return {key: _clean(container.get(key)) for key in ATTRIBUTION_FIELDS if container.get(key)}
+
+
+def _lead_context(lead_name):
+	if not lead_name or not frappe.db.exists("AI Lead", lead_name):
+		return None, None
+	lead = frappe.db.get_value(
+		"AI Lead", lead_name, ["tenant", "chat_session", "source_channel"], as_dict=True
+	)
+	return lead, _workspace_context(tenant=lead.tenant)
+
+
+def record_conversation_started(doc, method=None):
+	if not _tracking_available():
+		return
+	context = _workspace_context(tenant=doc.get("tenant"))
+	channel = _channel(doc.get("platform"))
+	if not context or not channel:
+		return
+	record_lifecycle_event(
+		"conversation.started",
+		workspace=context.name,
+		account=context.account,
+		channel=channel,
+		source=_clean(doc.get("platform")).casefold(),
+		object_type="AI Chat Session",
+		object_name=doc.name,
+		correlation_id=doc.name,
+		idempotency_key=f"conversation.started:{doc.name}",
+		metadata={"platform": _clean(doc.get("platform")), "status": _clean(doc.get("status"))},
+	)
+
+
+def record_lead_created(doc, method=None):
+	if not _tracking_available():
+		return
+	context = _workspace_context(tenant=doc.get("tenant"))
+	channel = _channel(doc.get("source_channel"))
+	if not context or not channel:
+		return
+	attribution = _safe_attribution(doc.get("dynamic_details"))
+	record_lifecycle_event(
+		"lead.captured",
+		workspace=context.name,
+		account=context.account,
+		channel=channel,
+		source=attribution.get("source") or _clean(doc.get("source_channel")).casefold(),
+		medium=attribution.get("medium"),
+		content=attribution.get("content"),
+		term=attribution.get("term"),
+		referral_code=attribution.get("referral_code"),
+		object_type="AI Lead",
+		object_name=doc.name,
+		correlation_id=doc.get("chat_session") or doc.name,
+		idempotency_key=f"lead.captured:{doc.name}",
+		metadata={
+			"status": _clean(doc.get("status")),
+			"has_email": bool(doc.get("email")),
+			"has_phone": bool(doc.get("phone")),
+		},
+	)
+
+
+def record_lead_status(doc, method=None):
+	if not _tracking_available() or not doc.has_value_changed("status"):
+		return
+	event_type = LEAD_STATUS_EVENTS.get(doc.get("status"))
+	if not event_type:
+		return
+	context = _workspace_context(tenant=doc.get("tenant"))
+	channel = _channel(doc.get("source_channel"))
+	if not context or not channel:
+		return
+	record_lifecycle_event(
+		event_type,
+		workspace=context.name,
+		account=context.account,
+		channel=channel,
+		source=_clean(doc.get("source_channel")).casefold(),
+		object_type="AI Lead",
+		object_name=doc.name,
+		correlation_id=doc.get("chat_session") or doc.name,
+		idempotency_key=f"{event_type}:{doc.name}",
+		metadata={"status": doc.get("status")},
+	)
+
+
+def record_opportunity_created(doc, method=None):
+	if not _tracking_available():
+		return
+	lead, context = _lead_context(doc.get("lead"))
+	context = context or _workspace_context(workspace=doc.get("workspace"))
+	if not context:
+		return
+	channel = _channel(lead.source_channel if lead else "CRM")
+	record_lifecycle_event(
+		"opportunity.created",
+		workspace=context.name,
+		account=context.account,
+		channel=channel,
+		source=_clean(doc.get("source") or (lead.source_channel if lead else "crm")).casefold(),
+		object_type="VerityAI Sales Opportunity",
+		object_name=doc.name,
+		correlation_id=(lead.chat_session if lead else None) or doc.name,
+		idempotency_key=f"opportunity.created:{doc.name}",
+		metadata={"stage": doc.get("stage"), "amount": flt(doc.get("amount")), "currency": _clean(doc.get("currency"), 3)},
+	)
+
+
+def record_opportunity_stage(doc, method=None):
+	if not _tracking_available() or not doc.has_value_changed("stage"):
+		return
+	event_type = OPPORTUNITY_STAGE_EVENTS.get(doc.get("stage"))
+	if not event_type:
+		return
+	lead, context = _lead_context(doc.get("lead"))
+	context = context or _workspace_context(workspace=doc.get("workspace"))
+	if not context:
+		return
+	channel = _channel(lead.source_channel if lead else "CRM")
+	record_lifecycle_event(
+		event_type,
+		workspace=context.name,
+		account=context.account,
+		channel=channel,
+		source=_clean(doc.get("source") or (lead.source_channel if lead else "crm")).casefold(),
+		object_type="VerityAI Sales Opportunity",
+		object_name=doc.name,
+		correlation_id=(lead.chat_session if lead else None) or doc.name,
+		idempotency_key=f"{event_type}:{doc.name}",
+		metadata={"stage": doc.get("stage"), "amount": flt(doc.get("amount")), "currency": _clean(doc.get("currency"), 3)},
+	)
+
+
 def record_consent(identifier, subject_type, purpose, status="Granted", **values):
 	status = _choice(status, CONSENT_STATUSES, "Consent status")
 	doc = frappe.get_doc({
@@ -300,6 +498,58 @@ def protect_event_delete(doc, method=None):
 	frappe.throw("Growth events cannot be deleted.", frappe.PermissionError)
 
 
+def channel_funnel():
+	channels = frappe.get_all(
+		"VerityAI Growth Channel",
+		filters={"channel_code": ["in", ["WIDGET", "WHATSAPP"]]},
+		fields=["name", "channel_code", "channel_name"],
+	)
+	rows = {
+		channel.name: {
+			"channel": channel.name,
+			"channel_code": channel.channel_code,
+			"channel_name": channel.channel_name,
+			"inbound_messages": 0,
+			"conversations": 0,
+			"leads": 0,
+			"qualified_leads": 0,
+			"opportunities": 0,
+			"won": 0,
+			"won_value": 0,
+		}
+		for channel in channels
+	}
+	events = frappe.get_all(
+		"VerityAI Growth Event",
+		filters={"channel": ["in", list(rows)]},
+		fields=["channel", "event_type", "metadata"],
+		limit_page_length=0,
+	) if rows else []
+	field_by_event = {
+		"channel.inbound_received": "inbound_messages",
+		"conversation.started": "conversations",
+		"lead.captured": "leads",
+		"lead.qualified": "qualified_leads",
+		"opportunity.created": "opportunities",
+		"opportunity.won": "won",
+	}
+	for event in events:
+		fieldname = field_by_event.get(event.event_type)
+		if not fieldname:
+			continue
+		rows[event.channel][fieldname] += 1
+		if event.event_type == "opportunity.won":
+			try:
+				metadata = json.loads(event.metadata or "{}")
+			except (TypeError, ValueError):
+				metadata = {}
+			rows[event.channel]["won_value"] += flt(metadata.get("amount"))
+	for row in rows.values():
+		row["lead_conversion_rate"] = min(100, round(row["leads"] / row["conversations"] * 100, 1)) if row["conversations"] else 0
+		row["win_rate"] = min(100, round(row["won"] / row["opportunities"] * 100, 1)) if row["opportunities"] else 0
+	return sorted(rows.values(), key=lambda row: row["channel_code"])
+
+
 def summary():
 	channels = frappe.get_all("VerityAI Growth Channel", fields=[
 		"name", "channel_name", "channel_code", "channel_type", "delivery_mode", "risk_class", "status",
@@ -321,6 +571,7 @@ def summary():
 		"feature_flags": feature_flags(),
 		"channels": channels,
 		"campaigns": campaigns,
+		"channel_funnel": channel_funnel(),
 		"metrics": {
 			"active_channels": sum(row.status == "Active" for row in channels),
 			"active_campaigns": sum(row.status == "Active" for row in campaigns),

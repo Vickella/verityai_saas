@@ -134,6 +134,24 @@ def record_inbound_webhook(tenant_name, message_id=None, **kwargs):
 	if frappe.db.get_value("VerityAI WhatsApp Setup", setup, "meta_waba_id"):
 		values["waba_subscription_status"] = "Subscribed"
 	frappe.db.set_value("VerityAI WhatsApp Setup", setup, values)
+	# The delivery hook runs for every accepted message, including existing sessions.
+	# Store operational evidence without persisting the sender number or message body.
+	from verityai_saas.services import growth
+	if growth._tracking_available():
+		context = growth._workspace_context(workspace=workspace)
+		channel = growth._channel("WhatsApp")
+		if context and channel:
+			growth.record_lifecycle_event(
+				"channel.inbound_received",
+				workspace=context.name,
+				account=context.account,
+				channel=channel,
+				source="whatsapp",
+				object_type="WhatsApp Webhook",
+				correlation_id=message_id or "inbound-whatsapp",
+				idempotency_key=f"whatsapp.inbound:{message_id or frappe.generate_hash(length=32)}",
+				metadata={"accepted": True},
+			)
 
 
 def test_connection(workspace_name):

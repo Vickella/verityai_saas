@@ -68,10 +68,23 @@ doc_events = {
 		"before_save": "verityai_saas.services.credit_stock.protect_ledger_update",
 		"on_trash": "verityai_saas.services.credit_stock.protect_ledger_delete",
 	},
-	"AI Lead": {"after_insert": "verityai_saas.services.notifications.send_lead_notification"},
+	"AI Lead": {
+		"after_insert": [
+			"verityai_saas.services.notifications.send_lead_notification",
+			"verityai_saas.services.growth.record_lead_created",
+		],
+		"on_update": "verityai_saas.services.growth.record_lead_status",
+	},
 	"AI Chat Session": {
-		"after_insert": "verityai_saas.services.whatsapp.record_channel_activity",
+		"after_insert": [
+			"verityai_saas.services.whatsapp.record_channel_activity",
+			"verityai_saas.services.growth.record_conversation_started",
+		],
 		"on_update": "verityai_saas.services.notifications.send_handoff_notification",
+	},
+	"VerityAI Sales Opportunity": {
+		"after_insert": "verityai_saas.services.growth.record_opportunity_created",
+		"on_update": "verityai_saas.services.growth.record_opportunity_stage",
 	},
 	"AI Quotation Request": {"after_insert": "verityai_saas.services.notifications.send_quote_request_notification"},
 	"AI Monitoring Alert": {"after_insert": "verityai_saas.services.notifications.send_provider_failure_notification"},

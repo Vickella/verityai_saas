@@ -5,8 +5,10 @@ from frappe.tests.utils import FrappeTestCase
 from frappe.utils import add_days, now_datetime
 
 from verityai_saas.api import growth as growth_api
-from verityai_saas.services import growth
+from verityai_saas.services import growth, whatsapp
+from verityai_saas.services.onboarding import create_workspace
 from verityai_saas.setup_doctypes import ensure_doctypes
+from verityai_saas.tests.cleanup import cleanup_test_workspace
 
 
 class TestGrowthFoundation(FrappeTestCase):
@@ -180,4 +182,86 @@ class TestGrowthFoundation(FrappeTestCase):
 		self.assertIn("One transparent growth control plane", script)
 		self.assertIn("growth-consent-form", script)
 		self.assertIn("growth-suppression-form", script)
+		self.assertIn("Product conversion funnel", script)
 		self.assertIn(".va-growth-hero", stylesheet)
+
+	def test_product_channels_share_conversation_to_crm_attribution(self):
+		growth.configure_feature_flags({"growth_foundation_enabled": 1})
+		owner = frappe.get_doc({
+			"doctype": "User",
+			"email": f"growth-owner-{self.token.lower()}@example.com",
+			"first_name": "Growth",
+			"last_name": "Tester",
+			"user_type": "Website User",
+			"send_welcome_email": 0,
+		}).insert(ignore_permissions=True).name
+		created = create_workspace(owner, f"Growth Account {self.token}", f"Growth Workspace {self.token}")
+		workspace = created["workspace"]
+		try:
+			conversation = frappe.get_doc({
+				"doctype": "AI Chat Session", "session_id": frappe.generate_hash(),
+				"tenant": created["engine_tenant"], "platform": "Web",
+				"user_identifier": "private-visitor@example.com", "status": "Open", "chat_history": "[]",
+			}).insert(ignore_permissions=True)
+			lead = frappe.get_doc({
+				"doctype": "AI Lead", "tenant": created["engine_tenant"], "lead_name": "Private Buyer",
+				"email": "private-buyer@example.com", "phone": "+263700000000",
+				"chat_session": conversation.name, "source_channel": "Web", "status": "New",
+				"dynamic_details": json.dumps({"attribution": {"source": "website", "medium": "widget"}}),
+			}).insert(ignore_permissions=True)
+			opportunity = frappe.get_doc({
+				"doctype": "VerityAI Sales Opportunity", "workspace": workspace,
+				"opportunity_name": "Growth opportunity", "lead": lead.name,
+				"stage": "New", "amount": 125, "currency": "USD",
+			}).insert(ignore_permissions=True)
+			lead.status = "Qualified"
+			lead.save(ignore_permissions=True)
+			opportunity.stage = "Won"
+			opportunity.save(ignore_permissions=True)
+
+			events = frappe.get_all("VerityAI Growth Event", filters={"workspace": workspace}, fields=["event_type", "channel", "correlation_id", "metadata"])
+			self.assertEqual(
+				{row.event_type for row in events},
+				{"conversation.started", "lead.captured", "lead.qualified", "opportunity.created", "opportunity.won"},
+			)
+			self.assertTrue(all(row.channel == "WIDGET" for row in events))
+			self.assertTrue(all(row.correlation_id == conversation.name for row in events))
+			self.assertNotIn("private-buyer@example.com", json.dumps(events))
+			widget = next(row for row in growth.channel_funnel() if row["channel_code"] == "WIDGET")
+			self.assertGreaterEqual(widget["conversations"], 1)
+			self.assertGreaterEqual(widget["leads"], 1)
+			self.assertGreaterEqual(widget["won"], 1)
+			self.assertGreaterEqual(widget["won_value"], 125)
+
+			whatsapp_conversation = frappe.get_doc({
+				"doctype": "AI Chat Session", "session_id": frappe.generate_hash(),
+				"tenant": created["engine_tenant"], "platform": "WhatsApp",
+				"user_identifier": "+263711111111", "status": "Open", "chat_history": "[]",
+			}).insert(ignore_permissions=True)
+			frappe.get_doc({
+				"doctype": "AI Lead", "tenant": created["engine_tenant"], "lead_name": "WhatsApp Buyer",
+				"phone": "+263711111111", "chat_session": whatsapp_conversation.name,
+				"source_channel": "WhatsApp", "status": "New",
+			}).insert(ignore_permissions=True)
+			setup = frappe.db.get_value("VerityAI WhatsApp Setup", {"workspace": workspace}, "name")
+			frappe.db.set_value("VerityAI WhatsApp Setup", setup, "meta_waba_id", "test-waba")
+			whatsapp.record_inbound_webhook(
+				created["engine_tenant"], message_id=f"message-{self.token}",
+				from_number="+263711111111", message="private message body",
+			)
+			whatsapp.record_inbound_webhook(created["engine_tenant"], message_id=f"message-{self.token}")
+			whatsapp_events = frappe.get_all(
+				"VerityAI Growth Event", filters={"workspace": workspace, "channel": "WHATSAPP"},
+				fields=["event_type", "metadata", "correlation_id"],
+			)
+			self.assertEqual(sum(row.event_type == "channel.inbound_received" for row in whatsapp_events), 1)
+			self.assertTrue({"conversation.started", "lead.captured", "channel.inbound_received"}.issubset({row.event_type for row in whatsapp_events}))
+			serialized = json.dumps(whatsapp_events)
+			self.assertNotIn("+263711111111", serialized)
+			self.assertNotIn("private message body", serialized)
+			whatsapp_funnel = next(row for row in growth.channel_funnel() if row["channel_code"] == "WHATSAPP")
+			self.assertGreaterEqual(whatsapp_funnel["inbound_messages"], 1)
+			self.assertGreaterEqual(whatsapp_funnel["conversations"], 1)
+			self.assertGreaterEqual(whatsapp_funnel["leads"], 1)
+		finally:
+			cleanup_test_workspace(workspace, users=[owner], engine_tenant=created["engine_tenant"])
