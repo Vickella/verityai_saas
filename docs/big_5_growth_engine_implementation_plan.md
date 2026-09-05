@@ -52,6 +52,38 @@ Useful contribution → Profile/content visit → Free tool → User → Case st
 
 SEO, referrals, affiliates, templates, integrations, workshops and open-source edge components amplify these loops. They must use shared attribution, consent, approval and reporting infrastructure rather than separate tracking implementations.
 
+### Five-system master architecture
+
+Every proposed capability must belong to one of five cooperating systems. This prevents a marketing idea from
+creating its own identity, event, credential, billing or reporting silo.
+
+| System | Owns | Does not own |
+|---|---|---|
+| Product Engine | Websites, AI experiences, CRM workflows, WhatsApp capabilities, hosting, SEO and customer-facing integrations | Cross-product attribution or partner commercial truth |
+| Growth Engine | Acquisition journeys, campaigns, touchpoints, referrals, prospecting, conversion and experiments | Provider credentials or autonomous channel delivery |
+| Channel Engine | Channel accounts, conversations, participants, messages, templates, delivery attempts and provider adapters | Lead/opportunity truth or partner permissions |
+| Partner Engine | Partner identity, type/tier, agreements, scoped client grants, branding, commissions and payouts | Unrestricted customer data access |
+| Governance Engine | Tenant isolation, RBAC, consent, suppression, secrets, audit logs, metering, approvals and attribution rules | Product-specific presentation logic |
+
+The operating rule is:
+
+```text
+Build the machine
+  -> sell today's proven capabilities while building
+  -> progressively automate safe distribution
+  -> turn customers, websites and approved partners into measurable distribution
+```
+
+The canonical commercial path is shared by every acquisition source:
+
+```text
+Visitor -> Prospect -> Lead -> Opportunity -> Customer -> Account/Workspace
+```
+
+The source may be Website Doctor, Widget, WhatsApp, a partner, a referral, a campaign or a manual lead, but
+all qualified commercial work converges in the existing CRM and carries first-touch, last-touch and conversion
+evidence. No initiative may create a parallel prospect or customer database merely for convenience.
+
 ## 2. What already exists and should be reused
 
 The current repositories already provide important foundations:
@@ -150,67 +182,135 @@ Exact limits should be configured through plan entitlements after cost measureme
 
 ## 7. Delivery plan and approval gates
 
-### Stage 0 — foundation and product contracts
+The roadmap is dependency-led. A downstream feature cannot bypass an unfinished platform or governance gate simply
+because its UI can be built quickly.
 
-Plan and approve:
+### Phase 0 — whole-repository readiness audit
 
-- Definition JSON schema and supported section catalogue.
-- Entitlement names, cost meters and operator-configurable limits.
-- Ownership model, public/private visibility and retention rules.
-- Growth event taxonomy and attribution rules.
-- Feature flags and kill switches.
-- Queue names, retry policy and idempotency keys.
-- Environment separation for local, staging and production.
+Read `verityai_saas`, `verity_ai` and `saas_ai_website` before changing implementation. Produce an existing-versus-new
+capability map for Tenant/Account, Customer, Website, Channel, Conversation, Lead, Opportunity, Partner, Referral,
+Campaign, Event, Subscription and Usage. Identify duplication, ownership gaps, unsafe secrets and unstable interfaces.
 
-**Gate:** architecture/security review and approved schemas. No public release.
+**Gate:** reviewed evidence map, repository ownership decisions and an explicit preserve/refactor/replace decision for
+every existing subsystem. No production mutation.
 
-### Stage 1 — Website Doctor vertical slice
+### Phase 1 — shared platform foundation
 
-Deliver URL submission, bounded fetch, deterministic checks, PageSpeed adapter, AI summary, report page, lead capture and event tracking.
+Establish stable service boundaries for identity, tenant isolation, permissions, secrets, feature flags, immutable
+events, attribution, consent, suppression, usage, costs, queues and APIs. Configure limits through plans or operator
+settings rather than embedding commercial policy in browser code.
 
-The deterministic evidence must be stored separately from AI interpretation. A report must clearly show what was observed, when it was measured and which recommendation was inferred.
+**Gate:** permissions, idempotency, isolation, auditability and disabled-by-default release controls are tested.
 
-**Gate:** SSRF and abuse tests pass; reports are useful without hallucinated claims; cost per audit is measurable.
+### Phase 2 — existing product consolidation
 
-### Stage 2 — structured Website Builder
+Make Widget, WhatsApp and CRM one coherent commercial flow before adding a second acquisition stack:
 
-Deliver Website Project, onboarding inputs, a small template catalogue, schema-validated AI population, preview and version history. Start with common small-business sites rather than a general-purpose visual editor.
+```text
+Website/WhatsApp conversation -> participant -> lead -> opportunity -> follow-up -> outcome
+```
 
-**Gate:** users can create and revise a complete responsive site without generated executable code.
+Introduce shared channel, message and delivery contracts only where they remove real duplication. Preserve the proven
+WhatsApp webhook and current customer journeys while adding common event names, correlation IDs, attribution and
+operator health signals.
 
-### Stage 3 — free publish and hosting
+**Gate:** Widget and WhatsApp each demonstrate conversation-to-CRM attribution without changing tenant visibility,
+delivery reliability or existing entitlements.
 
-Deliver immutable builds, validation, Verity subdomains, safe deployment worker, logs, health checks, rollback and operator controls. Add custom-domain proof and SSL only after subdomain publishing is reliable.
+### Phase 3 — Website Project platform
 
-**Gate:** repeated deploys are idempotent; failed releases do not replace the last healthy version; rollback is demonstrated in staging.
+Deliver a first-class, workspace-owned Website Project that will eventually aggregate business identity, domain,
+template, pages, structured content, brand assets, AI configuration, deployment, analytics, SEO, assistant and CRM
+connections. Definitions are versioned, schema validated and free of arbitrary executable code.
 
-### Stage 4 — Doctor-to-redesign conversion and Verity AI
+**Gate:** ownership, structured definition, version and permission tests pass before an editor or public builder exists.
 
-Turn an audit into a new Website Project without modifying the source website. Map approved uploads into both site content and the existing knowledge pipeline. Add widget/lead capture activation to the published site.
+### Phase 4 — Website Doctor vertical slice
 
-**Gate:** one complete journey works: audit → signup → preview → publish → AI conversation → CRM lead.
+Deliver URL submission, bounded fetch, deterministic checks, PageSpeed adapter, AI summary, report page, lead capture
+and event tracking. The audit lifecycle must be reusable by public acquisition, authenticated customers and later
+human-reviewed prospect research.
 
-### Stage 5 — Powered by Verity, referrals and showcase
+The first stable audit contract accepts a canonical public URL and produces measured performance, technical SEO,
+metadata, mobile readiness, accessibility, security headers, content quality, conversion/lead capture, AI readiness,
+structured data and page-architecture evidence. Its safe output contains an overall score, category scores, prioritised
+problems, severity, recommendations, opportunities, estimated impact, a plain-language explanation and an explicit
+redesign next step.
 
-Add required free-tier badge, signed attribution links, badge events, opt-in showcase, sharing assets and referral-stage reporting. Reuse the existing delayed reward service for credit grants.
+```text
+Audit -> consented Prospect/Lead -> Opportunity -> Redesign -> Website Project
+```
 
-**Gate:** no self-referral, duplicate conversion or badge-event replay can grant credits.
+Deterministic evidence is stored separately from AI interpretation. Reports state what was observed, when it was
+measured, what was inferred and which evidence supports each recommendation.
 
-### Stage 6 — SEO and discovery
+**Gate:** SSRF, redirect, DNS-rebinding and abuse tests pass; reports are useful without hallucinated claims; cost per
+audit is measurable.
 
-Publish useful industry, template, integration and showcase pages with canonical metadata, structured data, sitemaps and real examples. Add paid scheduled monitoring only after one-time audit quality is established.
+### Phase 5 — generation, redesign and preview
 
-**Gate:** every indexed page has distinct user value and a measurable product action; no mass-produced thin pages.
+Convert an audit into a Website Project without modifying the source website. Add a small template catalogue,
+schema-validated AI population, structured edits, responsive preview and version history.
 
-### Stage 7 — human-reviewed outbound
+**Gate:** users can generate and revise a complete responsive site without generated scripts, server code or unsafe HTML.
 
-Add CSV/manual prospect import first, duplicate detection, audit reuse, opportunity scoring, draft generation, review queue, CRM conversion, suppression lists and outcome tracking. Discovery automation comes after compliance and unit economics are proven.
+### Phase 6 — publish, hosting and product activation
 
-**Gate:** no message can be sent without explicit human approval; source, legal basis, opt-out and audit history are recorded.
+Deliver immutable builds, validation, Verity subdomains, an isolated deployment worker, logs, health checks and
+rollback. Activate the existing Widget, lead capture, CRM and optional WhatsApp journey from the published project.
+Add custom-domain proof and SSL only after subdomain publishing is reliable.
+
+**Gate:** audit -> signup -> preview -> publish -> AI conversation -> CRM lead works; repeat deployments are idempotent;
+failed releases preserve the last healthy version; rollback is demonstrated in staging.
+
+### Phase 7 — attribution, Powered by Verity and referrals
+
+Add required free-tier badge, signed attribution links, touchpoint resolution, showcase consent and referral-stage
+reporting. Reuse the existing delayed reward service; browser events never grant rewards directly.
+
+**Gate:** no self-referral, duplicate conversion, forged link or replayed badge event can grant value.
+
+### Phase 8 — partner platform
+
+Add the common partner hierarchy, verification, agreements, roles, explicit client-workspace grants, scoped portal,
+commercial terms, commission ledger, payout reconciliation and support workflow.
+
+**Gate:** cross-partner and ungranted client access tests pass; settled payment events are the only commission source.
+
+### Phase 9 — approved white-label capability
+
+Add versioned Brand Profiles, verified hostnames, validated email identities, preview and approval. Branding permits
+allow-listed names, logos, colours, terminology and links—not arbitrary CSS, JavaScript, HTML or headers.
+
+**Gate:** hostname ownership, TLS, partner isolation, brand approval and safe fallback are demonstrated.
+
+### Phase 10 — template and creator marketplace
+
+Add reviewed templates, creators, versions, categories, previews, licences, pricing, installations and attributable
+revenue share.
+
+**Gate:** incompatible or unsafe submissions cannot publish; revenue history is immutable and reconcilable.
+
+### Phase 11 — prospect research and human-reviewed outbound
+
+Add CSV/manual prospect import first, duplicate detection, audit reuse, opportunity scoring, draft generation, approval
+queue, CRM conversion, suppression checks and outcome tracking. Automate research, never unapproved sending.
+
+**Gate:** every message has source, lawful purpose, tenant, initiator, approval, credential scope, provider outcome and
+opt-out evidence; no message sends without explicit human approval.
+
+### Phase 12 — ecosystem and optimization
+
+Add controlled APIs, webhooks, OAuth/API credentials, SDKs, integration registry, developer tooling, SEO monitoring and
+evidence-backed experiments only after the underlying workflows are stable.
+
+**Gate:** scoped access, rate limits, replay protection, versioned contracts, operational ownership and measurable
+customer value are demonstrated.
 
 ### Deferred capability
 
-The Frappe coding agent remains a later, separately approved programme. It must not be a dependency for the Website Doctor or structured website builder.
+The Frappe coding agent remains a later, separately approved programme. It must not be a dependency for Website Doctor,
+the structured website builder or the core growth platform.
 
 ## 8. Critical security controls
 
@@ -329,6 +429,11 @@ verityai_saas/
     templates.py           # creator submissions and revenue attribution
   channels/
     registry.py            # channel definitions and capabilities
+    accounts.py            # tenant-owned provider configuration and secret references
+    conversations.py       # common conversation and participant identity boundaries
+    messages.py            # normalised inbound/outbound message contract
+    templates.py           # approved provider/channel message templates
+    policies.py            # consent windows, preferences, limits and channel rules
     adapters/              # provider-specific delivery/measurement adapters
     approvals.py           # human review and four-eyes workflows
     delivery.py            # retries, idempotency and delivery results
@@ -337,6 +442,7 @@ verityai_saas/
     secrets.py             # encrypted provider credentials
     audit_log.py           # sensitive administrative action history
     feature_flags.py       # staged rollout and emergency disable controls
+    ai_gateway.py          # tenant-aware provider/model/prompt/tool request boundary
 ```
 
 These are target module boundaries, not a requirement to create every file at once. Each vertical slice should add only the modules it needs.
@@ -345,6 +451,11 @@ These are target module boundaries, not a requirement to create every file at on
 
 ```text
 verity_ai/
+  ai_core/
+    requests.py            # common execution envelope and correlation contract
+    providers.py           # provider/model adapters behind stable internal names
+    guardrails.py          # purpose, tenant, tool and output constraints
+    usage.py               # token, latency, outcome and cost reporting
   growth_tools/
     website_analysis.py    # evidence-based content/conversion analysis
     redesign.py            # structured redesign proposals
@@ -356,6 +467,31 @@ verity_ai/
 ```
 
 Every engine call receives a tenant/workspace context, an entitlement decision, a correlation ID and an explicit tool allow-list. The engine returns proposals/results; SaaS remains authoritative for permissions, lifecycle and publication.
+
+### Canonical relationship and reuse rules
+
+```text
+Account
+  -> Workspace
+      -> Customer / Website Project / Channel Account
+      -> Conversation -> Participant -> Message
+      -> Lead -> Opportunity -> CRM Activity
+      -> Subscription -> Usage Wallet -> Usage Transaction
+
+Partner -> Partner Client Access -> Workspace
+Campaign -> Growth Event -> attributed Lead/Account/Subscription
+Referral -> attributed conversion -> existing Reward or new Commission Ledger
+```
+
+- Existing Account, Workspace, Subscription, Usage, Customer, CRM, conversation and referral records remain authoritative.
+- A Channel Account references encrypted provider secrets; it never copies decrypted values into API responses,
+  events, logs, campaigns or partner records.
+- Website Doctor prospects, widget leads, WhatsApp leads, partner leads and manually sourced leads converge through
+  the same deduplication and CRM services.
+- AI execution uses one internal request envelope containing tenant, workspace, purpose, provider/model policy,
+  prompt/template version, tool allow-list, budget, correlation ID and initiator.
+- AI responses return output plus tokens, estimated cost, latency, safety outcome and trace reference. Product modules
+  do not call providers directly once the common gateway is available.
 
 ### Public website routes
 
@@ -502,6 +638,23 @@ Referral credits and affiliate cash commissions are different products and must 
 
 All channels use a canonical naming convention such as `source`, `medium`, `campaign`, `content`, `term` and optional signed `partner/referral` identifiers. Raw events are immutable; corrected attribution is stored as a derived decision with its reason.
 
+### Common channel contract
+
+| Object | Responsibility | Existing reuse / implementation rule |
+|---|---|---|
+| Channel | Describes a delivery/acquisition capability and its operating risk | Extend the implemented Growth Channel registry; do not store tenant secrets here |
+| Channel Account | Binds one workspace to one provider identity/configuration | Adapt existing WhatsApp, email and widget setup records behind a common service; migrate only after parity tests |
+| Conversation | Cross-channel interaction lifecycle | Reuse the engine's existing chat session as the initial source; introduce a new record only if the audit proves it necessary |
+| Participant | Tenant-scoped external/internal identity | Store only necessary identifiers; encrypt or hash based on operational need |
+| Message | Normalised content direction/type/status with provider reference | Preserve provider payloads only under bounded retention and access controls |
+| Message Template | Versioned, approved business-initiated content | Provider approval and locale remain explicit |
+| Communication Preference | Purpose- and channel-specific permission | Resolve against Consent and Suppression before delivery |
+| Delivery Attempt | Append-only provider attempt/result | Carries initiator, purpose, tenant, credential reference, approval and correlation ID |
+
+The common contract is an adapter boundary, not an instruction to rewrite working WhatsApp code. Consolidation begins
+with shared interfaces and events, runs parity tests, then moves one channel at a time. Customer messages must continue
+working throughout the transition.
+
 ## 18. API and event contracts
 
 Exact URLs can follow the repository's existing API conventions, but responsibilities should be stable.
@@ -646,6 +799,28 @@ Measure lead captured → assigned → contacted → opportunity → won/lost, s
 
 Social replies remain human-written or human-approved. The system can identify and rank opportunities, but it should not impersonate people or post automatically.
 
+### Parallel 90-day execution stream
+
+This is an operating backlog, not permission for autonomous posting or messaging. A named human owns every asset,
+community interaction, follow-up and result in CRM.
+
+| Window | Product evidence | Distribution work | Required measurement |
+|---|---|---|---|
+| Days 1-15 | Verify Widget, WhatsApp and CRM demo workspaces; document the complete conversation-to-lead path | Publish one short proof for each product, refresh setup guides, prepare tracked landing links | Demo view, guide download, signup, setup started, first conversation |
+| Days 16-30 | Resolve recurring setup friction and add missing lifecycle events without redesigning working flows | Run two guided SME/agency demonstrations; publish one practical troubleshooting article and one lead-follow-up checklist | Setup completion, first AI reply, first lead, demo-to-trial conversion |
+| Days 31-45 | Complete channel/CRM attribution parity and operator funnel reporting | Launch one tightly scoped Widget campaign and one WhatsApp campaign; begin relevant human community participation | First/last touch, qualified leads, cost/time per lead, support failures |
+| Days 46-60 | Establish Website Project contracts and demonstrate a structured preview internally | Publish a build-in-public update and recruit a small design-partner cohort through existing CRM | Design-partner applications, activation, objections, preview usefulness |
+| Days 61-75 | Pilot Website Doctor internally only after security fixtures pass | Create evidence-based before/after material from approved sites; run one partner workshop | Audit completion, useful-report rating, audit-to-meeting, measured audit cost |
+| Days 76-90 | Run the first gated acquisition journey and review release evidence | Publish approved customer evidence, formalise early agency/referral conversations, repeat the best-performing proof | Lead-to-opportunity, opportunity-to-paid, source revenue, retention signal |
+
+Weekly review separates facts from assumptions:
+
+1. Product health: delivery failures, setup abandonment, response quality and support load.
+2. Funnel: reach -> visit -> demo/guide -> signup -> activation -> lead -> opportunity -> paid.
+3. Economics: staff time, provider spend, AI credits, acquisition cost and attributable revenue.
+4. Learning: objections, missing proof, lost opportunities and the smallest product correction.
+5. Decision: continue, revise or stop each campaign; create no vanity activity without an owner and conversion path.
+
 ## 21. Consolidated execution sequence
 
 Four workstreams run together, with production protected by feature flags and approvals.
@@ -662,16 +837,18 @@ This workstream does not wait for new feature code.
 
 ### Workstream B — shared technical foundation
 
-1. Approve entity definitions, permissions and event taxonomy.
-2. Add channel/campaign registry, attribution, consent and suppression contracts.
-3. Add feature flags, job correlation, cost meters and operator health views.
-4. Define partner roles, explicit client grants and append-only commercial ledgers.
+1. Complete the whole-repository readiness audit and canonical existing-versus-new entity map.
+2. Consolidate Widget, WhatsApp and CRM behind stable channel, conversation, lead and event boundaries.
+3. Finish attribution decisions, job correlation, cost meters and operator health views on the implemented registry,
+   consent, suppression, event and feature-flag foundation.
+4. Define the tenant-aware AI gateway and migrate direct provider calls gradually after contract tests.
+5. Define partner roles, explicit client grants and append-only commercial ledgers.
 
 ### Workstream C — product loop
 
-1. Website Doctor vertical slice.
-2. Structured Website Project and redesign preview.
-3. Builder, versioning and safe preview.
+1. Structured Website Project ownership and definition contracts.
+2. Website Doctor vertical slice using the shared audit lifecycle.
+3. Redesign, builder, versioning and safe preview.
 4. Free Verity-subdomain deployment and rollback.
 5. Existing Widget/WhatsApp/CRM activation from the website project.
 6. Badge, showcase and referral attribution.
@@ -689,9 +866,38 @@ This workstream does not wait for new feature code.
 
 White-labeling should follow a stable multi-client product and deployment flow. It should not delay the Website Doctor or free builder, but its tenant hierarchy, hostname and permission requirements must be accounted for in the foundation.
 
-## 22. Development gates and Definition of Done
+## 22. Required implementation specification
 
-Before coding begins:
+No initiative enters coding with only a feature name. Its design record must contain every section below, with
+"Not applicable" justified explicitly rather than silently omitted.
+
+| Section | Required answer |
+|---|---|
+| Purpose and business outcome | Which customer problem and measurable commercial result justify the work? |
+| User types | Which customer, operator, partner, agency or system actors participate? |
+| Core functionality | What genuinely works end to end, beyond screens and placeholders? |
+| Existing reuse | Which current records/services remain authoritative, and what duplication is prohibited? |
+| Data model | DocTypes/entities, relationships, ownership, lifecycle, retention and immutability rules |
+| Workflows | Happy path, state transitions, cancellation, retry, expiry and recovery |
+| Permissions | Read/create/change/approve/delete/export authority for every actor and tenant boundary |
+| Channels | Website, Widget, WhatsApp, email, API or partner adapters used and their policy constraints |
+| Events and attribution | Canonical events, idempotency, correlation, first/last touch and conversion decision rules |
+| Security and privacy | Secrets, isolation, consent, suppression, abuse, validation, logging and data minimisation |
+| Billing and usage | Who pays, which entitlement applies, what is metered and how cost is reconciled |
+| Administration | Configuration, approval, health, incident handling, kill switch and audit visibility |
+| Partner management | Agreement, scope, client grants, commission and branding implications where relevant |
+| Analytics | Operational health, funnel, customer value, unit economics and source revenue |
+| Failure handling | Safe user error, operator reference, retry ownership, escalation and rollback |
+| API contracts | Public/authenticated/partner/operator interfaces, versions, limits and webhook behavior |
+| UX | Complete customer, partner and operator journeys across desktop/mobile and accessibility states |
+| Acceptance criteria | Executable proof required before the feature can leave its disabled rollout stage |
+
+Every specification ends with dependencies, migration/rollback steps, test fixtures, responsible owner and explicit
+non-goals. This prevents impressive screens from being mistaken for commercially operable product capability.
+
+## 23. Development gates and Definition of Done
+
+Before each new product phase begins:
 
 - Product owner approves the first release slice and free limits.
 - Architecture review approves record ownership and repository boundaries.
@@ -710,8 +916,13 @@ For every implemented slice, Done means:
 - Rollback or disable procedure is demonstrated.
 - No regression in Widget, WhatsApp, CRM, billing or current portal journeys.
 
-## 23. Branch and implementation policy
+## 24. Branch and implementation policy
 
-This branch currently contains planning documentation only. No code, schema, patch, migration or production configuration should be added until the plan and Stage 0 decisions are approved.
+This branch contains the approved first control-plane slice: growth channels/campaigns, canonical events, consent,
+suppression, feature flags and operator controls. Public Website Doctor, Website Builder, partner, white-label and
+outbound capabilities remain disabled. Each next slice requires its implementation specification and phase gate before
+code is added.
 
-`main` remains untouched. When implementation is authorised, matching feature branches should be created in `verity_ai` and `saas_ai_website` only for work those repositories actually own. Changes should merge in small vertical slices behind disabled-by-default feature flags; the existing production journeys remain untouched until each rollout gate passes.
+`main` remains untouched. Matching feature branches should be created in `verity_ai` and `saas_ai_website` only for work
+those repositories actually own. Changes merge in small vertical slices behind disabled-by-default feature flags; the
+existing production journeys remain untouched until each rollout gate passes.
