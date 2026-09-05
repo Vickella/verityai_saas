@@ -71,6 +71,14 @@ def safe_setup(workspace_name):
 		and data["engine"]["verify_token_present"]
 		and (not data["engine"]["signature_verification_enabled"] or data["engine"]["app_secret_present"])
 	)
+	# A real inbound event is authoritative proof that Meta is delivering to this
+	# app, even while subscribed_apps is eventually consistent or inaccessible.
+	data["inbound_verified"] = bool(data.get("last_webhook_on"))
+	if data["inbound_verified"]:
+		data["setup_status"] = "Connected"
+		data["webhook_status"] = "Receiving"
+		if data.get("meta_waba_id"):
+			data["waba_subscription_status"] = "Subscribed"
 	data["webhook_health"] = webhook_health(data)
 	return data
 
@@ -85,7 +93,11 @@ def webhook_health(setup_data):
 	hours = max(time_diff_in_hours(now_datetime(), last_webhook_on), 0)
 	if hours <= 24:
 		return {"status": "Healthy", "message": "An inbound WhatsApp event was processed recently.", "hours_since_event": round(hours, 1)}
-	return {"status": "Stale", "message": "No inbound WhatsApp event has been processed in the last 24 hours.", "hours_since_event": round(hours, 1)}
+	return {
+		"status": "Verified",
+		"message": "Inbound delivery was verified previously. No customer message was received in the last 24 hours.",
+		"hours_since_event": round(hours, 1),
+	}
 
 
 def record_channel_activity(doc, method=None):
@@ -94,12 +106,34 @@ def record_channel_activity(doc, method=None):
 	workspace = frappe.db.get_value("VerityAI Workspace", {"engine_tenant": doc.tenant}, "name")
 	setup = frappe.db.get_value("VerityAI WhatsApp Setup", {"workspace": workspace}, "name") if workspace else None
 	if setup:
-		frappe.db.set_value("VerityAI WhatsApp Setup", setup, {
+		values = {
 			"setup_status": "Connected",
 			"last_webhook_on": now_datetime(),
 			"last_webhook_event": doc.name,
 			"webhook_status": "Receiving",
-		})
+		}
+		if frappe.db.get_value("VerityAI WhatsApp Setup", setup, "meta_waba_id"):
+			values["waba_subscription_status"] = "Subscribed"
+		frappe.db.set_value("VerityAI WhatsApp Setup", setup, values)
+
+
+def record_inbound_webhook(tenant_name, message_id=None, **kwargs):
+	"""Record every accepted inbound event, including existing chat sessions."""
+	if not tenant_name:
+		return
+	workspace = frappe.db.get_value("VerityAI Workspace", {"engine_tenant": tenant_name}, "name")
+	setup = frappe.db.get_value("VerityAI WhatsApp Setup", {"workspace": workspace}, "name") if workspace else None
+	if not setup:
+		return
+	values = {
+		"setup_status": "Connected",
+		"last_webhook_on": now_datetime(),
+		"last_webhook_event": message_id or "Inbound WhatsApp message",
+		"webhook_status": "Receiving",
+	}
+	if frappe.db.get_value("VerityAI WhatsApp Setup", setup, "meta_waba_id"):
+		values["waba_subscription_status"] = "Subscribed"
+	frappe.db.set_value("VerityAI WhatsApp Setup", setup, values)
 
 
 def test_connection(workspace_name):
@@ -162,6 +196,8 @@ def test_connection(workspace_name):
 	setup.access_token_status = "Verified"
 	subscription_warning = None
 	if setup.meta_waba_id:
+		if webhook_receiving:
+			setup.waba_subscription_status = "Subscribed"
 		try:
 			subscription = _get_waba_subscription(setup.meta_waba_id, access_token, version)
 			# Meta may acknowledge POST /subscribed_apps before the app appears in the
@@ -169,7 +205,7 @@ def test_connection(workspace_name):
 			# incorrectly rolling it back during propagation.
 			setup.waba_subscription_status = (
 				"Subscribed"
-				if subscription["subscribed"]
+				if subscription["subscribed"] or webhook_receiving
 				else "Requested"
 				if setup.waba_subscription_status == "Requested"
 				else "Not Subscribed"

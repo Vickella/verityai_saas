@@ -199,6 +199,31 @@ class TestVerityAISaaS(FrappeTestCase):
 		self.assertEqual(setup["setup_status"], "Connected")
 		self.assertEqual(setup["last_webhook_event"], "wa-session-test")
 
+	def test_whatsapp_inbound_event_reconciles_subscription_and_remains_verified(self):
+		self.enable_full_whatsapp_for_test()
+		whatsapp.configure(self.workspace, {
+			"mode": "Full AI Automation", "whatsapp_phone_id": "phone-id",
+			"whatsapp_access_token": "access-secret", "meta_verify_token": "verify-secret",
+			"meta_app_secret": "app-secret", "verify_meta_signature": 1,
+			"meta_waba_id": "waba-id",
+		})
+		whatsapp.record_inbound_webhook(self.tenant, message_id="wamid.inbound-test")
+		setup = whatsapp.safe_setup(self.workspace)
+		self.assertEqual(setup["waba_subscription_status"], "Subscribed")
+		self.assertEqual(setup["setup_status"], "Connected")
+		self.assertTrue(setup["inbound_verified"])
+		self.assertEqual(setup["last_webhook_event"], "wamid.inbound-test")
+
+		frappe.db.set_value(
+			"VerityAI WhatsApp Setup",
+			{"workspace": self.workspace},
+			"last_webhook_on",
+			frappe.utils.add_days(frappe.utils.now_datetime(), -2),
+		)
+		aged = whatsapp.safe_setup(self.workspace)
+		self.assertEqual(aged["webhook_health"]["status"], "Verified")
+		self.assertNotEqual(aged["webhook_health"]["status"], "Stale")
+
 	def test_whatsapp_waba_subscription_acceptance_is_not_a_false_failure(self):
 		self.enable_full_whatsapp_for_test()
 		whatsapp.configure(self.workspace, {
