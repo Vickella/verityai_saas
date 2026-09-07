@@ -115,7 +115,13 @@ def website_doctor_configuration():
 	return {
 		"crm_workspace": workspace,
 		"crm_workspace_label": frappe.db.get_value("VerityAI Workspace", workspace, "business_name") if workspace else None,
-		"crm_ready": bool(workspace and frappe.db.exists("VerityAI Workspace", {"name": workspace, "status": "Active", "engine_tenant": ["is", "set"]})),
+		"crm_ready": bool(
+			workspace
+			and frappe.db.exists(
+				"VerityAI Workspace",
+				{"name": workspace, "status": ["in", ["Trial", "Active"]], "engine_tenant": ["is", "set"]},
+			)
+		),
 	}
 
 
@@ -123,9 +129,10 @@ def configure_website_doctor(values):
 	values = values or {}
 	workspace = _clean(values.get("crm_workspace")) or None
 	if workspace and not frappe.db.exists(
-		"VerityAI Workspace", {"name": workspace, "status": "Active", "engine_tenant": ["is", "set"]}
+		"VerityAI Workspace",
+		{"name": workspace, "status": ["in", ["Trial", "Active"]], "engine_tenant": ["is", "set"]},
 	):
-		frappe.throw("Choose an active workspace with an AI tenant for Website Doctor leads.", frappe.ValidationError)
+		frappe.throw("Choose an active or trial workspace with an AI tenant for Website Doctor leads.", frappe.ValidationError)
 	settings = frappe.get_single("VerityAI Platform Settings")
 	settings.website_doctor_crm_workspace = workspace
 	settings.save(ignore_permissions=True)

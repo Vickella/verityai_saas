@@ -168,6 +168,19 @@ def capture_public_lead(audit_name, token, values):
 		update_modified=False,
 	)
 	growth.record_lifecycle_event(
+		"lead.captured",
+		workspace=workspace,
+		account=frappe.db.get_value("VerityAI Workspace", workspace, "account"),
+		channel=channel,
+		source="website_doctor",
+		medium="product",
+		object_type="AI Lead",
+		object_name=lead_name,
+		correlation_id=lead_name,
+		idempotency_key=f"lead.captured:{lead_name}",
+		metadata={"status": "New", "has_email": True, "has_phone": bool(phone)},
+	)
+	growth.record_lifecycle_event(
 		"audit.lead_captured",
 		workspace=workspace,
 		channel=channel,
