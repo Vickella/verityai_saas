@@ -919,9 +919,10 @@ For every implemented slice, Done means:
 ## 24. Branch and implementation policy
 
 This branch contains the growth control plane and the completed Phase 3 Website Project foundation. Phase 4 now has
-an internal Website Doctor evidence slice: opaque audit access, bounded and IP-pinned retrieval, deterministic checks,
-an optional PageSpeed adapter, cost/error telemetry and operator visibility. Public Website Doctor remains disabled by
-default until its report, lead-capture and staging acceptance gates pass. Website publishing, partner, white-label and
+an internal Website Doctor evidence slice plus an unlisted, evidence-based report and explicit-consent CRM hand-off:
+opaque audit access, bounded and IP-pinned retrieval, deterministic checks, an optional PageSpeed adapter, safe report
+rendering, tenant-scoped lead deduplication, suppression checks, cost/error telemetry and operator visibility. Public
+Website Doctor remains disabled by default until the server suite and staging acceptance gates pass. Website publishing, partner, white-label and
 outbound capabilities also remain disabled. Each next slice requires its implementation specification and phase gate
 before code is added.
 

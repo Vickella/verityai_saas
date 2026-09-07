@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<meta name="referrer" content="no-referrer">
+	<meta name="robots" content="noindex,nofollow,noarchive">
+	<title>{{ title }}</title>
+	<link rel="stylesheet" href="/assets/verityai_saas/css/website_doctor.css?v={{ asset_version }}">
+</head>
+<body>
+	<header class="doctor-header">
+		<a class="doctor-brand" href="/" aria-label="VerityAI home"><span aria-hidden="true">V</span>VerityAI</a>
+		<a class="doctor-link" href="/">Back to VerityAI</a>
+	</header>
+	<main class="doctor-main">
+		<section id="doctor-loading" class="doctor-state" aria-live="polite">
+			<div class="doctor-spinner" aria-hidden="true"></div>
+			<p class="doctor-eyebrow">Website Doctor</p>
+			<h1>Preparing your evidence-based report</h1>
+			<p id="doctor-loading-copy">We are checking the website safely. This page will update automatically.</p>
+		</section>
+		<section id="doctor-error" class="doctor-state doctor-error" hidden aria-live="assertive">
+			<p class="doctor-eyebrow">Report unavailable</p>
+			<h1>We could not open this report</h1>
+			<p id="doctor-error-copy">Check that you used the complete private report link.</p>
+			<a class="doctor-button" href="/">Return to VerityAI</a>
+		</section>
+		<section id="doctor-report" hidden>
+			<header class="doctor-hero">
+				<div><p class="doctor-eyebrow">Website Doctor report</p><h1 id="doctor-host"></h1><p>Measured observations and practical next steps—without changing your website.</p></div>
+				<div class="doctor-score" aria-label="Overall score"><strong id="doctor-score">0</strong><span>/100</span><small>Overall score</small></div>
+			</header>
+			<div class="doctor-meta"><span>Observed <strong id="doctor-observed"></strong></span><span><strong id="doctor-pages"></strong> page checked</span></div>
+			<section class="doctor-panel"><div class="doctor-heading"><div><p class="doctor-eyebrow">Scorecard</p><h2>What we measured</h2></div><p>Scores marked unavailable were not guessed and do not count as evidence.</p></div><div id="doctor-categories" class="doctor-categories"></div></section>
+			<section class="doctor-panel"><div class="doctor-heading"><div><p class="doctor-eyebrow">Priorities</p><h2>Recommended next steps</h2></div><p>Each recommendation is tied to an observation from this audit.</p></div><div id="doctor-findings" class="doctor-findings"></div></section>
+			<section class="doctor-contact">
+				<div><p class="doctor-eyebrow">Want help improving it?</p><h2>Talk to a VerityAI website specialist</h2><p>Share your details only if you want follow-up about this report. An audit alone does not add you to marketing lists.</p></div>
+				<form id="doctor-contact-form">
+					<div class="doctor-fields">
+						<label>Full name<input name="full_name" maxlength="120" autocomplete="name" required></label>
+						<label>Work email<input name="email" type="email" maxlength="140" autocomplete="email" required></label>
+						<label>Business name<input name="business_name" maxlength="140" autocomplete="organization" required></label>
+						<label>Phone <small>optional</small><input name="phone" type="tel" maxlength="30" autocomplete="tel"></label>
+					</div>
+					<label class="doctor-consent"><input name="consent" type="checkbox" value="1" required><span>Yes, VerityAI may contact me about this Website Doctor report. I can opt out at any time.</span></label>
+					<div id="doctor-contact-notice" class="doctor-notice" hidden></div>
+					<button class="doctor-button" type="submit">Request help with this report</button>
+				</form>
+			</section>
+		</section>
+	</main>
+	<footer class="doctor-footer">Evidence, not guesswork. Powered by VerityAI.</footer>
+	<script>window.csrf_token={{ (csrf_token or '') | tojson }};</script>
+	<script src="/assets/verityai_saas/js/website_doctor.js?v={{ asset_version }}"></script>
+</body>
+</html>

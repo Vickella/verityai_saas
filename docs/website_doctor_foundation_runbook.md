@@ -66,6 +66,23 @@ SHA-256 digest is stored.
 
 Turn off **Public Website Doctor** under Growth release controls to stop new anonymous and customer requests. Turn off
 **Internal Website Doctor** to stop new operator pilots. Existing queued work can be stopped by pausing the `long` queue
+
+## Public report and consented CRM hand-off
+
+Public audit creation returns an unlisted report URL in the form `/website-doctor/report#audit=...&token=...`. The
+opaque token remains in the URL fragment and is sent to the status API only in a POST body, keeping it out of request
+URLs, browser history, analytics and referrer headers. The report
+is marked `noindex`, renders only the safe audit contract, escapes all measured text through DOM APIs and never exposes
+stored evidence JSON, target paths, provider data or internal costs.
+
+Before enabling **Public Website Doctor**, open **Operator console -> Growth -> Release controls** and select an active
+**Website Doctor CRM workspace**. A visitor is added to that workspace's existing `AI Lead` records only after a
+completed audit and an explicit follow-up checkbox. Email is the tenant-scoped deduplication key. Consent evidence is
+stored as a keyed hash; the clear email remains only in the authorised CRM lead. Suppressed identities are rejected.
+
+The marketing site's `/website-doctor` discovery page remains owned by `saas_ai_website`. It should submit to
+`verityai_saas.api.audits.start` and redirect to the returned `report_url`. Do not enable the public flag until the
+server test suite and staging audit-to-CRM acceptance path pass.
 workers while preserving audit evidence for investigation.
 
 Application rollback does not require deleting audit tables. Revert the application commit, run `migrate`, clear cache

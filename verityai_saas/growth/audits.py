@@ -1,10 +1,11 @@
 import hashlib
 import hmac
 import json
+import re
 from urllib.parse import urlsplit
 
 import frappe
-from frappe.utils import flt, now_datetime
+from frappe.utils import cint, flt, now_datetime, validate_email_address
 
 from verityai_saas.growth.checks import deterministic_checks, score_findings
 from verityai_saas.growth.pagespeed import run_pagespeed
@@ -58,7 +59,13 @@ def _new_audit(url, request_kind, workspace=None, requested_by=None):
 		"verityai_saas.growth.audits.process_audit", queue="long", enqueue_after_commit=True,
 		audit_name=doc.name, job_name=f"website-audit-{doc.name}",
 	)
-	return {"audit": doc.name, "token": token, "status": doc.status, "target_host": doc.target_host}
+	return {
+		"audit": doc.name,
+		"token": token,
+		"status": doc.status,
+		"target_host": doc.target_host,
+		"report_url": f"/website-doctor/report#audit={doc.name}&token={token}",
+	}
 
 
 def request_public_audit(url):
@@ -90,9 +97,89 @@ def _safe_result(doc):
 
 def public_status(audit_name, token):
 	doc = frappe.get_doc("VerityAI Website Audit", audit_name)
-	if not token or not hmac.compare_digest(_token_digest(token), str(doc.public_token_hash or "")):
+	if doc.request_kind != "Public" or not token or not hmac.compare_digest(_token_digest(token), str(doc.public_token_hash or "")):
 		frappe.throw("Website audit link is invalid.", frappe.PermissionError)
 	return _safe_result(doc)
+
+
+def _required_text(value, label, maximum):
+	value = " ".join(str(value or "").split())[:maximum]
+	if not value:
+		frappe.throw(f"{label} is required.", frappe.ValidationError)
+	return value
+
+
+def capture_public_lead(audit_name, token, values):
+	if not growth.feature_flags().get("public_audits_enabled"):
+		frappe.throw("Public Website Doctor contact requests are not available yet.", frappe.PermissionError)
+	doc = frappe.get_doc("VerityAI Website Audit", audit_name)
+	if doc.request_kind != "Public" or not token or not hmac.compare_digest(_token_digest(token), str(doc.public_token_hash or "")):
+		frappe.throw("Website audit link is invalid.", frappe.PermissionError)
+	if doc.status != "Completed":
+		frappe.throw("Wait for the website audit to finish before requesting follow-up.", frappe.ValidationError)
+	if doc.follow_up_lead:
+		return {"captured": True}
+	values = values or {}
+	if not cint(values.get("consent")):
+		frappe.throw("Please confirm that VerityAI may contact you about this report.", frappe.ValidationError)
+	full_name = _required_text(values.get("full_name"), "Full name", 120)
+	business_name = _required_text(values.get("business_name"), "Business name", 140)
+	email = _required_text(values.get("email"), "Work email", 140).casefold()
+	if not validate_email_address(email):
+		frappe.throw("Enter a valid work email address.", frappe.ValidationError)
+	phone = re.sub(r"[^0-9+]", "", str(values.get("phone") or ""))[:30] or None
+	configuration = growth.website_doctor_configuration()
+	workspace = configuration.get("crm_workspace")
+	if not configuration.get("crm_ready"):
+		frappe.throw("Website Doctor follow-up is temporarily unavailable.", frappe.ValidationError)
+	channel = _channel()
+	if growth.is_suppressed(email, channel):
+		frappe.throw("This address cannot receive Website Doctor follow-up.", frappe.PermissionError)
+	consent = growth.record_consent(
+		email,
+		"Lead",
+		"Website Doctor report follow-up",
+		channel=channel,
+		source="Public Website Doctor",
+		evidence=f"Explicit checkbox; audit={doc.name}",
+	)
+	tenant = frappe.db.get_value("VerityAI Workspace", workspace, "engine_tenant")
+	lead_name = frappe.db.get_value("AI Lead", {"tenant": tenant, "email": email}, "name")
+	already_known = bool(lead_name)
+	if not lead_name:
+		lead = frappe.get_doc({
+			"doctype": "AI Lead",
+			"tenant": tenant,
+			"lead_name": full_name,
+			"email": email,
+			"phone": phone,
+			"source_channel": "Web",
+			"status": "New",
+			"requirements": f"Website Doctor follow-up for {business_name} ({doc.target_host}).",
+			"dynamic_details": json.dumps({
+				"attribution": {"source": "website_doctor", "medium": "product", "channel_code": "WEBSITE_DOCTOR"},
+				"website_doctor": {"audit": doc.name, "target_host": doc.target_host, "business_name": business_name, "consent_record": consent.name},
+			}, separators=(",", ":"), sort_keys=True),
+		}).insert(ignore_permissions=True)
+		lead_name = lead.name
+	frappe.db.set_value(
+		"VerityAI Website Audit", doc.name,
+		{"follow_up_lead": lead_name, "follow_up_captured_on": now_datetime()},
+		update_modified=False,
+	)
+	growth.record_lifecycle_event(
+		"audit.lead_captured",
+		workspace=workspace,
+		channel=channel,
+		source="website_doctor",
+		medium="product",
+		object_type="AI Lead",
+		object_name=lead_name,
+		correlation_id=doc.correlation_id,
+		idempotency_key=f"audit.lead_captured:{doc.name}",
+		metadata={"audit": doc.name, "target_host": doc.target_host, "already_known": already_known},
+	)
+	return {"captured": True}
 
 
 def workspace_audits(workspace):

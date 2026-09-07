@@ -10,6 +10,9 @@ after_install = "verityai_saas.setup_doctypes.install"
 web_include_css = "/assets/verityai_saas/css/portal.css"
 web_include_js = "/assets/verityai_saas/js/portal.js"
 home_page = "verityai"
+website_route_rules = [
+	{"from_route": "/website-doctor/report", "to_route": "website_doctor_report"},
+]
 
 permission_query_conditions = {
 	"VerityAI Account": "verityai_saas.services.permissions.account_query_condition",

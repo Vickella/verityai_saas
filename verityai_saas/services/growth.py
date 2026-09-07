@@ -109,6 +109,29 @@ def feature_flags():
 	return {name: bool(cint(settings.get(name))) for name in FEATURE_FLAGS}
 
 
+def website_doctor_configuration():
+	settings = frappe.get_single("VerityAI Platform Settings")
+	workspace = settings.get("website_doctor_crm_workspace")
+	return {
+		"crm_workspace": workspace,
+		"crm_workspace_label": frappe.db.get_value("VerityAI Workspace", workspace, "business_name") if workspace else None,
+		"crm_ready": bool(workspace and frappe.db.exists("VerityAI Workspace", {"name": workspace, "status": "Active", "engine_tenant": ["is", "set"]})),
+	}
+
+
+def configure_website_doctor(values):
+	values = values or {}
+	workspace = _clean(values.get("crm_workspace")) or None
+	if workspace and not frappe.db.exists(
+		"VerityAI Workspace", {"name": workspace, "status": "Active", "engine_tenant": ["is", "set"]}
+	):
+		frappe.throw("Choose an active workspace with an AI tenant for Website Doctor leads.", frappe.ValidationError)
+	settings = frappe.get_single("VerityAI Platform Settings")
+	settings.website_doctor_crm_workspace = workspace
+	settings.save(ignore_permissions=True)
+	return website_doctor_configuration()
+
+
 def configure_feature_flags(values):
 	values = values or {}
 	settings = frappe.get_single("VerityAI Platform Settings")
@@ -289,7 +312,11 @@ def _safe_attribution(raw):
 	if not isinstance(raw, dict):
 		return {}
 	container = raw.get("attribution") if isinstance(raw.get("attribution"), dict) else raw
-	return {key: _clean(container.get(key)) for key in ATTRIBUTION_FIELDS if container.get(key)}
+	return {
+		key: _clean(container.get(key))
+		for key in (*ATTRIBUTION_FIELDS, "channel_code")
+		if container.get(key)
+	}
 
 
 def _lead_context(lead_name):
@@ -326,10 +353,14 @@ def record_lead_created(doc, method=None):
 	if not _tracking_available():
 		return
 	context = _workspace_context(tenant=doc.get("tenant"))
-	channel = _channel(doc.get("source_channel"))
+	attribution = _safe_attribution(doc.get("dynamic_details"))
+	channel = (
+		frappe.db.get_value("VerityAI Growth Channel", {"channel_code": attribution.get("channel_code")}, "name")
+		if attribution.get("channel_code")
+		else _channel(doc.get("source_channel"))
+	)
 	if not context or not channel:
 		return
-	attribution = _safe_attribution(doc.get("dynamic_details"))
 	record_lifecycle_event(
 		"lead.captured",
 		workspace=context.name,
@@ -600,6 +631,7 @@ def summary():
 	website_audits = website_audit_summary()
 	return {
 		"feature_flags": feature_flags(),
+		"website_doctor_configuration": website_doctor_configuration(),
 		"channels": channels,
 		"campaigns": campaigns,
 		"channel_funnel": channel_funnel(),

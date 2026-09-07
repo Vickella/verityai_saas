@@ -188,6 +188,8 @@ class TestGrowthFoundation(FrappeTestCase):
 		self.assertIn("Website project foundation", script)
 		self.assertIn("Website Doctor operations", script)
 		self.assertIn("website-audit-pilot-form", script)
+		self.assertIn("website-doctor-configuration-form", script)
+		self.assertIn("Website Doctor CRM workspace", script)
 		self.assertIn(".va-inline-action", stylesheet)
 		self.assertIn(".va-growth-hero", stylesheet)
 

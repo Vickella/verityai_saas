@@ -20,6 +20,13 @@ def configure_feature_flags(values):
 
 @frappe.whitelist(methods=["POST"])
 @endpoint
+def configure_website_doctor(values):
+	_authorise_change()
+	return growth.configure_website_doctor(json_value(values, {}))
+
+
+@frappe.whitelist(methods=["POST"])
+@endpoint
 def save_channel(values, channel=None):
 	_authorise_change()
 	return growth.save_channel(json_value(values, {}), channel=channel)

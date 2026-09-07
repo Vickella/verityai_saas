@@ -137,6 +137,7 @@ class TestWebsiteAuditLifecycle(FrappeTestCase):
 		ensure_doctypes()
 		growth.seed_default_channels()
 		self.original_flags = growth.feature_flags()
+		self.original_doctor_configuration = growth.website_doctor_configuration()
 		self.token = frappe.generate_hash(length=8).lower()
 		self.owner = f"audit-owner-{self.token}@example.com"
 		frappe.get_doc({
@@ -146,8 +147,27 @@ class TestWebsiteAuditLifecycle(FrappeTestCase):
 		self.created = create_workspace(self.owner, f"Audit Account {self.token}", f"Audit Workspace {self.token}")
 		self.audit_names = []
 
+	def _complete_public_audit(self):
+		growth.configure_feature_flags({"public_audits_enabled": 1})
+		with patch("frappe.enqueue"):
+			created = audits.request_public_audit("https://example.com")
+		self.audit_names.append(created["audit"])
+		fetch = FetchResult(
+			url="https://example.com/", status_code=200, headers={"content-type": "text/html"},
+			body=b"<html lang='en'><head><title>Example Business</title></head><body><h1>Welcome</h1></body></html>",
+			resolved_ip="93.184.216.34", duration_ms=20, redirect_count=0,
+		)
+		with patch("verityai_saas.growth.audits.fetch_public_html", return_value=fetch), patch(
+			"verityai_saas.growth.audits.run_pagespeed", return_value=([], 0, 0)
+		):
+			audits.process_audit(created["audit"])
+		return created
+
 	def tearDown(self):
 		frappe.set_user("Administrator")
+		growth.configure_website_doctor({"crm_workspace": self.original_doctor_configuration.get("crm_workspace")})
+		frappe.db.delete("VerityAI Consent Record", {"source": "Public Website Doctor"})
+		frappe.db.delete("VerityAI Suppression Record", {"source": "Public Website Doctor"})
 		for audit_name in self.audit_names:
 			frappe.db.delete("VerityAI Website Audit Evidence", {"audit": audit_name})
 			frappe.db.delete("VerityAI Growth Event", {"object_type": "VerityAI Website Audit", "object_name": audit_name})
@@ -167,9 +187,74 @@ class TestWebsiteAuditLifecycle(FrappeTestCase):
 		doc = frappe.get_doc("VerityAI Website Audit", created["audit"])
 		self.assertNotEqual(doc.public_token_hash, created["token"])
 		self.assertNotIn("secret", doc.target_url)
+		self.assertIn("/website-doctor/report#audit=", created["report_url"])
+		self.assertNotIn("?token=", created["report_url"])
 		with self.assertRaises(frappe.PermissionError):
 			audits.public_status(doc.name, "wrong-token")
 		self.assertEqual(audits.public_status(doc.name, created["token"])["status"], "Requested")
+
+	def test_public_status_does_not_open_non_public_audits(self):
+		growth.configure_feature_flags({"website_doctor_internal_enabled": 1})
+		with patch("frappe.enqueue"):
+			created = audits.request_operator_audit("https://example.com")
+		self.audit_names.append(created["audit"])
+		with self.assertRaises(frappe.PermissionError):
+			audits.public_status(created["audit"], created["token"])
+
+	def test_public_follow_up_requires_consent_and_enters_existing_crm_once(self):
+		created = self._complete_public_audit()
+		growth.configure_website_doctor({"crm_workspace": self.created["workspace"]})
+		values = {
+			"full_name": "Website Owner", "email": f"doctor-{self.token}@example.com",
+			"business_name": "Example Business", "phone": "+263 77 000 0000",
+		}
+		with self.assertRaises(frappe.ValidationError):
+			audits.capture_public_lead(created["audit"], created["token"], values)
+		values["consent"] = 1
+		first = audits.capture_public_lead(created["audit"], created["token"], values)
+		second = audits.capture_public_lead(created["audit"], created["token"], values)
+		self.assertTrue(first["captured"])
+		self.assertEqual(first, second)
+		leads = frappe.get_all("AI Lead", filters={"tenant": self.created["engine_tenant"], "email": values["email"]})
+		self.assertEqual(len(leads), 1)
+		lead = frappe.get_doc("AI Lead", leads[0].name)
+		details = frappe.parse_json(lead.dynamic_details)
+		self.assertEqual(details["attribution"]["channel_code"], "WEBSITE_DOCTOR")
+		self.assertEqual(details["website_doctor"]["audit"], created["audit"])
+		self.assertEqual(frappe.db.get_value("VerityAI Website Audit", created["audit"], "follow_up_lead"), lead.name)
+		self.assertEqual(frappe.db.count("VerityAI Consent Record", {"source": "Public Website Doctor"}), 1)
+		channel = frappe.db.get_value("VerityAI Growth Channel", {"channel_code": "WEBSITE_DOCTOR"}, "name")
+		events = frappe.get_all("VerityAI Growth Event", filters={"workspace": self.created["workspace"], "channel": channel, "object_name": lead.name}, pluck="event_type")
+		self.assertIn("lead.captured", events)
+		self.assertIn("audit.lead_captured", events)
+
+	def test_public_follow_up_honours_suppression_and_crm_mapping(self):
+		created = self._complete_public_audit()
+		email = f"suppressed-doctor-{self.token}@example.com"
+		values = {"full_name": "No Contact", "email": email, "business_name": "Private Business", "consent": 1}
+		with self.assertRaises(frappe.ValidationError):
+			audits.capture_public_lead(created["audit"], created["token"], values)
+		growth.configure_website_doctor({"crm_workspace": self.created["workspace"]})
+		channel = frappe.db.get_value("VerityAI Growth Channel", {"channel_code": "WEBSITE_DOCTOR"}, "name")
+		growth.suppress(email, "Test opt-out", channel=channel, source="Public Website Doctor")
+		with self.assertRaises(frappe.PermissionError):
+			audits.capture_public_lead(created["audit"], created["token"], values)
+
+	def test_public_report_uses_fragment_token_and_safe_dom_rendering(self):
+		with open(frappe.get_app_path("verityai_saas", "www", "website_doctor_report.html"), encoding="utf-8") as handle:
+			template = handle.read()
+		with open(frappe.get_app_path("verityai_saas", "public", "js", "website_doctor.js"), encoding="utf-8") as handle:
+			script = handle.read()
+		self.assertIn('name="referrer" content="no-referrer"', template)
+		self.assertIn('name="robots" content="noindex,nofollow,noarchive"', template)
+		with open(frappe.get_app_path("verityai_saas", "hooks.py"), encoding="utf-8") as handle:
+			hooks = handle.read()
+		self.assertIn('"from_route": "/website-doctor/report"', hooks)
+		self.assertIn("location.hash.slice(1)", script)
+		self.assertIn('body.set("token", token)', script)
+		self.assertNotIn("URLSearchParams({audit, token})", script)
+		self.assertIn("textContent", script)
+		self.assertNotIn("innerHTML", script)
 
 	def test_operator_pilot_has_an_independent_kill_switch(self):
 		growth.configure_feature_flags({"website_doctor_internal_enabled": 0})

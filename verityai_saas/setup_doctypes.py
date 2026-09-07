@@ -190,6 +190,7 @@ def ensure_platform_settings():
 			field("growth_foundation_enabled", "Growth Foundation Enabled", "Check", default=1),
 			field("website_doctor_internal_enabled", "Internal Website Doctor Enabled", "Check", default=0),
 			field("public_audits_enabled", "Public Website Doctor Enabled", "Check", default=0),
+			field("website_doctor_crm_workspace", "Website Doctor CRM Workspace", "Link", options="VerityAI Workspace"),
 			field("website_builder_enabled", "Website Builder Enabled", "Check", default=0),
 			field("partner_portal_enabled", "Partner Portal Enabled", "Check", default=0),
 			field("white_label_enabled", "White Label Enabled", "Check", default=0),
@@ -332,6 +333,8 @@ def ensure_website_audit_doctypes():
 		field("error_code", "Error Code", read_only=1),
 		field("error_reference", "Error Reference", read_only=1, search_index=1),
 		field("error_message", "Safe Error Message", "Small Text", read_only=1),
+		field("follow_up_lead", "Consented Follow-up Lead", "Link", options="AI Lead", read_only=1),
+		field("follow_up_captured_on", "Follow-up Captured On", "Datetime", read_only=1),
 	], "AUD-.########")
 	ensure_doctype("VerityAI Website Audit Evidence", [
 		field("audit", "Website Audit", "Link", options="VerityAI Website Audit", reqd=1, in_list_view=1, search_index=1),
