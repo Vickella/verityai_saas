@@ -2,6 +2,7 @@ from unittest.mock import Mock, patch
 
 import frappe
 from frappe.tests.utils import FrappeTestCase
+from verity_ai.engine.openai_handler import build_system_prompt
 
 from verityai_saas import setup_doctypes
 from verityai_saas.tests.cleanup import cleanup_all_test_fixtures, cleanup_test_workspace
@@ -88,6 +89,22 @@ class TestVerityAISaaS(FrappeTestCase):
 		with self.assertRaises(frappe.ValidationError):
 			engine.update_widget_settings(self.workspace, {"widget_primary_color": "url(javascript:alert(1))"})
 		self.assertEqual(frappe.db.get_value("AI Tenant", other_tenant.name, "assistant_name"), "Other")
+
+	def test_workspace_identity_reaches_tenant_isolated_public_prompt(self):
+		engine.update_assistant_identity(
+			self.workspace,
+			{
+				"assistant_name": "Greater Grace Ministry Assistant",
+				"brand_name": "Greater Grace Revival Ministries",
+				"business_nature": "General Services",
+			},
+		)
+		config = frappe.get_doc("AI Configuration", self.created["engine_configuration"])
+		config.system_prompt = "You are Verity AI, the Client Support Assistant for VerityCore Consultancy."
+		prompt = build_system_prompt(config, self.tenant, platform="Web", knowledge="")
+		self.assertIn("Greater Grace Revival Ministries", prompt)
+		self.assertIn("Greater Grace Ministry Assistant", prompt)
+		self.assertNotIn("VerityCore", prompt)
 
 	def test_assistant_uses_curated_business_nature(self):
 		settings = engine.safe_settings(self.workspace)
