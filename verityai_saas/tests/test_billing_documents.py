@@ -6,7 +6,7 @@ from frappe.utils import add_days, today
 
 from verityai_saas import setup_doctypes
 from verityai_saas.api import billing as billing_api
-from verityai_saas.services import billing, billing_documents, entitlements
+from verityai_saas.services import billing, billing_documents, entitlements, platform_email
 from verityai_saas.services.admin_reauth import mark_admin_reauthenticated
 from verityai_saas.services.onboarding import create_workspace
 from verityai_saas.tests.cleanup import cleanup_all_test_fixtures, cleanup_test_workspace
@@ -88,10 +88,17 @@ class TestBillingDocumentsAndRecovery(FrappeTestCase):
 		frappe.db.set_value("VerityAI Subscription", self.created["subscription"], {
 			"next_billing_date": today(), "amount": 30, "currency": "USD",
 		})
-		with patch("frappe.sendmail") as sendmail:
+		with patch(
+			"verityai_saas.services.platform_email.send_transactional",
+			wraps=platform_email.send_transactional,
+		) as send_transactional:
 			billing.send_payment_reminders()
 			billing.send_payment_reminders()
-		self.assertEqual(sendmail.call_count, 1)
+		workspace_calls = [
+			call for call in send_transactional.call_args_list
+			if call.args and call.args[0] == self.workspace
+		]
+		self.assertEqual(len(workspace_calls), 1)
 		self.assertEqual(frappe.db.count("VerityAI Email Delivery Log", {"workspace": self.workspace, "notification_type": "Payment Reminder"}), 1)
 
 	def test_reconciliation_csv_neutralizes_spreadsheet_formulas(self):

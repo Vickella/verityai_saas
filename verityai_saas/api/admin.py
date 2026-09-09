@@ -5,6 +5,7 @@ from frappe.utils import add_days, cint, flt, getdate, today
 
 from verityai_saas.api._response import endpoint, json_value
 from verityai_saas.services import credit_stock, growth, paynow, platform_ai, platform_email, setup_guide
+from verityai_saas.websites import templates as website_templates
 from verityai_saas.services.admin_reauth import require_admin_reauthentication
 from verityai_saas.services.permissions import is_platform_admin, require_platform_admin
 
@@ -224,6 +225,24 @@ def upload_whatsapp_setup_guide():
 	require_admin_reauthentication()
 	uploaded_file = (getattr(frappe.request, "files", None) or {}).get("guide")
 	return setup_guide.upload(uploaded_file)
+
+
+@frappe.whitelist(methods=["POST"])
+@endpoint
+def upload_website_template():
+	"""Validate and add an operator-controlled ZIP template package."""
+	require_platform_admin()
+	require_admin_reauthentication()
+	uploaded_file = (getattr(frappe.request, "files", None) or {}).get("template")
+	return website_templates.upload_package(uploaded_file)
+
+
+@frappe.whitelist(methods=["POST"])
+@endpoint
+def set_website_template_active(template_key, active):
+	require_platform_admin()
+	require_admin_reauthentication()
+	return website_templates.set_active(template_key, active)
 
 
 @frappe.whitelist(methods=["POST"])

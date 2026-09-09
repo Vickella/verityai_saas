@@ -618,6 +618,8 @@ def website_audit_summary():
 
 
 def summary():
+	from verityai_saas.websites.templates import catalog as website_template_catalogue
+
 	channels = frappe.get_all("VerityAI Growth Channel", fields=[
 		"name", "channel_name", "channel_code", "channel_type", "delivery_mode", "risk_class", "status",
 		"owner_user", "adapter", "allowed_actions", "monthly_limit", "notes", "modified",
@@ -644,6 +646,7 @@ def summary():
 		"channel_funnel": channel_funnel(),
 		"website_projects": website_projects,
 		"website_audits": website_audits,
+		"website_templates": website_template_catalogue(include_disabled=True),
 		"metrics": {
 			"active_channels": sum(row.status == "Active" for row in channels),
 			"active_campaigns": sum(row.status == "Active" for row in campaigns),

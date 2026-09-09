@@ -97,6 +97,10 @@ doc_events = {
 		"validate": "verityai_saas.websites.projects.validate_project_document",
 		"on_trash": "verityai_saas.websites.projects.protect_project_delete",
 	},
+	"VerityAI Website Template": {
+		"validate": "verityai_saas.websites.templates.validate_template_document",
+		"on_trash": "verityai_saas.websites.templates.protect_template_delete",
+	},
 	"VerityAI Website Definition Version": {
 		"before_save": "verityai_saas.websites.projects.protect_definition_update",
 		"validate": "verityai_saas.websites.projects.validate_definition_document",

@@ -275,12 +275,26 @@ def ensure_growth_doctypes():
 
 
 def ensure_website_doctypes():
+	ensure_doctype("VerityAI Website Template", [
+		field("template_key", "Template Key", reqd=1, unique=1, in_list_view=1, search_index=1),
+		field("template_name", "Template Name", reqd=1, in_list_view=1),
+		field("category", "Category", reqd=1, in_list_view=1),
+		field("description", "Description", "Small Text", reqd=1),
+		field("definition_json", "Structured Definition", "Code", options="JSON", reqd=1),
+		field("definition_hash", "Definition Hash", reqd=1, search_index=1),
+		field("archive_file", "Private Source Archive", "Attach", read_only=1),
+		field("archive_hash", "Archive Hash", reqd=1, search_index=1),
+		field("active", "Active", "Check", default=1, in_list_view=1),
+		field("uploaded_by_user", "Uploaded By", "Link", options="User", read_only=1),
+		field("uploaded_on", "Uploaded On", "Datetime", read_only=1),
+	], "WTPL-.########", permission_rows=platform_settings_permissions())
 	project_fields = [
 		field("workspace", "Workspace", "Link", options="VerityAI Workspace", reqd=1, in_list_view=1, search_index=1),
 		field("project_name", "Project Name", reqd=1, in_list_view=1, search_index=1),
 		field("project_slug", "Project Slug", reqd=1, unique=1, in_list_view=1),
 		field("business_name", "Business Name", reqd=1),
 		field("template_key", "Template Key", reqd=1, default="starter-v1"),
+		field("source_audit", "Source Website Audit", "Link", options="VerityAI Website Audit", read_only=1, unique=1),
 		field("status", "Status", "Select", options="Draft\nReady\nPublished\nArchived", default="Draft", reqd=1, in_list_view=1),
 		field("verity_subdomain", "Reserved Verity Subdomain", read_only=1, unique=1),
 		field("custom_domain", "Custom Domain", read_only=1),

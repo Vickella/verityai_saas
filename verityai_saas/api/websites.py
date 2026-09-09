@@ -3,6 +3,7 @@ import frappe
 from verityai_saas.api._response import endpoint, json_value
 from verityai_saas.services.permissions import require_workspace_permission
 from verityai_saas.websites import projects
+from verityai_saas.websites import templates
 
 
 @frappe.whitelist()
@@ -10,6 +11,14 @@ from verityai_saas.websites import projects
 def list_projects(workspace):
 	require_workspace_permission(workspace, "view_website")
 	return projects.list_projects(workspace)
+
+
+@frappe.whitelist()
+@endpoint
+def template_catalogue(workspace):
+	require_workspace_permission(workspace, "view_website")
+	projects.require_builder_enabled()
+	return templates.catalog()
 
 
 @frappe.whitelist()
@@ -24,6 +33,20 @@ def detail(workspace, project):
 def create(workspace, values):
 	require_workspace_permission(workspace, "manage_website")
 	return projects.create_project(workspace, json_value(values, {}))
+
+
+@frappe.whitelist(methods=["POST"])
+@endpoint
+def create_from_template(workspace, values):
+	require_workspace_permission(workspace, "manage_website")
+	return projects.create_from_template(workspace, json_value(values, {}))
+
+
+@frappe.whitelist(methods=["POST"])
+@endpoint
+def create_from_audit(workspace, audit, values, token=None):
+	require_workspace_permission(workspace, "manage_website")
+	return projects.create_from_audit(workspace, audit, json_value(values, {}), token=token)
 
 
 @frappe.whitelist(methods=["POST"])

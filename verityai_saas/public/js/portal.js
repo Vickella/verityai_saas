@@ -202,6 +202,42 @@
     document.querySelectorAll("[data-delete-source]").forEach(button=>button.addEventListener("click",async()=>{if(!window.confirm(`Delete “${button.dataset.sourceTitle}” and its search index?`))return;button.disabled=true;try{await call("verityai_saas.api.knowledge.delete",{workspace,source:button.dataset.deleteSource});alert("Knowledge source deleted.");await knowledge();}catch(err){alert(err.message,true);button.disabled=false;}}));
     showGuidedNav();
   }
+
+  const websiteSection = section => {
+    const actions=[section.primary_action,section.secondary_action].filter(Boolean).map(action=>`<span>${esc(action.label)}</span>`).join("");
+    const items=(section.items||[]).map(item=>`<article><strong>${esc(item.title||item.label||"")}</strong><p>${esc(item.body||"")}</p></article>`).join("");
+    return `<section class="va-site-section va-site-${esc(section.type)}">${section.eyebrow?`<span>${esc(section.eyebrow)}</span>`:""}${section.heading?`<h3>${esc(section.heading)}</h3>`:""}${section.body?`<p>${esc(section.body)}</p>`:""}${items?`<div class="va-site-items">${items}</div>`:""}${actions?`<div class="va-site-actions">${actions}</div>`:""}</section>`;
+  };
+
+  const websitePreview = definition => {
+    const home=(definition.pages||[]).find(item=>item.slug==="home")||definition.pages?.[0];
+    const brand=definition.brand||{};
+    return `<div class="va-site-browser" style="--site-primary:${esc(brand.primary_color||"#2457d6")};--site-secondary:${esc(brand.secondary_color||"#0f766e")};--site-bg:${esc(brand.background_color||"#ffffff")};--site-text:${esc(brand.text_color||"#172033")}"><div class="va-site-browser-bar"><i></i><i></i><i></i><span>${esc(definition.site?.title||"Website preview")}</span></div><div class="va-site-page"><nav><strong>${esc(definition.site?.title||"")}</strong><div>${(definition.navigation||[]).map(item=>`<span>${esc(item.label)}</span>`).join("")}</div></nav>${(home?.sections||[]).map(websiteSection).join("")}</div></div>`;
+  };
+
+  async function website() {
+    const [projects,templates,audits]=await Promise.all([
+      call("verityai_saas.api.websites.list_projects",{workspace}),
+      call("verityai_saas.api.websites.template_catalogue",{workspace}),
+      call("verityai_saas.api.audits.list_for_workspace",{workspace}),
+    ]);
+    const project=(projects||[]).find(item=>item.status!=="Archived")||projects?.[0];
+    if(!project){
+      const cards=(templates||[]).map((item,index)=>`<label class="va-template-card"><input type="radio" name="template_key" value="${esc(item.key)}" ${index===0?"checked":""}><span class="va-template-swatch va-template-swatch-${(index%3)+1}"></span><span class="va-plan-label">${esc(item.category)}</span><strong>${esc(item.name)}</strong><small>${esc(item.description)}</small><em>${esc(item.source)}</em></label>`).join("");
+      const completed=(audits||[]).filter(item=>item.status==="Completed");
+      content.innerHTML=`<section class="va-builder-intro"><div><p class="eyebrow">Website Builder</p><h2>Turn your business into a polished website</h2><p>Choose a safe template, create a complete responsive draft, then refine it before publishing becomes available.</p></div><span>Draft & preview</span></section>${section("Choose a starting point","Every template is validated and contains no executable code.",`<form id="website-create-form" class="va-form"><div class="va-template-grid">${cards}</div><div class="va-fields">${field("Project name","project_name",`${picker.textContent} website`)}${field("Verity address","project_slug",String(picker.textContent||"website").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"").slice(0,50))}<div class="va-field full"><label>Start from a completed Website Doctor audit (optional)</label><select name="audit"><option value="">Create from template only</option>${completed.map(item=>`<option value="${esc(item.name)}">${esc(item.target_host)} · score ${number(item.overall_score)}/100</option>`).join("")}</select><small>A completed audit links its evidence to this redesign without copying source code.</small></div></div><div class="va-form-actions"><span class="muted">One active free website project per account.</span><button class="va-button">Create website draft</button></div></form>`)}`;
+      document.querySelector("#website-create-form").addEventListener("submit",async event=>{event.preventDefault();const form=event.currentTarget;const button=form.querySelector("button");button.disabled=true;try{const values={project_name:form.project_name.value,project_slug:form.project_slug.value,template_key:form.template_key.value};if(form.audit.value)await call("verityai_saas.api.websites.create_from_audit",{workspace,audit:form.audit.value,values});else await call("verityai_saas.api.websites.create_from_template",{workspace,values});alert("Your website draft is ready.");await website();}catch(error){alert(error.message,true);button.disabled=false;}});
+      return;
+    }
+    const detail=await call("verityai_saas.api.websites.detail",{workspace,project:project.name});
+    const definition=detail.definition;
+    if(!definition){content.innerHTML=emptyState("This project needs a website version","Create a validated version before previewing this project.");return;}
+    const home=(definition.pages||[]).find(item=>item.slug==="home")||definition.pages[0];
+    const hero=(home.sections||[]).find(item=>item.type==="hero")||home.sections[0];
+    content.innerHTML=`<section class="va-builder-toolbar"><div><p class="eyebrow">${esc(detail.template_key)}</p><h2>${esc(detail.project_name)}</h2><p>${esc(detail.verity_subdomain)}.verity.site · Version ${number(detail.definition_version)}</p></div><div>${pill(detail.status)}<button type="button" class="va-button secondary" id="website-ready">${detail.status==="Ready"?"Return to draft":"Mark ready"}</button></div></section><div class="va-builder-layout"><form id="website-editor-form" class="va-section va-form"><div class="va-section-heading"><div><h2>Content & brand</h2><p>Edit the key content safely. Each save creates an immutable version.</p></div></div><div class="va-fields">${field("Website title","site_title",definition.site.title)}${field("Short description","site_description",definition.site.description)}${colourField("Primary colour","primary_color",definition.brand.primary_color,"#2457d6")}${colourField("Page background","background_color",definition.brand.background_color,"#ffffff")}${field("Hero eyebrow","hero_eyebrow",hero.eyebrow||"")}${field("Hero heading","hero_heading",hero.heading||"")}${field("Hero message","hero_body",hero.body||"","textarea",true)}${field("Button label","action_label",hero.primary_action?.label||"")}${field("Button link","action_url",hero.primary_action?.url||"")}</div><div class="va-form-actions"><span class="muted">Scripts and unsafe HTML are always rejected.</span><button class="va-button">Save new version</button></div></form><section class="va-builder-preview"><header><div><span>Responsive preview</span><strong>Desktop & mobile safe</strong></div><span class="va-live-dot">Draft</span></header>${websitePreview(definition)}</section></div>`;
+    document.querySelector("#website-editor-form").addEventListener("submit",async event=>{event.preventDefault();const form=event.currentTarget;const button=form.querySelector("button");button.disabled=true;try{const next=JSON.parse(JSON.stringify(definition));next.site.title=form.site_title.value;next.site.description=form.site_description.value;next.brand.primary_color=form.primary_color.value;next.brand.background_color=form.background_color.value;const nextHome=next.pages.find(item=>item.slug==="home")||next.pages[0];const nextHero=nextHome.sections.find(item=>item.type==="hero")||nextHome.sections[0];nextHero.eyebrow=form.hero_eyebrow.value;nextHero.heading=form.hero_heading.value;nextHero.body=form.hero_body.value;nextHero.primary_action={label:form.action_label.value,url:form.action_url.value};await call("verityai_saas.api.websites.add_version",{workspace,project:detail.name,definition:next,source:"Manual"});alert("A new validated website version was saved.");await website();}catch(error){alert(error.message,true);button.disabled=false;}});
+    document.querySelector("#website-ready").addEventListener("click",async event=>{event.currentTarget.disabled=true;try{await call("verityai_saas.api.websites.change_status",{workspace,project:detail.name,status:detail.status==="Ready"?"Draft":"Ready"});alert(detail.status==="Ready"?"Website returned to draft.":"Website marked ready for the publishing phase.");await website();}catch(error){alert(error.message,true);event.currentTarget.disabled=false;}});
+  }
   function renderLeadDetail(data) {
     const row=data.lead||{};
     let dynamic={};
@@ -639,7 +675,7 @@
     bind("new-workspace", async f=>{const d=await call("verityai_saas.api.onboarding.create",json(f));location.href=d.onboarding_url||d.dashboard_url;});
   }
 
-  const renderers={dashboard,health,onboarding,assistant,widget,knowledge,leads,crm,conversations,commerce,quotes,usage,billing,integrations,email,whatsapp,team,account};
+  const renderers={dashboard,health,onboarding,assistant,website,widget,knowledge,leads,crm,conversations,commerce,quotes,usage,billing,integrations,email,whatsapp,team,account};
   async function init(){try{const params=new URLSearchParams(location.search);const requested=params.get("workspace")||localStorage.getItem("verityai_workspace")||"";const rows=await call("verityai_saas.api.workspace.list_workspaces",requested?{workspace:requested}:{});if(!rows.length){await newWorkspace();return}const current=rows[0];workspace=current.name;picker.textContent=current.business_name||current.workspace_name;document.querySelectorAll(".va-sidebar nav a").forEach(link=>{const route=link.pathname.split("/").filter(Boolean).pop();link.href=routeUrl(route);});localStorage.setItem("verityai_workspace",workspace);await (renderers[page]||dashboard)()}catch(err){content.innerHTML=`<div class="va-card va-empty">${esc(err.message)}</div>`;alert(err.message,true)}}
   init();
 })();

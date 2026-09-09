@@ -9,6 +9,7 @@ PAGE_META = {
 	"health": ("Health", "Services and alerts"),
 	"onboarding": ("Setup", "Launch progress"),
 	"assistant": ("Assistant", "Identity and sales profile"),
+	"website": ("Website Builder", "Create, edit and preview your website"),
 	"widget": ("Widget", "Appearance and domains"),
 	"knowledge": ("Knowledge", "Trusted sources"),
 	"leads": ("Leads", "Pipeline"),

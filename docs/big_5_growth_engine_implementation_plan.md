@@ -252,6 +252,15 @@ audit is measurable.
 Convert an audit into a Website Project without modifying the source website. Add a small template catalogue,
 schema-validated AI population, structured edits, responsive preview and version history.
 
+**Implemented foundation (September 2026):** the feature-gated customer portal now creates tenant-branded drafts
+from three built-in templates or a completed workspace audit, renders a responsive non-interactive preview and saves
+edits as immutable validated versions. Platform administrators can upload, activate and deactivate ZIP template
+packages through the operator console. Packages are data-only (`template.json` plus an optional README), bounded by
+compressed/expanded size and file count, reject traversal, symlinks, encryption, duplicate paths, HTML and executable
+content, and retain a private archive checksum. Audit provenance is uniquely linked to the created project. Publishing
+remains blocked pending Phase 6. AI-assisted structured population beyond deterministic tenant-safe placeholders is
+still outstanding in this phase.
+
 **Gate:** users can generate and revise a complete responsive site without generated scripts, server code or unsafe HTML.
 
 ### Phase 6 — publish, hosting and product activation

@@ -26,3 +26,4 @@ verityai_saas.patches.v0_22.growth_foundation
 verityai_saas.patches.v0_23.website_project_foundation
 verityai_saas.patches.v0_24.website_doctor_foundation
 verityai_saas.patches.v0_25.website_doctor_public_report
+verityai_saas.patches.v0_26.website_template_catalogue

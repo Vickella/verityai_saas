@@ -5,6 +5,7 @@ from frappe.utils import cint, now_datetime
 
 from verityai_saas.services import growth
 from verityai_saas.websites.definitions import SCHEMA_VERSION, canonical_json, definition_hash, validate_definition
+from verityai_saas.websites import templates
 
 
 PROJECT_STATUSES = {"Draft", "Ready", "Published", "Archived"}
@@ -60,6 +61,7 @@ def _account_has_active_project(account, exclude=None):
 def project_data(doc, include_definition=False):
 	data = {key: doc.get(key) for key in (
 		"name", "workspace", "project_name", "project_slug", "business_name", "template_key", "status",
+		"source_audit",
 		"current_version", "published_version", "verity_subdomain", "custom_domain", "domain_status",
 		"widget_enabled", "whatsapp_enabled", "crm_enabled", "created_by_user", "creation", "modified",
 	)}
@@ -95,6 +97,7 @@ def create_project(workspace, values, user=None):
 		"project_slug": normalize_slug(values.get("project_slug")),
 		"business_name": _clean(values.get("business_name") or context.business_name, "Business name", required=True),
 		"template_key": _clean(values.get("template_key") or "starter-v1", "Template key", 80, required=True),
+		"source_audit": values.get("source_audit"),
 		"status": "Draft",
 		"verity_subdomain": normalize_slug(values.get("project_slug")),
 		"domain_status": "Unconfigured",
@@ -107,6 +110,54 @@ def create_project(workspace, values, user=None):
 	if values.get("definition"):
 		add_definition_version(workspace, doc.name, values.get("definition"), source=values.get("source") or "Manual", user=user)
 	return get_project(workspace, doc.name)
+
+
+def create_from_template(workspace, values, user=None):
+	require_builder_enabled()
+	values = values or {}
+	context = _workspace_context(workspace)
+	template_key = _clean(values.get("template_key") or "starter-v1", "Template key", 80, required=True).lower()
+	definition = templates.build_definition(
+		template_key,
+		values.get("business_name") or context.business_name,
+		frappe.db.get_value("VerityAI Workspace", workspace, "business_nature"),
+	)
+	return create_project(workspace, {
+		**values, "template_key": template_key, "definition": definition, "source": "AI Generation",
+	}, user=user)
+
+
+def create_from_audit(workspace, audit_name, values, token=None, user=None):
+	require_builder_enabled()
+	values = values or {}
+	audit = frappe.get_doc("VerityAI Website Audit", audit_name)
+	if audit.status != "Completed":
+		frappe.throw("The Website Doctor audit must finish before creating a redesign.", frappe.ValidationError)
+	if audit.request_kind == "Workspace":
+		if audit.workspace != workspace:
+			frappe.throw("Website audit was not found in this workspace.", frappe.DoesNotExistError)
+	elif audit.request_kind == "Public":
+		from verityai_saas.growth.audits import public_status
+		public_status(audit.name, token)
+	else:
+		frappe.throw("Operator audits cannot be claimed by a customer workspace.", frappe.PermissionError)
+	claimed = frappe.db.get_value("VerityAI Website Project", {"source_audit": audit.name}, ["name", "workspace"], as_dict=True)
+	if claimed:
+		if claimed.workspace == workspace:
+			return get_project(workspace, claimed.name)
+		frappe.throw("This Website Doctor report has already been claimed.", frappe.PermissionError)
+	context = _workspace_context(workspace)
+	template_key = _clean(values.get("template_key") or "starter-v1", "Template key", 80, required=True).lower()
+	definition = templates.build_definition(
+		template_key,
+		values.get("business_name") or context.business_name,
+		frappe.db.get_value("VerityAI Workspace", workspace, "business_nature"),
+	)
+	definition["site"]["description"] = f"A fresh website draft informed by a Website Doctor review of {audit.target_host}."
+	return create_project(workspace, {
+		**values, "template_key": template_key, "definition": definition,
+		"source": "Website Doctor", "source_audit": audit.name,
+	}, user=user)
 
 
 def update_project(workspace, project, values):
@@ -205,6 +256,10 @@ def validate_project_document(doc, method=None):
 		frappe.throw("Domains and publishing require the later deployment security gate.", frappe.ValidationError)
 	if doc.current_version and not frappe.db.exists("VerityAI Website Definition Version", {"name": doc.current_version, "workspace": doc.workspace, "project": doc.name}):
 		frappe.throw("Current version must belong to this website project.", frappe.ValidationError)
+	if doc.source_audit:
+		audit = frappe.db.get_value("VerityAI Website Audit", doc.source_audit, ["name", "workspace", "request_kind", "status"], as_dict=True)
+		if not audit or audit.status != "Completed" or (audit.request_kind == "Workspace" and audit.workspace != doc.workspace) or audit.request_kind == "Operator":
+			frappe.throw("Source audit must be a completed workspace or claimed public Website Doctor audit.", frappe.ValidationError)
 	previous = doc.get_doc_before_save()
 	if doc.status == "Ready" and not doc.current_version:
 		frappe.throw("A ready website project requires a validated current version.", frappe.ValidationError)
