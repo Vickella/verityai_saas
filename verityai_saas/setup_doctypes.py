@@ -550,10 +550,30 @@ def ensure_doctypes():
 
 	ensure_doctype("VerityAI Usage Transaction", [
 		field("workspace", "Workspace", "Link", options="VerityAI Workspace", reqd=1, in_list_view=1), field("engine_tenant", "Engine Tenant", "Link", options="AI Tenant", reqd=1),
-		field("ai_usage_log", "AI Usage Log", "Link", options="AI Usage Log", unique=1), field("transaction_type", "Transaction Type", "Select", options="Usage\nBlocked\nTop-Up\nCredit\nAdjustment\nRefund", reqd=1),
+		field("ai_usage_log", "AI Usage Log", "Link", options="AI Usage Log", unique=1), field("transaction_type", "Transaction Type", "Select", options="Usage\nBlocked\nFailed\nTop-Up\nCredit\nAdjustment\nRefund", reqd=1),
 		field("platform", "Platform"), field("input_tokens", "Input Tokens", "Int"), field("output_tokens", "Output Tokens", "Int"), field("total_tokens", "Total Tokens", "Int"),
 		field("estimated_cost", "Estimated Cost", "Currency"), field("billable_amount", "Billable Amount", "Currency"), field("period", "Period"),
+		field("operation", "Operation"), field("source_feature", "Source Feature"),
+		field("correlation_id", "Correlation ID", unique=1), field("occurred_on", "Occurred On", "Datetime"),
+		field("metadata_json", "Safe Metadata", "Code", options="JSON"),
 	], "VUTX-.########")
+
+	# These referenced commercial DocTypes must exist before Billing Event is
+	# validated on a clean installation.
+	ensure_doctype("VerityAI Credit Pack", [
+		field("pack_name", "Pack Name", reqd=1, unique=1, in_list_view=1), field("pack_code", "Pack Code", reqd=1, unique=1, in_list_view=1),
+		field("active", "Active", "Check", default=1, in_list_view=1), field("credits", "AI Credits", "Int", reqd=1, in_list_view=1),
+		field("price", "Price", "Currency", reqd=1, in_list_view=1), field("currency", "Currency", "Link", options="Currency", default="USD"),
+		field("sort_order", "Sort Order", "Int", default=10),
+	], "field:pack_code")
+
+	ensure_doctype("VerityAI Promotion", [
+		field("promotion_name", "Promotion Name", reqd=1, in_list_view=1), field("code", "Code", reqd=1, unique=1, in_list_view=1),
+		field("active", "Active", "Check", default=1, in_list_view=1), field("discount_percent", "Discount Percent", "Percent"),
+		field("bonus_credits", "Bonus AI Credits", "Int"), field("valid_from", "Valid From", "Date"), field("valid_until", "Valid Until", "Date"),
+		field("max_redemptions", "Maximum Redemptions", "Int"), field("per_account_limit", "Per Account Limit", "Int", default=1),
+		field("minimum_plan", "Minimum Plan", "Link", options="VerityAI Plan"), field("notes", "Notes", "Small Text"),
+	], "VPROMO-.#####")
 
 	ensure_doctype("VerityAI Billing Event", [
 		field("account", "Account", "Link", options="VerityAI Account", reqd=1), field("workspace", "Workspace", "Link", options="VerityAI Workspace", reqd=1, in_list_view=1),
@@ -569,21 +589,6 @@ def ensure_doctypes():
 		field("live_checkout_verified", "Live Checkout Verified", "Check", default=0),
 		field("gateway_response_json", "Gateway Response", "Code", options="JSON"), field("usage_snapshot_json", "Usage Snapshot", "Code", options="JSON"), field("paid_on", "Paid On", "Datetime"),
 	], "VBE-.#####")
-
-	ensure_doctype("VerityAI Credit Pack", [
-		field("pack_name", "Pack Name", reqd=1, unique=1, in_list_view=1), field("pack_code", "Pack Code", reqd=1, unique=1, in_list_view=1),
-		field("active", "Active", "Check", default=1, in_list_view=1), field("credits", "AI Credits", "Int", reqd=1, in_list_view=1),
-		field("price", "Price", "Currency", reqd=1, in_list_view=1), field("currency", "Currency", "Link", options="Currency", default="USD"),
-		field("sort_order", "Sort Order", "Int", default=10),
-	], "field:pack_code")
-
-	ensure_doctype("VerityAI Promotion", [
-		field("promotion_name", "Promotion Name", reqd=1, in_list_view=1), field("code", "Code", reqd=1, unique=1, in_list_view=1),
-		field("active", "Active", "Check", default=1, in_list_view=1), field("discount_percent", "Discount Percent", "Percent"),
-		field("bonus_credits", "Bonus AI Credits", "Int"), field("valid_from", "Valid From", "Date"), field("valid_until", "Valid Until", "Date"),
-		field("max_redemptions", "Maximum Redemptions", "Int"), field("per_account_limit", "Per Account Limit", "Int", default=1),
-		field("minimum_plan", "Minimum Plan", "Link", options="VerityAI Plan"), field("notes", "Notes", "Small Text"),
-	], "VPROMO-.#####")
 
 	ensure_doctype("VerityAI Promotion Redemption", [
 		field("promotion", "Promotion", "Link", options="VerityAI Promotion", reqd=1, in_list_view=1),
@@ -667,9 +672,17 @@ def ensure_doctypes():
 	], "VEDL-.########")
 
 	ensure_doctype("VerityAI WhatsApp Setup", [
-		field("workspace", "Workspace", "Link", options="VerityAI Workspace", reqd=1, unique=1, in_list_view=1), field("mode", "Mode", "Select", options="Button Only\nLead Alerts\nFull AI Automation", default="Button Only"),
+		field("workspace", "Workspace", "Link", options="VerityAI Workspace", reqd=1, unique=0, in_list_view=1),
+		field("account_label", "Account Label", reqd=1, default="Primary WhatsApp", in_list_view=1),
+		field("active", "Active", "Check", default=1, in_list_view=1), field("is_default", "Default Outbound Account", "Check", default=0),
+		field("mode", "Mode", "Select", options="Button Only\nLead Alerts\nFull AI Automation", default="Button Only"),
 		field("business_whatsapp_number", "Business WhatsApp Number"), field("whatsapp_button_enabled", "WhatsApp Button Enabled", "Check", default=1),
 		field("lead_alert_enabled", "Lead Alert Enabled", "Check"), field("full_ai_enabled", "Full AI Enabled", "Check"), field("setup_status", "Setup Status", "Select", options="Not Configured\nIn Progress\nConnected\nFailed", default="Not Configured"),
+		field("whatsapp_phone_id", "Meta Phone Number ID", in_list_view=1),
+		field("whatsapp_access_token", "WhatsApp Access Token", "Password"),
+		field("meta_verify_token", "Meta Verify Token", "Password"),
+		field("meta_app_secret", "Meta App Secret", "Password"),
+		field("verify_meta_signature", "Verify Meta Webhook Signature", "Check", default=1),
 		field("meta_waba_id", "WhatsApp Business Account ID"), field("waba_subscription_status", "WABA Subscription Status"), field("last_subscription_check_on", "Last Subscription Check On", "Datetime"),
 		field("meta_phone_number_id_status", "Meta Phone Number ID Status"), field("access_token_status", "Access Token Status"), field("webhook_status", "Webhook Status"),
 		field("signature_verification_status", "Signature Verification Status"), field("last_tested_on", "Last Tested On", "Datetime"), field("last_webhook_on", "Last Webhook On", "Datetime"), field("last_webhook_event", "Last Webhook Event"),

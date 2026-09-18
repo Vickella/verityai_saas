@@ -42,23 +42,11 @@ class TestWorkspaceTeamManagement(FrappeTestCase):
 		)
 		self.workspace = self.created["workspace"]
 		self.tenant = self.created["engine_tenant"]
-		self.team_plan = frappe.get_doc(
-			{
-				"doctype": "VerityAI Plan",
-				"plan_name": f"Team Plan {token}",
-				"plan_code": f"TEAM-{token.upper()}",
-				"active": 1,
-				"currency": "USD",
-				"monthly_price": 5,
-				"annual_price": 50,
-				"monthly_token_limit": 100000,
-				"max_tokens": 1200,
-				"max_team_members": 3,
-				"max_knowledge_sources": 5,
-				"max_allowed_domains": 2,
-			}
-		).insert(ignore_permissions=True).name
-		assign_plan(self.workspace, self.team_plan, "Active", "Monthly")
+		# Growth includes three active members (owner plus two teammates), which
+		# is the capacity exercised by this module. Launch intentionally includes
+		# only the owner.
+		growth_plan = frappe.db.get_value("VerityAI Plan", {"plan_code": "GROWTH"}, "name")
+		assign_plan(self.workspace, growth_plan, "Active", "Monthly")
 
 	def tearDown(self):
 		super().tearDown()
@@ -66,10 +54,7 @@ class TestWorkspaceTeamManagement(FrappeTestCase):
 			self.workspace,
 			users=[self.owner, self.other, self.member_user, *self.extra_users],
 			engine_tenant=self.tenant,
-			commit=False,
 		)
-		frappe.db.delete("VerityAI Plan", {"name": self.team_plan})
-		frappe.db.commit()
 
 	def create_user(self, email):
 		return frappe.get_doc(

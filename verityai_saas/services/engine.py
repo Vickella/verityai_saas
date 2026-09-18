@@ -267,10 +267,14 @@ def get_workspace_usage(workspace_name, from_date=None, to_date=None):
 	elif to_date:
 		filters["creation"] = ["<=", to_date]
 	rows = frappe.get_all("AI Usage Log", filters=filters, fields=["name", "platform", "input_tokens", "output_tokens", "total_tokens", "estimated_cost", "status", "creation"], order_by="creation asc")
-	data = {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0, "estimated_cost": 0.0, "blocked_events": 0, "by_platform": defaultdict(int), "by_date": defaultdict(int)}
+	data = {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0, "estimated_cost": 0.0, "blocked_events": 0, "failed_events": 0, "by_platform": defaultdict(int), "by_date": defaultdict(int)}
 	for row in rows:
+		if row.status != "Success":
+			data["blocked_events"] += int(row.status == "Blocked")
+			data["failed_events"] += int(row.status == "Error")
+			continue
 		data["input_tokens"] += int(row.input_tokens or 0); data["output_tokens"] += int(row.output_tokens or 0); data["total_tokens"] += int(row.total_tokens or 0)
-		data["estimated_cost"] += float(row.estimated_cost or 0); data["blocked_events"] += int(row.status == "Blocked")
+		data["estimated_cost"] += float(row.estimated_cost or 0)
 		data["by_platform"][row.platform or "Unknown"] += int(row.total_tokens or 0); data["by_date"][str(row.creation.date())] += int(row.total_tokens or 0)
 	data["by_platform"] = dict(data["by_platform"]); data["by_date"] = dict(data["by_date"]); data["estimated_cost"] = round(data["estimated_cost"], 6)
 	return data
