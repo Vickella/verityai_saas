@@ -337,7 +337,7 @@
 
   const unlockForm=document.querySelector("#va-admin-unlock-form");
   if(unlockForm){
-    unlockForm.addEventListener("submit",async event=>{event.preventDefault();const button=unlockForm.querySelector("button");button.disabled=true;button.textContent="Verifying…";try{await call("verityai_saas.api.admin_auth.unlock",{password:unlockForm.password.value});location.reload();}catch(error){unlockForm.password.value="";unlockForm.password.focus();alert(error.message,true);button.disabled=false;button.textContent="Unlock operator console";}});
+    unlockForm.addEventListener("submit",async event=>{event.preventDefault();const button=unlockForm.querySelector("button");const password=unlockForm.password.value;unlockForm.password.value="";button.disabled=true;button.textContent="Verifying…";try{await call("verityai_saas.api.admin_auth.unlock",{password});location.reload();}catch(error){unlockForm.password.focus();alert(error.message,true);button.disabled=false;button.textContent="Unlock operator console";}});
     return;
   }
   document.querySelector("#va-admin-lock")?.addEventListener("click",async event=>{const button=event.currentTarget;button.disabled=true;try{await call("verityai_saas.api.admin_auth.lock");location.reload();}catch(error){alert(error.message,true);button.disabled=false;}});

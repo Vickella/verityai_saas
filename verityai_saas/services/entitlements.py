@@ -75,14 +75,14 @@ def _channel_usage(context, platform):
 	if platform == "Web":
 		return cint(frappe.db.sql(
 			"""select count(distinct chat_session) from `tabAI Usage Log`
-			where tenant=%s and platform='Web' and creation >= %s and status != 'Error'""",
+			where tenant=%s and platform='Web' and creation >= %s and status = 'Success'""",
 			(context.workspace.engine_tenant, start),
 		)[0][0])
 	return cint(frappe.db.count("AI Usage Log", {
 		"tenant": context.workspace.engine_tenant,
 		"platform": platform,
 		"creation": [">=", start],
-		"status": ["!=", "Error"],
+		"status": "Success",
 	}))
 
 

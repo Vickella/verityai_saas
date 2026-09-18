@@ -22,6 +22,8 @@ class TestCustomerSignup(FrappeTestCase):
 		self.assertIn("Create your AI workspace", content)
 		self.assertIn('name="password"', content)
 		self.assertIn('name="confirm_password"', content)
+		self.assertIn('method="post"', content)
+		self.assertIn('action="/api/method/verityai_saas.api.signup.register"', content)
 
 	@patch("verityai_saas.api.signup.frappe.get_doc")
 	def test_registration_creates_user_and_authenticates_before_onboarding(self, get_doc):

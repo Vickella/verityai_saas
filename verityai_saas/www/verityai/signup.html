@@ -14,7 +14,7 @@
 				<div><p class="eyebrow">Start your trial</p><h1>Create your AI workspace</h1><p>Set up your business account and assistant.</p></div>
 			</header>
 			<div id="signup-notice" class="va-notice" hidden></div>
-			<form id="signup-form" class="va-form">
+			<form id="signup-form" class="va-form" method="post" action="/api/method/verityai_saas.api.signup.register">
 				<div class="va-fields">
 					<div class="va-field"><label for="full_name">Full name</label><input id="full_name" name="full_name" maxlength="120" autocomplete="name" required></div>
 					<div class="va-field"><label for="email">Work email</label><input id="email" name="email" type="email" maxlength="140" autocomplete="email" required></div>

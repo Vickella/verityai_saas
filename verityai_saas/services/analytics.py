@@ -38,7 +38,7 @@ def workspace_analytics(workspace_name, from_date=None, to_date=None):
 	start, end = report_range(from_date, to_date)
 	tenant = engine.get_workspace_engine_tenant(workspace_name)
 	end_time = f"{end} 23:59:59"
-	usage_rows = frappe.db.sql("""select date(creation) as date, coalesce(sum(total_tokens),0) as tokens, coalesce(sum(estimated_cost),0) as cost, count(name) as requests from `tabAI Usage Log` where tenant=%s and creation between %s and %s group by date(creation) order by date(creation)""", (tenant, start, end_time), as_dict=True)
+	usage_rows = frappe.db.sql("""select date(creation) as date, coalesce(sum(total_tokens),0) as tokens, coalesce(sum(estimated_cost),0) as cost, count(name) as requests from `tabAI Usage Log` where tenant=%s and status='Success' and creation between %s and %s group by date(creation) order by date(creation)""", (tenant, start, end_time), as_dict=True)
 	lead_rows = frappe.db.sql("""select date(creation) as date, count(name) as leads from `tabAI Lead` where tenant=%s and creation between %s and %s group by date(creation) order by date(creation)""", (tenant, start, end_time), as_dict=True)
 	conversation_rows = frappe.db.sql("""select date(creation) as date, count(name) as conversations from `tabAI Chat Session` where tenant=%s and creation between %s and %s group by date(creation) order by date(creation)""", (tenant, start, end_time), as_dict=True)
 	channel_rows = frappe.get_all("AI Chat Session", filters={"tenant": tenant, "creation": ["between", [start, end_time]]}, fields=["platform", "count(name) as total"], group_by="platform")

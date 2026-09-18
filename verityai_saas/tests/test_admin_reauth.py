@@ -30,6 +30,8 @@ class TestAdminReauthentication(FrappeTestCase):
 	def test_locked_page_does_not_render_operator_console(self):
 		content = get_response_content("/verityai/admin")
 		self.assertIn('id="va-admin-unlock-form"', content)
+		self.assertIn('method="post"', content)
+		self.assertIn('action="/api/method/verityai_saas.api.admin_auth.unlock"', content)
 		self.assertNotIn('id="va-admin-content"', content)
 		response = admin_api.dashboard()
 		self.assertFalse(response["success"])

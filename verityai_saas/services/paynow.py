@@ -302,7 +302,6 @@ def initiate_test_transaction(workspace_name, merchant_email, test_method="Hoste
 	"""Create a Paynow test-mode transaction that can never fulfil customer value."""
 	if operating_mode() != "Test":
 		frappe.throw("Switch Paynow to Test mode before starting an integration test.", frappe.ValidationError)
-	_credentials()
 	merchant_email = str(merchant_email or "").strip().lower()
 	if not validate_email_address(merchant_email):
 		frappe.throw("Enter the email address used to sign in to the Paynow merchant account.", frappe.ValidationError)
@@ -318,6 +317,9 @@ def initiate_test_transaction(workspace_name, merchant_email, test_method="Hoste
 				"Choose one of Paynow's documented Test-mode simulator numbers.",
 				frappe.ValidationError,
 			)
+	# Validate all operator input before looking up credentials or making a
+	# provider request, so malformed simulator tests fail deterministically.
+	_credentials()
 	return _initiate_gateway_event(
 		workspace.name,
 		"Payment",

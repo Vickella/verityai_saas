@@ -141,6 +141,38 @@ class TestEntitlements(FrappeTestCase):
 		self.assertEqual(wallet.whatsapp_messages_used, 1)
 		self.assertEqual(wallet.email_sends_used, 1)
 
+	def test_only_successful_assistant_responses_consume_credits_once(self):
+		before = frappe.db.get_value("VerityAI Usage Wallet", self.created["wallet"], "tokens_remaining")
+		from verityai_saas.services.engine import create_knowledge_source
+		create_knowledge_source(self.workspace, "Billing policy", "Knowledge indexing is not customer-visible chat usage.")
+		usage.sync_workspace_usage(self.workspace)
+		self.assertEqual(frappe.db.get_value("VerityAI Usage Wallet", self.created["wallet"], "tokens_remaining"), before)
+		session = frappe.get_doc({
+			"doctype": "AI Chat Session", "session_id": frappe.generate_hash(), "tenant": self.tenant,
+			"platform": "Web", "status": "Open", "chat_history": "[]",
+		}).insert(ignore_permissions=True)
+		failed = frappe.get_doc({
+			"doctype": "AI Usage Log", "tenant": self.tenant, "chat_session": session.name,
+			"platform": "Web", "input_tokens": 70, "output_tokens": 30, "total_tokens": 100,
+			"status": "Error", "operation": "assistant_response", "source_feature": "website_widget",
+			"correlation_id": f"failed-{frappe.generate_hash(length=12)}",
+		}).insert(ignore_permissions=True)
+		success = frappe.get_doc({
+			"doctype": "AI Usage Log", "tenant": self.tenant, "chat_session": session.name,
+			"platform": "Web", "input_tokens": 3, "output_tokens": 2, "total_tokens": 5,
+			"status": "Success", "operation": "assistant_response", "source_feature": "website_widget",
+			"correlation_id": f"success-{frappe.generate_hash(length=12)}",
+		}).insert(ignore_permissions=True)
+		usage.sync_workspace_usage(self.workspace)
+		usage.sync_workspace_usage(self.workspace)
+		wallet = frappe.db.get_value("VerityAI Usage Wallet", self.created["wallet"], ["tokens_used", "tokens_remaining"], as_dict=True)
+		self.assertEqual(wallet.tokens_used, 5)
+		self.assertEqual(wallet.tokens_remaining, before - 5)
+		failed_tx = frappe.db.get_value("VerityAI Usage Transaction", {"ai_usage_log": failed.name}, ["transaction_type", "total_tokens", "operation", "source_feature", "correlation_id"], as_dict=True)
+		self.assertEqual((failed_tx.transaction_type, failed_tx.total_tokens), ("Failed", 0))
+		self.assertEqual((failed_tx.operation, failed_tx.source_feature, failed_tx.correlation_id), ("assistant_response", "website_widget", failed.correlation_id))
+		self.assertEqual(frappe.db.count("VerityAI Usage Transaction", {"ai_usage_log": success.name}), 1)
+
 	def test_plan_capacity_blocks_another_workspace(self):
 		self._activate_plan()
 		with self.assertRaises(frappe.ValidationError):

@@ -42,8 +42,11 @@ class TestWorkspaceTeamManagement(FrappeTestCase):
 		)
 		self.workspace = self.created["workspace"]
 		self.tenant = self.created["engine_tenant"]
-		launch_plan = frappe.db.get_value("VerityAI Plan", {"plan_code": "LAUNCH"}, "name")
-		assign_plan(self.workspace, launch_plan, "Active", "Monthly")
+		# Growth includes three active members (owner plus two teammates), which
+		# is the capacity exercised by this module. Launch intentionally includes
+		# only the owner.
+		growth_plan = frappe.db.get_value("VerityAI Plan", {"plan_code": "GROWTH"}, "name")
+		assign_plan(self.workspace, growth_plan, "Active", "Monthly")
 
 	def tearDown(self):
 		super().tearDown()

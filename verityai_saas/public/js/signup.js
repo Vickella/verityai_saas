@@ -13,6 +13,8 @@
 	  if (data.get("password") !== data.get("confirm_password")) {
 		throw new Error("Passwords do not match");
 	  }
+	  form.password.value = "";
+	  form.confirm_password.value = "";
       const response = await fetch("/api/method/verityai_saas.api.signup.register", {
         method: "POST",
         headers: {"X-Frappe-CSRF-Token": window.csrf_token || ""},

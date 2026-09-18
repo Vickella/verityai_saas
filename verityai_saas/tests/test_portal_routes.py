@@ -1,3 +1,4 @@
+from pathlib import Path
 from unittest.mock import patch
 
 import frappe
@@ -127,7 +128,17 @@ class TestCustomerPortalRoutes(FrappeTestCase):
 		content = get_response_content("/verityai/signin")
 		self.assertIn('id="signin-form"', content)
 		self.assertIn('autocomplete="current-password"', content)
+		self.assertIn('method="post"', content)
+		self.assertIn('action="/api/method/login"', content)
 		self.assertIn("Use the email address and password registered to your account.", content)
+
+	def test_trial_billing_ui_uses_authoritative_values_without_duplicate_status(self):
+		portal_js = (Path(__file__).resolve().parents[1] / "public" / "js" / "portal.js").read_text(encoding="utf-8")
+		self.assertIn("s?.plan_name||s?.plan", portal_js)
+		self.assertIn("s?.included_credits??d.wallet?.opening_token_allowance", portal_js)
+		self.assertIn('trial?"":pill(s?.status', portal_js)
+		self.assertIn("tokens_used", portal_js)
+		self.assertIn("tokens_remaining", portal_js)
 
 	def test_guest_entry_route_is_signup(self):
 		frappe.set_user("Guest")

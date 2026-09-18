@@ -5,6 +5,7 @@ from frappe.tests.utils import FrappeTestCase
 from verity_ai.engine.openai_handler import build_system_prompt
 
 from verityai_saas import setup_doctypes
+from verityai_saas.api import billing as billing_api
 from verityai_saas.tests.cleanup import cleanup_all_test_fixtures, cleanup_test_workspace
 from verityai_saas.services import billing, engine, notifications, onboarding, usage, whatsapp
 from verityai_saas.services.admin_reauth import mark_admin_reauthenticated
@@ -32,9 +33,12 @@ class TestVerityAISaaS(FrappeTestCase):
 		self.created = onboarding.create_workspace(self.owner, f"Account {token}", f"Workspace {token}", f"Business {token}")
 		self.workspace = self.created["workspace"]
 		self.tenant = self.created["engine_tenant"]
+		self.extra_created = []
 
 	def tearDown(self):
 		super().tearDown()
+		for created in self.extra_created:
+			cleanup_test_workspace(created["workspace"], engine_tenant=created["engine_tenant"], commit=False)
 		cleanup_test_workspace(self.workspace, users=[self.owner, self.other], engine_tenant=self.tenant)
 
 	def create_user(self, email):
@@ -160,6 +164,19 @@ class TestVerityAISaaS(FrappeTestCase):
 		self.assertEqual(wallet.promotional_credits, 1_000)
 		self.assertEqual(wallet.tokens_remaining, 9_000)
 
+	def test_trial_billing_payload_uses_plan_allowance_and_reconciled_wallet(self):
+		plan_name = frappe.db.get_value("VerityAI Subscription", self.created["subscription"], "plan")
+		plan = frappe.db.get_value("VerityAI Plan", plan_name, ["plan_name", "monthly_token_limit", "monthly_price", "currency"], as_dict=True)
+		frappe.set_user(self.owner)
+		response = billing_api.get(self.workspace)
+		self.assertTrue(response["success"])
+		data = response["data"]
+		self.assertEqual(data["subscription"][0]["plan_name"], plan.plan_name)
+		self.assertEqual(data["subscription"][0]["included_credits"], plan.monthly_token_limit)
+		self.assertEqual(data["subscription"][0]["display_price"], plan.monthly_price)
+		self.assertEqual(data["subscription"][0]["display_currency"], plan.currency)
+		self.assertEqual(data["wallet"]["tokens_used"] + data["wallet"]["tokens_remaining"], data["wallet"]["total_allowance"])
+
 	def test_email_delivery_log_is_created(self):
 		with patch("frappe.sendmail"):
 			logs = notifications.send_notification(self.workspace, "Test", "Subject", "Body")
@@ -177,6 +194,43 @@ class TestVerityAISaaS(FrappeTestCase):
 		self.assertEqual(data["whatsapp_phone_id"], "phone-id")
 		self.assertTrue(data["configuration_ready"])
 		self.assertEqual(data["setup_status"], "In Progress")
+
+	def test_multiple_whatsapp_accounts_are_isolated_and_deactivate_safely(self):
+		from verity_ai.api.whatsapp import get_config_for_phone
+
+		self.enable_full_whatsapp_for_test()
+		first = whatsapp.configure(self.workspace, {
+			"account_label": "Sales", "mode": "Full AI Automation",
+			"whatsapp_phone_id": f"sales-{frappe.generate_hash(length=8)}",
+			"whatsapp_access_token": "sales-secret", "meta_verify_token": "sales-verify",
+			"meta_app_secret": "sales-app-secret", "verify_meta_signature": 1,
+		})
+		second = whatsapp.create_account(self.workspace, {
+			"account_label": "Support", "mode": "Full AI Automation",
+			"whatsapp_phone_id": f"support-{frappe.generate_hash(length=8)}",
+			"whatsapp_access_token": "support-secret", "meta_verify_token": "support-verify",
+			"meta_app_secret": "support-app-secret", "verify_meta_signature": 1,
+		})
+		self.assertEqual(len(whatsapp.list_accounts(self.workspace)), 2)
+		self.assertEqual(frappe.get_doc("VerityAI WhatsApp Setup", first["name"]).get_password("whatsapp_access_token"), "sales-secret")
+		self.assertEqual(frappe.get_doc("VerityAI WhatsApp Setup", second["name"]).get_password("whatsapp_access_token"), "support-secret")
+		whatsapp.configure(self.workspace, {"account_label": "Support Team", "mode": "Full AI Automation"}, account=second["name"])
+		self.assertEqual(frappe.get_doc("VerityAI WhatsApp Setup", second["name"]).get_password("whatsapp_access_token"), "support-secret")
+		other_created = onboarding.create_workspace(self.other, f"Other Account {frappe.generate_hash(length=6)}", f"Other Workspace {frappe.generate_hash(length=6)}")
+		self.extra_created.append(other_created)
+		self.assertFalse(whatsapp.safe_setup(other_created["workspace"], second["name"])["configuration_ready"])
+		routed = get_config_for_phone(second["whatsapp_phone_id"])
+		self.assertEqual(routed.get("channel_account"), second["name"])
+		self.assertEqual(routed.tenant, self.tenant)
+		whatsapp.set_account_state(self.workspace, second["name"], is_default=1)
+		engine_config = frappe.get_doc("AI Configuration", self.created["engine_configuration"])
+		self.assertEqual(engine_config.whatsapp_phone_id, second["whatsapp_phone_id"])
+		self.assertEqual(engine_config.get_password("whatsapp_access_token"), "support-secret")
+		whatsapp.record_inbound_webhook(self.tenant, phone_number_id=second["whatsapp_phone_id"], message_id="wamid.support")
+		self.assertEqual(whatsapp.safe_setup(self.workspace, second["name"])["last_webhook_event"], "wamid.support")
+		self.assertFalse(whatsapp.safe_setup(self.workspace, first["name"])["last_webhook_event"])
+		whatsapp.set_account_state(self.workspace, second["name"], active=0)
+		self.assertIsNone(get_config_for_phone(second["whatsapp_phone_id"]))
 
 	def test_customer_cannot_use_operator_dashboard(self):
 		frappe.set_user(self.owner)

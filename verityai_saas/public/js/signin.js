@@ -12,7 +12,9 @@
 		notice.hidden = true;
 		try {
 			const data = new FormData(form);
-			const body = new URLSearchParams({usr: String(data.get("usr") || "").trim(), pwd: String(data.get("pwd") || "")});
+			const password = String(data.get("pwd") || "");
+			form.elements.pwd.value = "";
+			const body = new URLSearchParams({usr: String(data.get("usr") || "").trim(), pwd: password});
 			const response = await fetch("/api/method/login", {
 				method: "POST",
 				headers: {"Content-Type": "application/x-www-form-urlencoded", "X-Frappe-CSRF-Token": window.csrf_token || ""},
