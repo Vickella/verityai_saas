@@ -13,6 +13,7 @@ PAGE_META = {
 	"widget": ("Widget", "Appearance and domains"),
 	"knowledge": ("Knowledge", "Trusted sources"),
 	"leads": ("Leads", "Pipeline"),
+	"campaigns": ("Campaigns", "Keep your assistant aligned with every live offer"),
 	"crm": ("Sales CRM", "Opportunities and appointments"),
 	"conversations": ("Conversations", "Customer interactions"),
 	"commerce": ("Commerce", "Customers, products and quotations"),

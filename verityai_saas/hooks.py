@@ -40,6 +40,7 @@ permission_query_conditions = {
 	"VerityAI Sales Opportunity": "verityai_saas.services.permissions.workspace_child_query_condition",
 	"VerityAI Appointment": "verityai_saas.services.permissions.workspace_child_query_condition",
 	"VerityAI CRM Activity": "verityai_saas.services.permissions.workspace_child_query_condition",
+	"VerityAI Sales Campaign": "verityai_saas.services.permissions.workspace_child_query_condition",
 	"VerityAI Promotion Redemption": "verityai_saas.services.permissions.workspace_child_query_condition",
 	"VerityAI Website Project": "verityai_saas.services.permissions.workspace_child_query_condition",
 	"VerityAI Website Definition Version": "verityai_saas.services.permissions.workspace_child_query_condition",
@@ -61,7 +62,7 @@ role_home_page = {
 	"VerityAI Viewer": "verityai",
 }
 scheduler_events = {
-	"hourly": ["verityai_saas.services.usage.sync_all_usage", "verityai_saas.services.billing.check_subscription_expiry"],
+	"hourly": ["verityai_saas.services.usage.sync_all_usage", "verityai_saas.services.billing.check_subscription_expiry", "verityai_saas.services.campaigns.sync_all_campaign_contexts"],
 	"daily": ["verityai_saas.services.notifications.send_daily_summaries", "verityai_saas.services.platform_email.send_trial_lifecycle_emails", "verityai_saas.services.billing.check_trial_expiry", "verityai_saas.services.billing.roll_usage_periods", "verityai_saas.services.billing.send_payment_reminders", "verityai_saas.services.analytics.send_due_reports", "verityai_saas.services.notifications.send_usage_warnings", "verityai_saas.services.commercial.process_referral_rewards"],
 }
 

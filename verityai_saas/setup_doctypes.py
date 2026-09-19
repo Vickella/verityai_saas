@@ -67,6 +67,7 @@ def commerce_workspace_links():
 
 def crm_workspace_links():
 	return [
+		workspace_link("Campaigns", "VerityAI Sales Campaign", "Sales"),
 		workspace_link("Opportunities", "VerityAI Sales Opportunity", "Sales"),
 		workspace_link("Appointments", "VerityAI Appointment", "Sales"),
 		workspace_link("Activities", "VerityAI CRM Activity", "Sales"),
@@ -274,6 +275,46 @@ def ensure_growth_doctypes():
 	], "hash")
 
 
+def ensure_sales_campaign_doctypes():
+	"""Customer-owned campaigns that ground the tenant assistant."""
+	ensure_doctype("VerityAI Sales Campaign Image", [
+		field("image_file", "Private Image", "Link", options="File", reqd=1, in_list_view=1),
+		field("alt_text", "Image Description", reqd=1, in_list_view=1),
+		field("caption", "Caption", "Small Text"),
+		field("visible_text", "Visible Offer Text", "Small Text"),
+	], istable=True)
+	ensure_doctype("VerityAI Sales Campaign", [
+		field("workspace", "Workspace", "Link", options="VerityAI Workspace", reqd=1, in_list_view=1, search_index=1),
+		field("campaign_name", "Campaign Name", reqd=1, in_list_view=1, search_index=1),
+		field("campaign_code", "Campaign Code", reqd=1, in_list_view=1, search_index=1),
+		field("channel", "Channel", "Select", options="Facebook\nInstagram\nGoogle\nWhatsApp\nEmail\nWebsite\nTikTok\nLinkedIn\nRadio\nPrint\nOther", reqd=1, in_list_view=1),
+		field("objective", "Objective", "Select", options="Awareness\nLead Generation\nSales\nTraffic\nEngagement\nEvent\nOther", reqd=1),
+		field("status", "Status", "Select", options="Draft\nScheduled\nActive\nPaused\nCompleted\nArchived", default="Draft", reqd=1, in_list_view=1),
+		field("headline", "Public Headline", reqd=1),
+		field("offer_summary", "Offer Summary", "Small Text", reqd=1),
+		field("description", "Campaign Details", "Text Editor", reqd=1),
+		field("target_audience", "Target Audience", "Small Text"),
+		field("pricing_section", "Pricing and Inclusions", "Section Break"),
+		field("offer_price", "Offer Price", "Currency"),
+		field("currency", "Currency", "Link", options="Currency", default="USD"),
+		field("inclusions", "What's Included", "Small Text"),
+		field("terms", "Terms and Eligibility", "Small Text"),
+		field("schedule_section", "Schedule and Response", "Section Break"),
+		field("starts_on", "Starts On", "Date"),
+		field("ends_on", "Ends On", "Date"),
+		field("call_to_action", "Call to Action", reqd=1),
+		field("destination_url", "Destination URL"),
+		field("contact_phone", "Campaign Phone"),
+		field("contact_email", "Campaign Email", options="Email"),
+		field("response_guidance", "AI Response Guidance", "Small Text"),
+		field("images_section", "Campaign Images", "Section Break"),
+		field("images", "Images", "Table", options="VerityAI Sales Campaign Image"),
+		field("knowledge_source", "Managed Knowledge Source", "Link", options="AI Knowledge Source", read_only=1),
+		field("created_by_user", "Created By", "Link", options="User", read_only=1),
+		field("activated_by_user", "Activated By", "Link", options="User", read_only=1),
+		field("activated_on", "Activated On", "Datetime", read_only=1),
+	], "SCAMP-.########")
+
 def ensure_website_doctypes():
 	ensure_doctype("VerityAI Website Template", [
 		field("template_key", "Template Key", reqd=1, unique=1, in_list_view=1, search_index=1),
@@ -397,6 +438,7 @@ def ensure_doctypes():
 	])
 	ensure_website_doctypes()
 	ensure_website_audit_doctypes()
+	ensure_sales_campaign_doctypes()
 
 	ensure_doctype("VerityAI Workspace Member", [
 		field("workspace", "Workspace", "Link", options="VerityAI Workspace", reqd=1, in_list_view=1),
@@ -412,6 +454,7 @@ def ensure_doctypes():
 			("can_view_customers", "Can View Customers"), ("can_manage_customers", "Can Manage Customers"),
 			("can_view_catalog", "Can View Catalogue"), ("can_manage_catalog", "Can Manage Catalogue"),
 			("can_view_quotes", "Can View SaaS Quotes"), ("can_manage_quotes", "Can Manage SaaS Quotes"),
+			("can_view_campaigns", "Can View Campaigns"), ("can_manage_campaigns", "Can Manage Campaigns"),
 			("can_view_website", "Can View Website Projects"), ("can_manage_website", "Can Manage Website Projects"),
 		)],
 	], "hash")

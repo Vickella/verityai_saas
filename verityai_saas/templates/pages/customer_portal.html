@@ -22,6 +22,7 @@
 				<symbol id="va-i-website" viewBox="0 0 24 24"><path d="M3 5h18v14H3V5Zm0 4h18M7 7h.01M10 7h.01M13 7h.01M7 13h5m-5 3h9"/></symbol>
 				<symbol id="va-i-knowledge" viewBox="0 0 24 24"><path d="M4 5a3 3 0 0 1 3-3h5v18H7a3 3 0 0 0-3 2V5Zm16 0a3 3 0 0 0-3-3h-5v18h5a3 3 0 0 1 3 2V5Z"/></symbol>
 				<symbol id="va-i-leads" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm8-3h5m-2.5-2.5v5"/></symbol>
+				<symbol id="va-i-campaigns" viewBox="0 0 24 24"><path d="M3 11v2l12 5V6L3 11Zm12-2 5-3v12l-5-3M6 14l1 6h4l-2-5"/></symbol>
 				<symbol id="va-i-crm" viewBox="0 0 24 24"><path d="M4 19V9m6 10V5m6 14v-7m5 7H2M4 7l6-4 6 6 5-4"/></symbol>
 				<symbol id="va-i-conversations" viewBox="0 0 24 24"><path d="M21 15a4 4 0 0 1-4 4H9l-5 3v-5a7 7 0 1 1 3-13h10a4 4 0 0 1 4 4v7Z"/></symbol>
 				<symbol id="va-i-commerce" viewBox="0 0 24 24"><path d="M3 7h18l-2 9H6L3 3H1m6 17a1 1 0 1 0 0-2 1 1 0 0 0 0 2Zm11 0a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z"/></symbol>
@@ -38,7 +39,7 @@
 				{% for group, routes in (
 					("Overview", (("dashboard", "Dashboard"), ("health", "Health"), ("onboarding", "Setup"))),
 					("AI & Content", (("assistant", "Assistant"), ("website", "Website Builder"), ("widget", "Widget"), ("knowledge", "Knowledge"))),
-					("Sales", (("leads", "Leads"), ("crm", "Sales CRM"), ("conversations", "Conversations"), ("commerce", "Commerce"), ("quotes", "AI Quote Requests"))),
+					("Sales", (("leads", "Leads"), ("campaigns", "Campaigns"), ("crm", "Sales CRM"), ("conversations", "Conversations"), ("commerce", "Commerce"), ("quotes", "AI Quote Requests"))),
 					("Operations", (("usage", "Usage"), ("billing", "Billing"), ("email", "Email"), ("whatsapp", "WhatsApp"), ("team", "Team"), ("account", "Account")))
 				) %}
 				<p class="va-nav-label">{{ group }}</p>

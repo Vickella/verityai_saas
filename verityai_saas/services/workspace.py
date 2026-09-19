@@ -15,6 +15,8 @@ PERMISSION_FIELDS = (
 	"can_manage_knowledge",
 	"can_view_leads",
 	"can_manage_leads",
+	"can_view_campaigns",
+	"can_manage_campaigns",
 	"can_view_conversations",
 	"can_manage_conversations",
 	"can_manage_billing",

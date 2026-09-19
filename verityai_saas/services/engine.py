@@ -198,9 +198,10 @@ def create_knowledge_source(workspace_name, title, content, file=None):
 
 def list_knowledge_sources(workspace_name):
 	tenant = get_workspace_engine_tenant(workspace_name)
-	rows = frappe.get_all("AI Knowledge Source", filters={"tenant": tenant}, fields=["name", "title", "summary", "active", "source_file", "modified"], order_by="modified desc")
+	rows = frappe.get_all("AI Knowledge Source", filters={"tenant": tenant, "title": ["not like", "[Managed Campaign]%"]}, fields=["name", "title", "summary", "active", "source_file", "modified"], order_by="modified desc")
 	for row in rows:
 		row["chunk_count"] = frappe.db.count("AI Knowledge Chunk", {"tenant": tenant, "knowledge_source": row.name})
+		row["managed"] = str(row.get("title") or "").startswith("[Managed Campaign]")
 	return rows
 
 
@@ -221,6 +222,8 @@ def update_knowledge_source(workspace_name, source_name, values):
 	if not frappe.db.exists("AI Knowledge Source", {"name": source_name, "tenant": tenant}):
 		frappe.throw(_("Knowledge source was not found."), frappe.DoesNotExistError)
 	doc = frappe.get_doc("AI Knowledge Source", source_name)
+	if str(doc.title or "").startswith("[Managed Campaign]"):
+		frappe.throw(_("Managed campaign knowledge must be edited from Sales > Campaigns."), frappe.ValidationError)
 	if "title" in values:
 		title = str(values.get("title") or "").strip()
 		if not title:
@@ -249,6 +252,8 @@ def delete_knowledge_source(workspace_name, source_name):
 	tenant = get_workspace_engine_tenant(workspace_name)
 	if not frappe.db.exists("AI Knowledge Source", {"name": source_name, "tenant": tenant}):
 		frappe.throw(_("Knowledge source was not found."), frappe.DoesNotExistError)
+	if str(frappe.db.get_value("AI Knowledge Source", source_name, "title") or "").startswith("[Managed Campaign]"):
+		frappe.throw(_("Managed campaign knowledge must be archived or deleted from Sales > Campaigns."), frappe.ValidationError)
 	for chunk in frappe.get_all("AI Knowledge Chunk", filters={"tenant": tenant, "knowledge_source": source_name}, pluck="name"):
 		frappe.delete_doc("AI Knowledge Chunk", chunk, ignore_permissions=True, force=True)
 	for ingestion in frappe.get_all("VerityAI Knowledge Ingestion", filters={"workspace": workspace_name, "knowledge_source": source_name}, pluck="name"):

@@ -1753,3 +1753,36 @@ img, svg, video, canvas { max-width: 100%; }
 .va-colour-control { display: grid; grid-template-columns: 54px 1fr; align-items: center; gap: 12px; }
 .va-colour-control input[type="color"] { width: 54px; min-height: 42px; padding: 4px; cursor: pointer; }
 .va-colour-control output { min-height: 42px; display: flex; align-items: center; padding: 0 13px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-soft); color: var(--ink-700); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; font-weight: 700; }
+
+/* Sales campaigns */
+.va-campaign-grounding { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
+.va-campaign-grounding > div { display: grid; gap: 4px; }
+.va-campaign-grounding span:not(.va-live-indicator) { color: var(--ink-500); }
+.va-live-indicator { flex: 0 0 auto; padding: 7px 11px; border-radius: 999px; color: #087443; background: #e7f8ef; font-size: 11px; font-weight: 800; }
+.va-campaign-detail { display: grid; gap: 10px; }
+.va-campaign-detail h3,.va-campaign-detail p { margin: 0; }
+.va-campaign-detail dl { display: grid; gap: 0; margin: 6px 0 0; }
+.va-campaign-detail dl div { display: grid; grid-template-columns: minmax(100px,140px) 1fr; gap: 14px; padding: 10px 0; border-top: 1px solid var(--line); }
+.va-campaign-detail dt { color: var(--ink-500); font-size: 11px; font-weight: 750; }
+.va-campaign-detail dd { margin: 0; white-space: pre-line; }
+.va-campaign-images { display: grid; grid-template-columns: repeat(auto-fit,minmax(170px,1fr)); gap: 14px; }
+.va-campaign-images figure { overflow: hidden; margin: 0; border: 1px solid var(--line); border-radius: 13px; background: #fff; }
+.va-campaign-images img { width: 100%; aspect-ratio: 4/3; display: block; object-fit: cover; background: var(--surface-soft); }
+.va-campaign-images figcaption { display: grid; gap: 3px; padding: 11px; }
+.va-campaign-images figcaption span { color: var(--ink-500); font-size: 11px; }
+.va-ai-context pre { max-height: 300px; margin: 0; overflow: auto; white-space: pre-wrap; font-size: 11px; }
+.va-campaign-media-editor { display: grid; gap: 13px; padding-top: 18px; border-top: 1px solid var(--line); }
+.va-file-button { position: relative; cursor: pointer; }
+.va-campaign-image-editor-list { display: grid; gap: 12px; }
+.va-campaign-image-edit { position: relative; display: grid; grid-template-columns: 110px minmax(0,1fr) 34px; gap: 14px; align-items: start; padding: 13px; border: 1px solid var(--line); border-radius: 13px; background: var(--surface-soft); }
+.va-campaign-image-preview { overflow: hidden; border-radius: 10px; background: #e8edf5; }
+.va-campaign-image-preview img { width: 100%; aspect-ratio: 1; display: block; object-fit: cover; }
+.va-campaign-image-edit .va-fields { grid-template-columns: 1fr; gap: 9px; }
+.va-campaign-image-edit textarea { min-height: 64px; }
+
+@media (max-width: 620px) {
+  .va-campaign-grounding { align-items: flex-start; }
+  .va-campaign-image-edit { grid-template-columns: 76px minmax(0,1fr); }
+  .va-campaign-image-edit > .va-icon-button { position: absolute; top: 8px; right: 8px; }
+  .va-campaign-detail dl div { grid-template-columns: 1fr; gap: 4px; }
+}
