@@ -5,7 +5,7 @@ import frappe
 from frappe.utils import cint
 
 from verityai_saas.api._response import endpoint
-from verityai_saas.services import crm, engine
+from verityai_saas.services import crm, engine, followups
 from verityai_saas.services.permissions import require_workspace_permission
 
 
@@ -28,6 +28,7 @@ def detail(workspace, conversation):
 	require_workspace_permission(workspace, "view_conversations")
 	data = engine.get_conversation(workspace, conversation)
 	data["handoff"] = crm.handoff_data(workspace, conversation)
+	data["follow_ups"] = followups.list_for_conversation(workspace, conversation)
 	return data
 
 
@@ -43,6 +44,34 @@ def update_handoff(workspace, conversation, status, assigned_to=None, note=None)
 def assignees(workspace):
 	require_workspace_permission(workspace, "view_conversations")
 	return crm.workspace_assignees(workspace)
+
+
+@frappe.whitelist(methods=["POST"])
+@endpoint
+def send_reply(workspace, conversation, message):
+	require_workspace_permission(workspace, "manage_conversations")
+	return followups.send_reply(workspace, conversation, message)
+
+
+@frappe.whitelist(methods=["POST"])
+@endpoint
+def draft_follow_up(workspace, conversation, instruction=None):
+	require_workspace_permission(workspace, "manage_conversations")
+	return followups.draft(workspace, conversation, instruction)
+
+
+@frappe.whitelist(methods=["POST"])
+@endpoint
+def schedule_follow_up(workspace, conversation, message, due_at):
+	require_workspace_permission(workspace, "manage_conversations")
+	return {"follow_up": followups.schedule(workspace, conversation, message, due_at)}
+
+
+@frappe.whitelist(methods=["POST"])
+@endpoint
+def cancel_follow_up(workspace, follow_up):
+	require_workspace_permission(workspace, "manage_conversations")
+	return followups.cancel(workspace, follow_up)
 
 
 def _csv_safe(value):

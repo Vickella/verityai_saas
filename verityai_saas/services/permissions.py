@@ -6,10 +6,10 @@ OPERATOR_ROLES = {"System Manager", "VerityAI SaaS Administrator", "VerityAI Ope
 PLATFORM_ADMIN_ROLES = {"System Manager", "VerityAI SaaS Administrator"}
 ROLE_DEFAULTS = {
 	"Owner": {"*"},
-	"Admin": {"manage_assistant", "manage_widget", "manage_knowledge", "view_leads", "manage_leads", "view_campaigns", "manage_campaigns", "view_conversations", "manage_conversations", "manage_billing", "manage_whatsapp", "manage_email", "manage_team", "approve_quotes", "view_customers", "manage_customers", "view_catalog", "manage_catalog", "view_quotes", "manage_quotes", "view_website", "manage_website"},
+	"Admin": {"manage_assistant", "manage_widget", "manage_knowledge", "view_leads", "manage_leads", "view_campaigns", "manage_campaigns", "view_conversations", "manage_conversations", "manage_billing", "manage_whatsapp", "manage_email", "manage_team", "approve_quotes", "view_customers", "manage_customers", "view_catalog", "manage_catalog", "view_quotes", "manage_quotes"},
 	"Sales": {"view_leads", "manage_leads", "view_campaigns", "manage_campaigns", "view_conversations", "view_customers", "manage_customers", "view_catalog", "view_quotes", "manage_quotes"},
 	"Support": {"view_leads", "view_conversations", "manage_conversations"},
-	"Viewer": {"view_leads", "view_campaigns", "view_conversations", "view_customers", "view_catalog", "view_quotes", "view_website"},
+	"Viewer": {"view_leads", "view_campaigns", "view_conversations", "view_customers", "view_catalog", "view_quotes"},
 	"Billing Manager": {"manage_billing"},
 }
 
@@ -63,7 +63,7 @@ def get_membership(workspace_name, user=None):
 	rows = frappe.get_all(
 		"VerityAI Workspace Member",
 		filters={"workspace": workspace_name, "user": user, "status": "Active"},
-		fields=["name", "workspace_role", "can_manage_assistant", "can_manage_widget", "can_manage_knowledge", "can_view_leads", "can_manage_leads", "can_view_campaigns", "can_manage_campaigns", "can_view_conversations", "can_manage_conversations", "can_manage_billing", "can_manage_whatsapp", "can_manage_email", "can_approve_quotes", "can_view_customers", "can_manage_customers", "can_view_catalog", "can_manage_catalog", "can_view_quotes", "can_manage_quotes", "can_view_website", "can_manage_website"],
+		fields=["name", "workspace_role", "can_manage_assistant", "can_manage_widget", "can_manage_knowledge", "can_view_leads", "can_manage_leads", "can_view_campaigns", "can_manage_campaigns", "can_view_conversations", "can_manage_conversations", "can_manage_billing", "can_manage_whatsapp", "can_manage_email", "can_approve_quotes", "can_view_customers", "can_manage_customers", "can_view_catalog", "can_manage_catalog", "can_view_quotes", "can_manage_quotes"],
 		limit=1,
 	)
 	return rows[0] if rows else None
@@ -126,10 +126,6 @@ def workspace_child_query_condition(user=None):
 	if is_operator(user):
 		return ""
 	return f"`workspace` in ({sql_names(get_user_workspaces(user))})"
-
-
-def operator_query_condition(user=None):
-	return "" if is_operator(user) else "1=0"
 
 
 def require_operator(user=None):

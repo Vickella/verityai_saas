@@ -23,9 +23,5 @@ verityai_saas.patches.v0_19.credit_stock_unit_economics
 verityai_saas.patches.v0_20.whatsapp_waba_subscription
 verityai_saas.patches.v0_21.whatsapp_setup_guide_upload
 verityai_saas.patches.v0_22.production_product_fixes
-verityai_saas.patches.v0_22.growth_foundation
-verityai_saas.patches.v0_23.website_project_foundation
-verityai_saas.patches.v0_24.website_doctor_foundation
-verityai_saas.patches.v0_25.website_doctor_public_report
-verityai_saas.patches.v0_26.website_template_catalogue
 verityai_saas.patches.v0_27.sales_campaign_grounding
+verityai_saas.patches.v0_28.conversation_followups

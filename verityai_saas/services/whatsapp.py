@@ -196,24 +196,6 @@ def record_inbound_webhook(tenant_name, phone_number_id=None, message_id=None, *
 	setup = frappe.get_doc("VerityAI WhatsApp Setup", name) if name else _get_setup(workspace)
 	if setup:
 		_record(setup, message_id)
-	# Store operational evidence without persisting the sender number or body.
-	from verityai_saas.services import growth
-
-	if growth._tracking_available():
-		context = growth._workspace_context(workspace=workspace)
-		channel = growth._channel("WhatsApp")
-		if context and channel:
-			growth.record_lifecycle_event(
-				"channel.inbound_received",
-				workspace=context.name,
-				account=context.account,
-				channel=channel,
-				source="whatsapp",
-				object_type="WhatsApp Webhook",
-				correlation_id=message_id or "inbound-whatsapp",
-				idempotency_key=f"whatsapp.inbound:{message_id or frappe.generate_hash(length=32)}",
-				metadata={"accepted": True},
-			)
 
 
 def test_connection(workspace_name, account=None):

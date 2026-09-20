@@ -1,5 +1,7 @@
 import frappe
 from frappe.tests.utils import FrappeTestCase
+from frappe.utils import add_to_date, now_datetime
+from unittest.mock import patch
 
 from verityai_saas import setup_doctypes
 from verityai_saas.api import conversations as conversations_api
@@ -36,8 +38,8 @@ class TestCRMOperations(FrappeTestCase):
 	def make_lead(self, name, email=None, status="New"):
 		return frappe.get_doc({"doctype": "AI Lead", "tenant": self.tenant, "lead_name": name, "email": email, "source_channel": "Web", "status": status}).insert(ignore_permissions=True)
 
-	def make_conversation(self, identifier):
-		return frappe.get_doc({"doctype": "AI Chat Session", "tenant": self.tenant, "session_id": frappe.generate_hash(), "platform": "Web", "user_identifier": identifier, "status": "Open", "chat_history": frappe.as_json([{"role": "user", "content": "We need manufacturing stock visibility"}, {"role": "assistant", "content": "I can help capture that requirement."}, {"role": "tool", "content": "private tool payload"}])}).insert(ignore_permissions=True)
+	def make_conversation(self, identifier, platform="Web"):
+		return frappe.get_doc({"doctype": "AI Chat Session", "tenant": self.tenant, "session_id": frappe.generate_hash(), "platform": platform, "user_identifier": identifier, "status": "Open", "chat_history": frappe.as_json([{"role": "system", "content": "private system prompt"}, {"role": "user", "content": "We need manufacturing stock visibility"}, {"role": "assistant", "content": "I can help capture that requirement."}, {"role": "assistant", "content": "  "}, {"role": "tool", "content": "private tool payload"}])}).insert(ignore_permissions=True)
 
 	def test_lead_search_pagination_assignment_notes_status_and_funnel(self):
 		first = self.make_lead("Alpha Buyer", "alpha@example.com")
@@ -99,3 +101,28 @@ class TestCRMOperations(FrappeTestCase):
 		self.assertEqual(page["data"]["rows"][0]["handoff"]["status"], "Resolved")
 		conversations_api.export_csv(self.workspace)
 		self.assertIn("Resolved", frappe.local.response.filecontent.decode("utf-8-sig"))
+
+	def test_conversation_detail_exposes_only_public_nonempty_messages(self):
+		conversation = self.make_conversation("visitor@example.com")
+		frappe.set_user(self.owner)
+		data = conversations_api.detail(self.workspace, conversation.name)["data"]
+		self.assertEqual([item["role"] for item in data["history"]], ["user", "assistant"])
+		self.assertNotIn("private system prompt", frappe.as_json(data))
+		self.assertNotIn("private tool payload", frappe.as_json(data))
+
+	def test_whatsapp_reply_and_scheduled_follow_up(self):
+		conversation = self.make_conversation("263776552106", platform="WhatsApp")
+		frappe.db.set_value("AI Configuration", {"tenant": self.tenant}, "whatsapp_phone_id", "123456")
+		frappe.set_user(self.owner)
+		with patch("verityai_saas.services.followups.send_whatsapp_message", return_value=True) as sender:
+			response = conversations_api.send_reply(self.workspace, conversation.name, "Are you ready to continue?")
+			self.assertTrue(response["data"]["sent"])
+			sender.assert_called_once()
+		history = frappe.parse_json(frappe.db.get_value("AI Chat Session", conversation.name, "chat_history"))
+		self.assertEqual(history[-1]["content"], "Are you ready to continue?")
+		due_at = add_to_date(now_datetime(), hours=1)
+		scheduled = conversations_api.schedule_follow_up(self.workspace, conversation.name, "I can help you complete the next step.", due_at)
+		follow_up = scheduled["data"]["follow_up"]
+		self.assertEqual(frappe.db.get_value("VerityAI Conversation Follow Up", follow_up, "status"), "Scheduled")
+		cancelled = conversations_api.cancel_follow_up(self.workspace, follow_up)
+		self.assertEqual(cancelled["data"]["cancelled"], follow_up)

@@ -23,9 +23,6 @@ def install():
 	from verityai_saas.services.business_natures import seed_business_natures
 
 	seed_business_natures()
-	from verityai_saas.services.growth import seed_default_channels
-
-	seed_default_channels()
 	ensure_default_plan()
 	ensure_workspace()
 	from verityai_saas.services.platform_email import ensure_system_email_templates
@@ -187,92 +184,10 @@ def ensure_platform_settings():
 			field("paynow_integration_key", "Integration Key", "Password"),
 			field("whatsapp_guide_section", "Customer Guides", "Section Break"),
 			field("whatsapp_setup_guide", "WhatsApp Setup Guide", "Attach"),
-			field("growth_section", "Growth Platform", "Section Break"),
-			field("growth_foundation_enabled", "Growth Foundation Enabled", "Check", default=1),
-			field("website_doctor_internal_enabled", "Internal Website Doctor Enabled", "Check", default=0),
-			field("public_audits_enabled", "Public Website Doctor Enabled", "Check", default=0),
-			field("website_doctor_crm_workspace", "Website Doctor CRM Workspace", "Link", options="VerityAI Workspace"),
-			field("website_builder_enabled", "Website Builder Enabled", "Check", default=0),
-			field("partner_portal_enabled", "Partner Portal Enabled", "Check", default=0),
-			field("white_label_enabled", "White Label Enabled", "Check", default=0),
-			field("outbound_enabled", "Outbound Delivery Enabled", "Check", default=0),
 		],
 		issingle=True,
 		permission_rows=platform_settings_permissions(),
 	)
-
-
-def ensure_growth_doctypes():
-	ensure_doctype("VerityAI Growth Channel", [
-		field("channel_name", "Channel Name", reqd=1, in_list_view=1),
-		field("channel_code", "Channel Code", reqd=1, unique=1, in_list_view=1),
-		field("channel_type", "Channel Type", "Select", options="Owned\nProduct\nMessaging\nPartner\nCommunity\nMarketplace\nIntegration", reqd=1, in_list_view=1),
-		field("delivery_mode", "Delivery Mode", "Select", options="Public\nAutomated\nHuman Operated\nHuman Approved\nEmbedded\nPartner Managed", reqd=1),
-		field("risk_class", "Risk Class", "Select", options="Low\nModerate\nHigh", default="Low", reqd=1),
-		field("status", "Status", "Select", options="Active\nPaused\nArchived", default="Active", in_list_view=1),
-		field("owner_user", "Owner", "Link", options="User"),
-		field("adapter", "Adapter"),
-		field("allowed_actions", "Allowed Actions", "Small Text"),
-		field("monthly_limit", "Monthly Delivery Limit", "Int", default=0),
-		field("notes", "Operating Notes", "Small Text"),
-	], "field:channel_code")
-
-	ensure_doctype("VerityAI Growth Campaign", [
-		field("campaign_name", "Campaign Name", reqd=1, in_list_view=1),
-		field("campaign_code", "Campaign Code", reqd=1, unique=1, in_list_view=1),
-		field("channel", "Channel", "Link", options="VerityAI Growth Channel", reqd=1, in_list_view=1),
-		field("objective", "Objective", "Select", options="Awareness\nAcquisition\nActivation\nReferral\nRevenue\nRetention", reqd=1),
-		field("audience", "Audience", "Small Text"),
-		field("source", "Source"), field("medium", "Medium"),
-		field("content", "Content"), field("term", "Term"),
-		field("starts_on", "Starts On", "Date"), field("ends_on", "Ends On", "Date"),
-		field("budget", "Budget", "Currency", default=0),
-		field("currency", "Currency", "Link", options="Currency", default="USD"),
-		field("delivery_limit", "Delivery Limit", "Int", default=0),
-		field("owner_user", "Owner", "Link", options="User"),
-		field("status", "Status", "Select", options="Draft\nActive\nPaused\nCompleted\nArchived", default="Draft", in_list_view=1),
-		field("notes", "Operating Notes", "Small Text"),
-	], "field:campaign_code")
-
-	ensure_doctype("VerityAI Growth Event", [
-		field("event_type", "Event Type", reqd=1, in_list_view=1),
-		field("occurred_at", "Occurred At", "Datetime", reqd=1, in_list_view=1),
-		field("visitor_id", "Visitor ID"),
-		field("account", "Account", "Link", options="VerityAI Account"),
-		field("workspace", "Workspace", "Link", options="VerityAI Workspace", in_list_view=1),
-		field("channel", "Channel", "Link", options="VerityAI Growth Channel", in_list_view=1),
-		field("campaign", "Campaign", "Link", options="VerityAI Growth Campaign"),
-		field("referral_code", "Referral Code"),
-		field("source", "Source"), field("medium", "Medium"),
-		field("content", "Content"), field("term", "Term"),
-		field("object_type", "Object Type"), field("object_name", "Object Name"),
-		field("correlation_id", "Correlation ID"),
-		field("idempotency_key", "Idempotency Key", reqd=1, unique=1),
-		field("metadata", "Metadata", "Code", options="JSON"),
-	], "hash", permission_rows=permissions())
-
-	ensure_doctype("VerityAI Consent Record", [
-		field("subject_type", "Subject Type", "Select", options="Visitor\nUser\nLead\nCustomer\nPartner", reqd=1, in_list_view=1),
-		field("subject_hash", "Subject Hash", reqd=1, in_list_view=1),
-		field("purpose", "Purpose", reqd=1, in_list_view=1),
-		field("channel", "Channel", "Link", options="VerityAI Growth Channel"),
-		field("status", "Status", "Select", options="Granted\nWithdrawn\nExpired", reqd=1, in_list_view=1),
-		field("source", "Source"),
-		field("captured_on", "Captured On", "Datetime", reqd=1),
-		field("withdrawn_on", "Withdrawn On", "Datetime"),
-		field("expires_on", "Expires On", "Datetime"),
-		field("evidence", "Evidence", "Small Text"),
-	], "hash")
-
-	ensure_doctype("VerityAI Suppression Record", [
-		field("identity_hash", "Identity Hash", reqd=1, in_list_view=1),
-		field("channel", "Channel", "Link", options="VerityAI Growth Channel", in_list_view=1),
-		field("reason", "Reason", reqd=1, in_list_view=1),
-		field("source", "Source"),
-		field("starts_on", "Starts On", "Datetime", reqd=1),
-		field("expires_on", "Expires On", "Datetime"),
-		field("status", "Status", "Select", options="Active\nExpired\nLifted", default="Active", in_list_view=1),
-	], "hash")
 
 
 def ensure_sales_campaign_doctypes():
@@ -315,94 +230,6 @@ def ensure_sales_campaign_doctypes():
 		field("activated_on", "Activated On", "Datetime", read_only=1),
 	], "SCAMP-.########")
 
-def ensure_website_doctypes():
-	ensure_doctype("VerityAI Website Template", [
-		field("template_key", "Template Key", reqd=1, unique=1, in_list_view=1, search_index=1),
-		field("template_name", "Template Name", reqd=1, in_list_view=1),
-		field("category", "Category", reqd=1, in_list_view=1),
-		field("description", "Description", "Small Text", reqd=1),
-		field("definition_json", "Structured Definition", "Code", options="JSON", reqd=1),
-		field("definition_hash", "Definition Hash", reqd=1, search_index=1),
-		field("archive_file", "Private Source Archive", "Attach", read_only=1),
-		field("archive_hash", "Archive Hash", reqd=1, search_index=1),
-		field("active", "Active", "Check", default=1, in_list_view=1),
-		field("uploaded_by_user", "Uploaded By", "Link", options="User", read_only=1),
-		field("uploaded_on", "Uploaded On", "Datetime", read_only=1),
-	], "WTPL-.########", permission_rows=platform_settings_permissions())
-	project_fields = [
-		field("workspace", "Workspace", "Link", options="VerityAI Workspace", reqd=1, in_list_view=1, search_index=1),
-		field("project_name", "Project Name", reqd=1, in_list_view=1, search_index=1),
-		field("project_slug", "Project Slug", reqd=1, unique=1, in_list_view=1),
-		field("business_name", "Business Name", reqd=1),
-		field("template_key", "Template Key", reqd=1, default="starter-v1"),
-		field("source_audit", "Source Website Audit", "Link", options="VerityAI Website Audit", read_only=1, unique=1),
-		field("status", "Status", "Select", options="Draft\nReady\nPublished\nArchived", default="Draft", reqd=1, in_list_view=1),
-		field("verity_subdomain", "Reserved Verity Subdomain", read_only=1, unique=1),
-		field("custom_domain", "Custom Domain", read_only=1),
-		field("domain_status", "Domain Status", "Select", options="Unconfigured\nPending\nVerified\nActive\nFailed", default="Unconfigured", read_only=1),
-		field("widget_enabled", "Widget Enabled", "Check", default=0),
-		field("whatsapp_enabled", "WhatsApp Enabled", "Check", default=0),
-		field("crm_enabled", "CRM Enabled", "Check", default=1),
-		field("created_by_user", "Created By", "Link", options="User", read_only=1),
-	]
-	# Create the project first so the immutable version can link back to it.
-	ensure_doctype("VerityAI Website Project", project_fields, "WPRJ-.########")
-	ensure_doctype("VerityAI Website Definition Version", [
-		field("workspace", "Workspace", "Link", options="VerityAI Workspace", reqd=1, in_list_view=1, search_index=1),
-		field("project", "Website Project", "Link", options="VerityAI Website Project", reqd=1, in_list_view=1, search_index=1),
-		field("version_number", "Version", "Int", reqd=1, in_list_view=1),
-		field("schema_version", "Schema Version", "Int", reqd=1, default=1),
-		field("status", "Status", "Select", options="Validated\nSuperseded", default="Validated", reqd=1, in_list_view=1),
-		field("source", "Source", "Select", options="Manual\nWebsite Doctor\nAI Generation\nImport", default="Manual"),
-		field("definition_json", "Structured Definition", "Code", options="JSON", reqd=1),
-		field("definition_hash", "Definition Hash", reqd=1, search_index=1),
-		field("created_by_user", "Created By", "Link", options="User", read_only=1),
-		field("validated_on", "Validated On", "Datetime", read_only=1),
-	], "WVER-.########")
-	ensure_doctype("VerityAI Website Project", [
-		*project_fields,
-		field("current_version", "Current Version", "Link", options="VerityAI Website Definition Version", read_only=1),
-		field("published_version", "Published Version", "Link", options="VerityAI Website Definition Version", read_only=1),
-	], "WPRJ-.########")
-
-
-def ensure_website_audit_doctypes():
-	ensure_doctype("VerityAI Website Audit", [
-		field("workspace", "Workspace", "Link", options="VerityAI Workspace", in_list_view=1, search_index=1),
-		field("target_url", "Target URL", reqd=1),
-		field("target_host", "Target Host", reqd=1, in_list_view=1, search_index=1),
-		field("request_kind", "Request Kind", "Select", options="Public\nWorkspace\nOperator", reqd=1, in_list_view=1),
-		field("status", "Status", "Select", options="Requested\nRunning\nCompleted\nFailed", default="Requested", reqd=1, in_list_view=1),
-		field("requested_by_user", "Requested By", "Link", options="User", read_only=1),
-		field("correlation_id", "Correlation ID", reqd=1, unique=1, search_index=1),
-		field("public_token_hash", "Public Token Hash", read_only=1),
-		field("observed_at", "Observed At", "Datetime", read_only=1),
-		field("completed_at", "Completed At", "Datetime", read_only=1),
-		field("overall_score", "Overall Score", "Float", read_only=1),
-		field("pages_checked", "Pages Checked", "Int", default=0, read_only=1),
-		field("response_bytes", "Response Bytes", "Int", default=0, read_only=1),
-		field("fetch_duration_ms", "Fetch Duration (ms)", "Int", default=0, read_only=1),
-		field("provider_duration_ms", "Provider Duration (ms)", "Int", default=0, read_only=1),
-		field("provider_cost_usd", "Provider Cost (USD)", "Currency", precision=6, default=0, read_only=1),
-		field("result_json", "Safe Result", "Code", options="JSON", read_only=1),
-		field("error_code", "Error Code", read_only=1),
-		field("error_reference", "Error Reference", read_only=1, search_index=1),
-		field("error_message", "Safe Error Message", "Small Text", read_only=1),
-		field("follow_up_lead", "Consented Follow-up Lead", "Link", options="AI Lead", read_only=1),
-		field("follow_up_captured_on", "Follow-up Captured On", "Datetime", read_only=1),
-	], "AUD-.########")
-	ensure_doctype("VerityAI Website Audit Evidence", [
-		field("audit", "Website Audit", "Link", options="VerityAI Website Audit", reqd=1, in_list_view=1, search_index=1),
-		field("workspace", "Workspace", "Link", options="VerityAI Workspace", search_index=1),
-		field("category", "Category", "Select", options="Performance\nTechnical SEO\nMetadata\nMobile Readiness\nAccessibility\nSecurity\nContent Quality\nConversion\nAI Readiness\nStructured Data\nPage Architecture", reqd=1, in_list_view=1),
-		field("check_code", "Check Code", reqd=1, in_list_view=1, search_index=1),
-		field("status", "Status", "Select", options="Pass\nWarning\nFail\nUnavailable", reqd=1, in_list_view=1),
-		field("source", "Evidence Source", "Select", options="Deterministic\nPageSpeed", reqd=1),
-		field("summary", "Observed Result", "Small Text", reqd=1),
-		field("evidence_json", "Measured Evidence", "Code", options="JSON", reqd=1, read_only=1),
-		field("observed_at", "Observed At", "Datetime", reqd=1, read_only=1),
-	], "AEV-.########")
-
 
 def ensure_doctypes():
 	ensure_platform_settings()
@@ -436,8 +263,6 @@ def ensure_doctypes():
 	ensure_doctype("VerityAI Account", [
 		field("default_workspace", "Default Workspace", "Link", options="VerityAI Workspace"),
 	])
-	ensure_website_doctypes()
-	ensure_website_audit_doctypes()
 	ensure_sales_campaign_doctypes()
 
 	ensure_doctype("VerityAI Workspace Member", [
@@ -455,7 +280,6 @@ def ensure_doctypes():
 			("can_view_catalog", "Can View Catalogue"), ("can_manage_catalog", "Can Manage Catalogue"),
 			("can_view_quotes", "Can View SaaS Quotes"), ("can_manage_quotes", "Can Manage SaaS Quotes"),
 			("can_view_campaigns", "Can View Campaigns"), ("can_manage_campaigns", "Can Manage Campaigns"),
-			("can_view_website", "Can View Website Projects"), ("can_manage_website", "Can Manage Website Projects"),
 		)],
 	], "hash")
 
@@ -675,6 +499,16 @@ def ensure_doctypes():
 		field("status", "Status", "Select", options="Open\nAssigned\nResolved", default="Open", in_list_view=1), field("assigned_to", "Assigned To", "Link", options="User", in_list_view=1),
 		field("opened_on", "Opened On", "Datetime"), field("resolved_on", "Resolved On", "Datetime"), field("resolved_by", "Resolved By", "Link", options="User"), field("history_json", "History", "Code", options="JSON"),
 	], "VHO-.########")
+	ensure_doctype("VerityAI Conversation Follow Up", [
+		field("workspace", "Workspace", "Link", options="VerityAI Workspace", reqd=1, in_list_view=1),
+		field("conversation", "Conversation", "Link", options="AI Chat Session", reqd=1, in_list_view=1),
+		field("due_at", "Send At", "Datetime", reqd=1, in_list_view=1),
+		field("recipient", "Recipient", reqd=1, read_only=1, in_list_view=1),
+		field("message", "Message", "Small Text", reqd=1),
+		field("status", "Status", "Select", options="Scheduled\nSending\nSent\nFailed\nCancelled", default="Scheduled", in_list_view=1),
+		field("created_by_user", "Created By", "Link", options="User", read_only=1),
+		field("sent_on", "Sent On", "Datetime", read_only=1), field("error", "Error", "Small Text", read_only=1),
+	], "VCFU-.########")
 	ensure_doctype("VerityAI Billing Document", [
 		field("workspace", "Workspace", "Link", options="VerityAI Workspace", reqd=1, in_list_view=1), field("account", "Account", "Link", options="VerityAI Account", reqd=1),
 		field("subscription", "Subscription", "Link", options="VerityAI Subscription"), field("billing_event", "Billing Event", "Link", options="VerityAI Billing Event", reqd=1),
@@ -787,10 +621,6 @@ def ensure_doctypes():
 		field("last_product_sync_on", "Last Product Sync On", "Datetime", read_only=1),
 		field("last_error", "Last Error", "Small Text", read_only=1),
 	], "VERPC-.#####")
-
-	# Growth records link to the core Account and Workspace DocTypes, so they
-	# must be installed after the core platform schema on a clean site.
-	ensure_growth_doctypes()
 
 
 def ensure_default_plan():

@@ -3,11 +3,7 @@ import frappe
 
 SAAS_WORKSPACE_DOCTYPES = (
 	"VerityAI Sales Campaign",
-	"VerityAI Growth Event",
-	"VerityAI Website Audit Evidence",
-	"VerityAI Website Audit",
-	"VerityAI Website Definition Version",
-	"VerityAI Website Project",
+	"VerityAI Conversation Follow Up",
 	"VerityAI CRM Activity",
 	"VerityAI Appointment",
 	"VerityAI Sales Opportunity",
@@ -88,7 +84,7 @@ def cleanup_test_workspace(workspace_name, users=None, commit=True, engine_tenan
 
 
 def cleanup_all_test_fixtures():
-	patterns = ("owner-%@example.com", "campaign-owner-%@example.com", "campaign-other-%@example.com", "account-owner-%@example.com", "analytics-owner-%@example.com", "integration-owner-%@example.com", "billing-owner-%@example.com", "crm-owner-%@example.com", "commerce-owner-%@example.com", "commerce-other-%@example.com", "ingest-owner-%@example.com", "entitlement-owner-%@example.com", "portal-%@example.com", "quote-owner-%@example.com", "health-owner-%@example.com", "team-owner-%@example.com", "notify-owner-%@example.com", "paynow-owner-%@example.com", "ops-owner-%@example.com", "website-%@example.com", "audit-owner-%@example.com", "audit-other-%@example.com")
+	patterns = ("owner-%@example.com", "campaign-owner-%@example.com", "campaign-other-%@example.com", "account-owner-%@example.com", "analytics-owner-%@example.com", "integration-owner-%@example.com", "billing-owner-%@example.com", "crm-owner-%@example.com", "commerce-owner-%@example.com", "commerce-other-%@example.com", "ingest-owner-%@example.com", "entitlement-owner-%@example.com", "portal-%@example.com", "quote-owner-%@example.com", "health-owner-%@example.com", "team-owner-%@example.com", "notify-owner-%@example.com", "paynow-owner-%@example.com", "ops-owner-%@example.com")
 	workspaces = []
 	for pattern in patterns:
 		workspaces.extend(

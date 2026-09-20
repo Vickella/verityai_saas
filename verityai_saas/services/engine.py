@@ -306,8 +306,18 @@ def get_conversation(workspace_name, conversation_name):
 	doc = frappe.get_doc("AI Chat Session", conversation_name)
 	try: history = json.loads(doc.chat_history or "[]")
 	except (TypeError, ValueError): history = []
+	# Chat history also contains system instructions, tool calls and tool results.
+	# Those are operational data, not customer-visible messages, and must never be
+	# exposed by the customer portal API.
+	public_history = []
+	for item in history if isinstance(history, list) else []:
+		if not isinstance(item, dict) or item.get("role") not in {"user", "assistant"}:
+			continue
+		content = str(item.get("content") or "").strip()
+		if content:
+			public_history.append({"role": item["role"], "content": content})
 	lead = frappe.db.get_value("AI Lead", {"tenant": tenant, "chat_session": doc.name}, "name")
-	return {"name": doc.name, "platform": doc.platform, "user_identifier": doc.user_identifier, "status": doc.status, "estimated_deal_value": doc.estimated_deal_value, "history": history, "lead": lead}
+	return {"name": doc.name, "platform": doc.platform, "user_identifier": doc.user_identifier, "status": doc.status, "estimated_deal_value": doc.estimated_deal_value, "history": public_history, "lead": lead}
 
 
 def get_workspace_leads(workspace_name, filters=None):

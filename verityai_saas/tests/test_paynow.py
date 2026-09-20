@@ -251,10 +251,7 @@ class TestPaynowBilling(FrappeTestCase):
 		settings = frappe.get_single("VerityAI Platform Settings")
 		settings.paynow_environment = "Test"
 		settings.save(ignore_permissions=True)
-		with (
-			patch.object(paynow, "_credentials", return_value=("1201", self.integration_key)),
-			self.assertRaisesRegex(frappe.ValidationError, "documented Test-mode simulator"),
-		):
+		with self.assertRaisesRegex(frappe.ValidationError, "documented Test-mode simulator"):
 			paynow.initiate_test_transaction(
 				self.workspace, "merchant@example.com", "ecocash", "0775555555",
 			)

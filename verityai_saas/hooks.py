@@ -10,9 +10,6 @@ after_install = "verityai_saas.setup_doctypes.install"
 web_include_css = "/assets/verityai_saas/css/portal.css"
 web_include_js = "/assets/verityai_saas/js/portal.js"
 home_page = "verityai"
-website_route_rules = [
-	{"from_route": "/website-doctor/report", "to_route": "website_doctor_report"},
-]
 
 permission_query_conditions = {
 	"VerityAI Account": "verityai_saas.services.permissions.account_query_condition",
@@ -27,6 +24,7 @@ permission_query_conditions = {
 	"VerityAI Lead Activity": "verityai_saas.services.permissions.workspace_child_query_condition",
 	"VerityAI Knowledge Ingestion": "verityai_saas.services.permissions.workspace_child_query_condition",
 	"VerityAI Conversation Handoff": "verityai_saas.services.permissions.workspace_child_query_condition",
+	"VerityAI Conversation Follow Up": "verityai_saas.services.permissions.workspace_child_query_condition",
 	"VerityAI Onboarding Checklist": "verityai_saas.services.permissions.workspace_child_query_condition",
 	"VerityAI Notification Setting": "verityai_saas.services.permissions.workspace_child_query_condition",
 	"VerityAI Email Delivery Log": "verityai_saas.services.permissions.workspace_child_query_condition",
@@ -42,15 +40,6 @@ permission_query_conditions = {
 	"VerityAI CRM Activity": "verityai_saas.services.permissions.workspace_child_query_condition",
 	"VerityAI Sales Campaign": "verityai_saas.services.permissions.workspace_child_query_condition",
 	"VerityAI Promotion Redemption": "verityai_saas.services.permissions.workspace_child_query_condition",
-	"VerityAI Website Project": "verityai_saas.services.permissions.workspace_child_query_condition",
-	"VerityAI Website Definition Version": "verityai_saas.services.permissions.workspace_child_query_condition",
-	"VerityAI Website Audit": "verityai_saas.services.permissions.workspace_child_query_condition",
-	"VerityAI Website Audit Evidence": "verityai_saas.services.permissions.workspace_child_query_condition",
-	"VerityAI Growth Channel": "verityai_saas.services.permissions.operator_query_condition",
-	"VerityAI Growth Campaign": "verityai_saas.services.permissions.operator_query_condition",
-	"VerityAI Growth Event": "verityai_saas.services.permissions.operator_query_condition",
-	"VerityAI Consent Record": "verityai_saas.services.permissions.operator_query_condition",
-	"VerityAI Suppression Record": "verityai_saas.services.permissions.operator_query_condition",
 }
 
 role_home_page = {
@@ -62,58 +51,21 @@ role_home_page = {
 	"VerityAI Viewer": "verityai",
 }
 scheduler_events = {
+	"cron": {"* * * * *": ["verityai_saas.services.followups.process_due_followups"]},
 	"hourly": ["verityai_saas.services.usage.sync_all_usage", "verityai_saas.services.billing.check_subscription_expiry", "verityai_saas.services.campaigns.sync_all_campaign_contexts"],
 	"daily": ["verityai_saas.services.notifications.send_daily_summaries", "verityai_saas.services.platform_email.send_trial_lifecycle_emails", "verityai_saas.services.billing.check_trial_expiry", "verityai_saas.services.billing.roll_usage_periods", "verityai_saas.services.billing.send_payment_reminders", "verityai_saas.services.analytics.send_due_reports", "verityai_saas.services.notifications.send_usage_warnings", "verityai_saas.services.commercial.process_referral_rewards"],
 }
 
 doc_events = {
-	"VerityAI Growth Event": {
-		"before_save": "verityai_saas.services.growth.protect_event_update",
-		"on_trash": "verityai_saas.services.growth.protect_event_delete",
-	},
 	"VerityAI Credit Stock Ledger": {
 		"before_insert": "verityai_saas.services.credit_stock.protect_ledger_insert",
 		"before_save": "verityai_saas.services.credit_stock.protect_ledger_update",
 		"on_trash": "verityai_saas.services.credit_stock.protect_ledger_delete",
 	},
-	"AI Lead": {
-		"after_insert": [
-			"verityai_saas.services.notifications.send_lead_notification",
-			"verityai_saas.services.growth.record_lead_created",
-		],
-		"on_update": "verityai_saas.services.growth.record_lead_status",
-	},
+	"AI Lead": {"after_insert": "verityai_saas.services.notifications.send_lead_notification"},
 	"AI Chat Session": {
-		"after_insert": [
-			"verityai_saas.services.whatsapp.record_channel_activity",
-			"verityai_saas.services.growth.record_conversation_started",
-		],
+		"after_insert": "verityai_saas.services.whatsapp.record_channel_activity",
 		"on_update": "verityai_saas.services.notifications.send_handoff_notification",
-	},
-	"VerityAI Sales Opportunity": {
-		"after_insert": "verityai_saas.services.growth.record_opportunity_created",
-		"on_update": "verityai_saas.services.growth.record_opportunity_stage",
-	},
-	"VerityAI Website Project": {
-		"validate": "verityai_saas.websites.projects.validate_project_document",
-		"on_trash": "verityai_saas.websites.projects.protect_project_delete",
-	},
-	"VerityAI Website Template": {
-		"validate": "verityai_saas.websites.templates.validate_template_document",
-		"on_trash": "verityai_saas.websites.templates.protect_template_delete",
-	},
-	"VerityAI Website Definition Version": {
-		"before_save": "verityai_saas.websites.projects.protect_definition_update",
-		"validate": "verityai_saas.websites.projects.validate_definition_document",
-		"on_trash": "verityai_saas.websites.projects.protect_definition_delete",
-	},
-	"VerityAI Website Audit": {
-		"validate": "verityai_saas.growth.audits.validate_audit_document",
-		"on_trash": "verityai_saas.growth.audits.protect_audit_delete",
-	},
-	"VerityAI Website Audit Evidence": {
-		"before_save": "verityai_saas.growth.audits.validate_evidence_document",
-		"on_trash": "verityai_saas.growth.audits.protect_evidence_delete",
 	},
 	"AI Quotation Request": {"after_insert": "verityai_saas.services.notifications.send_quote_request_notification"},
 	"AI Monitoring Alert": {"after_insert": "verityai_saas.services.notifications.send_provider_failure_notification"},
