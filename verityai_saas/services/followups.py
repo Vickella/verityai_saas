@@ -1,4 +1,5 @@
 import json
+import re
 
 import frappe
 from frappe import _
@@ -13,12 +14,22 @@ from verity_ai.engine.openai_handler import (
 	get_client,
 	get_config,
 	log_usage,
+	get_or_create_session,
 )
 
 from verityai_saas.services import crm, engine
 
 
-MAX_MESSAGE_LENGTH = 1000
+MAX_MESSAGE_LENGTH = 4000
+
+
+def _phone_number(value):
+	phone = re.sub(r"\D", "", str(value or ""))
+	if phone.startswith("00"):
+		phone = phone[2:]
+	if len(phone) < 8 or len(phone) > 15:
+		frappe.throw(_("Enter a valid international phone number, including country code."), frappe.ValidationError)
+	return phone
 
 
 def _message(value):
@@ -68,6 +79,32 @@ def send_reply(workspace, conversation, message, follow_up=None):
 	if follow_up and frappe.db.exists("VerityAI Conversation Follow Up", {"name": follow_up, "workspace": workspace, "conversation": conversation}):
 		frappe.db.set_value("VerityAI Conversation Follow Up", follow_up, {"status": "Sent", "sent_on": now_datetime(), "error": None})
 	return {"conversation": conversation, "sent": True}
+
+
+def start_conversation(workspace, phone_number, message=None):
+	"""Create the same deterministic session key used by the inbound webhook."""
+	phone = _phone_number(phone_number)
+	tenant = engine.get_workspace_engine_tenant(workspace)
+	config = engine.get_engine_configuration(workspace)
+	phone_id = _phone_id(frappe._dict(), config)
+	session = get_or_create_session(
+		tenant, f"wa_{phone_id}_{phone}", "WhatsApp", phone,
+		channel_phone_number_id=phone_id,
+	)
+	if session.status == "Closed":
+		session.status = "Open"
+		session.save(ignore_permissions=True)
+	sent, warning = False, None
+	if str(message or "").strip():
+		try:
+			send_reply(workspace, session.name, message)
+			sent = True
+		except Exception as exc:
+			# Keep the thread available even when Meta requires an approved
+			# first-contact template; the operator can still receive a reply or
+			# retry from the composer after correcting the channel setup.
+			warning = " ".join(str(exc).split())[:300]
+	return {"conversation": session.name, "phone_number": phone, "sent": sent, "warning": warning}
 
 
 def schedule(workspace, conversation, message, due_at):

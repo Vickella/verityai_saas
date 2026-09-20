@@ -298,7 +298,16 @@ def get_workspace_conversations(workspace_name, filters=None):
 	or_filters = None
 	if search:
 		or_filters = {"session_id": ["like", f"%{search}%"], "user_identifier": ["like", f"%{search}%"]}
-	return frappe.get_all("AI Chat Session", filters=query, or_filters=or_filters, fields=["name", "session_id", "platform", "user_identifier", "status", "estimated_deal_value", "modified"], order_by="modified desc", limit_start=start, limit_page_length=limit)
+	rows = frappe.get_all("AI Chat Session", filters=query, or_filters=or_filters, fields=["name", "session_id", "platform", "user_identifier", "status", "estimated_deal_value", "modified", "chat_history"], order_by="modified desc", limit_start=start, limit_page_length=limit)
+	for row in rows:
+		try:
+			history = json.loads(row.pop("chat_history", None) or "[]")
+		except (TypeError, ValueError):
+			history = []
+		last = next((item for item in reversed(history) if isinstance(item, dict) and item.get("role") in {"user", "assistant"} and str(item.get("content") or "").strip()), None)
+		row["last_message"] = str((last or {}).get("content") or "").strip()[:140]
+		row["last_role"] = (last or {}).get("role")
+	return rows
 
 def get_conversation(workspace_name, conversation_name):
 	tenant = get_workspace_engine_tenant(workspace_name)

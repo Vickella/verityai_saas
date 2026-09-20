@@ -1712,6 +1712,73 @@ img, svg, video, canvas { max-width: 100%; }
   .va-auth-header h1 { font-size: 27px; }
 }
 
+/* Conversation workspace */
+.va-chat-app { overflow: hidden; border: 1px solid var(--line); border-radius: 18px; background: #fff; box-shadow: var(--shadow-sm); }
+.va-chat-toolbar { min-height: 74px; display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 14px 18px; border-bottom: 1px solid var(--line); }
+.va-chat-toolbar h2,.va-chat-toolbar p { margin: 0; }
+.va-chat-layout { height: min(760px,calc(100vh - 210px)); min-height: 570px; display: grid; grid-template-columns: minmax(270px,330px) minmax(0,1fr); }
+.va-chat-sidebar { min-width: 0; display: grid; grid-template-rows: auto minmax(0,1fr) auto; border-right: 1px solid var(--line); background: #fff; }
+.va-chat-search { display: grid; grid-template-columns: minmax(0,1fr) 112px; gap: 8px; padding: 12px; border-bottom: 1px solid var(--line); }
+.va-chat-search input,.va-chat-search select { min-width: 0; min-height: 38px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-soft); color: var(--ink-900); font: inherit; font-size: 11px; }
+.va-chat-contact-list { min-height: 0; overflow-y: auto; }
+.va-chat-contact { position: relative; width: 100%; min-width: 0; display: grid; grid-template-columns: 42px minmax(0,1fr); gap: 10px; padding: 13px 12px; border: 0; border-bottom: 1px solid #edf1f5; background: transparent; color: inherit; text-align: left; cursor: pointer; }
+.va-chat-contact:hover { background: #f7fafc; }
+.va-chat-contact.active { background: #eaf5f0; }
+.va-chat-avatar { width: 42px; height: 42px; display: grid; place-items: center; border-radius: 50%; color: #fff; background: linear-gradient(145deg,#1f8f6a,#0c7053); font-size: 12px; font-weight: 850; text-transform: uppercase; }
+.va-chat-avatar.large { width: 44px; height: 44px; }
+.va-chat-contact-copy { min-width: 0; display: grid; align-content: center; gap: 5px; }
+.va-chat-contact-copy > span { min-width: 0; display: flex; justify-content: space-between; gap: 8px; }
+.va-chat-contact-copy strong,.va-chat-contact-copy small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.va-chat-contact-copy strong { font-size: 12px; }
+.va-chat-contact-copy time,.va-chat-contact-copy small { color: var(--ink-500); font-size: 9px; }
+.va-chat-channel { position: absolute; right: 12px; bottom: 6px; color: #168260; font-size: 8px; font-weight: 800; text-transform: uppercase; }
+.va-chat-sidebar > footer { display: flex; justify-content: space-between; padding: 8px 10px; border-top: 1px solid var(--line); }
+.va-chat-thread { min-width: 0; min-height: 0; display: grid; grid-template-rows: auto minmax(0,1fr) auto; padding: 0; background: #efeae2; }
+.va-chat-thread-header { min-width: 0; min-height: 66px; display: grid; grid-template-columns: 44px minmax(0,1fr) auto; align-items: center; gap: 11px; padding: 10px 15px; border-bottom: 1px solid #dce3e7; background: #f6f8f9; }
+.va-chat-thread-header > div { min-width: 0; display: grid; gap: 2px; }
+.va-chat-thread-header strong,.va-chat-thread-header small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.va-chat-thread-header small { color: var(--ink-500); font-size: 10px; }
+.va-chat-menu { position: relative; }
+.va-chat-menu summary { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; cursor: pointer; list-style: none; font-weight: 900; }
+.va-chat-menu summary:hover { background: #e8edef; }
+.va-chat-menu > div { position: absolute; z-index: 5; top: 42px; right: 0; width: 160px; display: grid; padding: 6px; border: 1px solid var(--line); border-radius: 11px; background: #fff; box-shadow: 0 15px 35px rgba(24,40,58,.15); }
+.va-chat-menu button { padding: 9px 10px; border: 0; border-radius: 8px; background: transparent; text-align: left; cursor: pointer; }
+.va-chat-menu button:hover { background: var(--surface-soft); }
+.va-wa-messages { min-height: 0; display: flex; flex-direction: column; gap: 4px; overflow-y: auto; padding: 20px clamp(16px,6vw,70px); background-color: #efeae2; background-image: radial-gradient(rgba(52,74,67,.045) 1px,transparent 1px); background-size: 18px 18px; }
+.va-wa-message { max-width: min(76%,620px); padding: 8px 10px 6px; border-radius: 10px; box-shadow: 0 1px 1px rgba(24,40,35,.08); }
+.va-wa-message p { margin: 0; color: #17221f; font-size: 12px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
+.va-wa-message small { display: block; margin-top: 3px; color: #6f7d78; font-size: 8px; text-align: right; }
+.va-wa-message.incoming { align-self: flex-start; border-top-left-radius: 2px; background: #fff; }
+.va-wa-message.outgoing { align-self: flex-end; border-top-right-radius: 2px; background: #d9fdd3; }
+.va-wa-composer { display: grid; gap: 6px; padding: 9px 11px 7px; border-top: 1px solid #dce3e7; background: #f3f5f6; }
+.va-wa-compose-row { display: grid; grid-template-columns: minmax(0,1fr) 38px 42px; align-items: end; gap: 7px; }
+.va-wa-compose-row textarea { width: 100%; min-height: 42px; max-height: 120px; resize: vertical; padding: 11px 13px; border: 1px solid #dfe5e7; border-radius: 21px; background: #fff; color: var(--ink-900); font: inherit; font-size: 12px; }
+.va-ai-draft-button,.va-send-button { height: 40px; border: 0; border-radius: 50%; color: #fff; cursor: pointer; font-size: 11px; font-weight: 850; }
+.va-ai-draft-button { background: #5968d9; }
+.va-send-button { background: #168260; font-size: 16px; }
+.va-ai-draft-button:disabled,.va-send-button:disabled { opacity: .55; cursor: wait; }
+.va-composer-tools { min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 4px; color: var(--ink-500); font-size: 9px; }
+.va-composer-tools details { position: relative; }
+.va-composer-tools summary { cursor: pointer; font-weight: 750; }
+.va-followup-popover { position: absolute; z-index: 6; right: 0; bottom: 25px; width: min(390px,80vw); max-height: 360px; display: grid; gap: 10px; overflow-y: auto; padding: 13px; border: 1px solid var(--line); border-radius: 12px; background: #fff; box-shadow: 0 16px 40px rgba(24,40,58,.17); }
+.va-followup-popover label { display: grid; gap: 5px; color: var(--ink-700); font-weight: 750; }
+.va-followup-popover input { min-height: 38px; padding: 7px 9px; border: 1px solid var(--line); border-radius: 9px; }
+.va-followup-list { display: grid; gap: 8px; padding-top: 9px; border-top: 1px solid var(--line); }
+.va-followup-list > div { padding: 9px; border-radius: 9px; background: var(--surface-soft); }
+.va-followup-list p { margin: 5px 0; color: var(--ink-700); }
+.va-wa-composer.unavailable { display: block; color: var(--ink-500); text-align: center; }
+
+@media (max-width: 760px) {
+  .va-chat-toolbar { align-items: flex-start; flex-direction: column; }
+  .va-chat-toolbar .va-actions { width: 100%; }
+  .va-chat-layout { height: auto; min-height: 0; grid-template-columns: 1fr; }
+  .va-chat-sidebar { max-height: 280px; border-right: 0; border-bottom: 1px solid var(--line); }
+  .va-chat-thread { min-height: 590px; }
+  .va-wa-messages { padding-inline: 12px; }
+  .va-wa-message { max-width: 88%; }
+  .va-composer-tools > span { display: none; }
+}
+
 .va-colour-field { align-content: start; }
 .va-colour-control { display: grid; grid-template-columns: 54px 1fr; align-items: center; gap: 12px; }
 .va-colour-control input[type="color"] { width: 54px; min-height: 42px; padding: 4px; cursor: pointer; }

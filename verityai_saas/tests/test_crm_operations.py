@@ -126,3 +126,25 @@ class TestCRMOperations(FrappeTestCase):
 		self.assertEqual(frappe.db.get_value("VerityAI Conversation Follow Up", follow_up, "status"), "Scheduled")
 		cancelled = conversations_api.cancel_follow_up(self.workspace, follow_up)
 		self.assertEqual(cancelled["data"]["cancelled"], follow_up)
+
+	def test_start_whatsapp_conversation_uses_inbound_session_key(self):
+		frappe.db.set_value("AI Configuration", {"tenant": self.tenant}, "whatsapp_phone_id", "123456")
+		frappe.set_user(self.owner)
+		created = conversations_api.start_whatsapp_conversation(self.workspace, "+263 77 655 2106")
+		self.assertTrue(created["success"])
+		conversation = frappe.get_doc("AI Chat Session", created["data"]["conversation"])
+		self.assertEqual(conversation.session_id, "wa_123456_263776552106")
+		self.assertEqual(conversation.user_identifier, "263776552106")
+		self.assertEqual(conversation.platform, "WhatsApp")
+		# Calling it again returns the same thread that the inbound webhook uses.
+		reopened = conversations_api.start_whatsapp_conversation(self.workspace, "263776552106")
+		self.assertEqual(reopened["data"]["conversation"], conversation.name)
+
+	def test_conversation_list_has_safe_message_preview(self):
+		conversation = self.make_conversation("preview@example.com")
+		frappe.set_user(self.owner)
+		row = conversations_api.list_conversations(self.workspace, search="preview@example.com")["data"]["rows"][0]
+		self.assertEqual(row["last_message"], "I can help capture that requirement.")
+		self.assertEqual(row["last_role"], "assistant")
+		self.assertNotIn("chat_history", row)
+		self.assertNotIn("private tool payload", frappe.as_json(row))

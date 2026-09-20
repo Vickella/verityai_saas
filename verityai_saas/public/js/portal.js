@@ -8,6 +8,8 @@
   let workspace = null;
   let leadFilters = {start:0, limit:20, status:"", source_channel:"", search:""};
   let conversationFilters = {start:0, limit:20, platform:"", status:"", search:""};
+	let activeConversation = null;
+	let conversationRefreshTimer = null;
   let analyticsFilters = {from_date:"", to_date:""};
   let commerceView = "overview";
   let crmView = "opportunities";
@@ -291,7 +293,7 @@
     });
     document.querySelector("[data-lead-close]").onclick=()=>{leadDrawer.hidden=true;document.body.classList.remove("va-no-scroll");};
   }
-  async function conversations() {
+  async function conversationsLegacy() {
     const [data, assignees] = await Promise.all([
       call("verityai_saas.api.conversations.list_conversations", {workspace, ...conversationFilters}),
       call("verityai_saas.api.conversations.assignees", {workspace})
@@ -309,6 +311,60 @@
     document.querySelectorAll("[data-handoff-open]").forEach(button=>button.addEventListener("click",async()=>{const note=window.prompt("Why does this conversation need a person?","");if(note===null)return;try{await call("verityai_saas.api.conversations.update_handoff",{workspace,conversation:button.dataset.handoffOpen,status:"Open",note});alert("Handoff opened.");await conversations();}catch(err){alert(err.message,true);}}));
     document.querySelectorAll("[data-handoff-assign]").forEach(button=>button.addEventListener("click",async()=>{const assigned=window.prompt(`Assign to:\n${assignees.join("\n")}`,button.dataset.assigned);if(!assigned)return;const note=window.prompt("Assignment note","")||"";try{await call("verityai_saas.api.conversations.update_handoff",{workspace,conversation:button.dataset.handoffAssign,status:"Assigned",assigned_to:assigned,note});alert("Handoff assigned.");await conversations();}catch(err){alert(err.message,true);}}));
     document.querySelectorAll("[data-handoff-resolve]").forEach(button=>button.addEventListener("click",async()=>{const note=window.prompt("Resolution note","");if(note===null)return;try{await call("verityai_saas.api.conversations.update_handoff",{workspace,conversation:button.dataset.handoffResolve,status:"Resolved",note});alert("Handoff resolved.");await conversations();}catch(err){alert(err.message,true);}}));
+  }
+
+  async function conversations() {
+	clearInterval(conversationRefreshTimer);
+	const [data, assignees] = await Promise.all([
+		call("verityai_saas.api.conversations.list_conversations", {workspace, ...conversationFilters}),
+		call("verityai_saas.api.conversations.assignees", {workspace})
+	]);
+	const rows=data.rows||[];
+	if(activeConversation && !rows.some(row=>row.name===activeConversation)) activeConversation=null;
+	if(!activeConversation && rows.length) activeConversation=rows[0].name;
+	const contactList=rows.length?rows.map(row=>`<button type="button" class="va-chat-contact ${row.name===activeConversation?"active":""}" data-chat-open="${esc(row.name)}"><span class="va-chat-avatar">${esc((row.user_identifier||"?").slice(-2))}</span><span class="va-chat-contact-copy"><span><strong>${esc(row.user_identifier||"Unknown visitor")}</strong><time>${esc(String(row.modified||"").slice(0,16))}</time></span><small>${row.last_role==="assistant"?"You: ":""}${esc(row.last_message||"No messages yet")}</small></span><span class="va-chat-channel">${esc(row.platform||"")}</span></button>`).join(""):emptyState("No conversations yet","Start a WhatsApp conversation or wait for a visitor to message your assistant.");
+	content.innerHTML=`<section class="va-chat-app"><header class="va-chat-toolbar"><div><p class="eyebrow">Unified inbox</p><h2>Conversations</h2></div><div class="va-actions"><button type="button" class="va-button secondary" id="conversation-refresh">Refresh</button><button type="button" class="va-button" id="new-whatsapp-chat">New WhatsApp chat</button></div></header><div class="va-chat-layout"><aside class="va-chat-sidebar"><form id="conversation-filter" class="va-chat-search"><input name="search" value="${esc(conversationFilters.search)}" placeholder="Search conversations" aria-label="Search conversations"><select name="platform" aria-label="Channel"><option value="">All channels</option>${["WhatsApp","Web","Desk"].map(value=>`<option ${conversationFilters.platform===value?"selected":""}>${value}</option>`).join("")}</select></form><div class="va-chat-contact-list">${contactList}</div><footer><button type="button" class="va-button ghost" id="conversations-prev" ${conversationFilters.start<=0?"disabled":""}>Previous</button><button type="button" class="va-button ghost" id="conversations-next" ${data.has_more?"":"disabled"}>Next</button></footer></aside><section class="va-chat-thread" id="conversation-thread">${emptyState("Select a conversation","Choose a conversation to read and reply.")}</section></div></section><div class="va-drawer-backdrop" id="new-chat-drawer" hidden><aside class="va-drawer" role="dialog" aria-modal="true"><section class="va-drawer-panel"><header class="va-drawer-heading"><div><p class="eyebrow">New message</p><h2>Start a WhatsApp conversation</h2><p>Use the international number, including country code.</p></div><button type="button" class="va-icon-button" data-new-chat-close aria-label="Close">×</button></header><form id="new-chat-form" class="va-form"><div class="va-field"><label>Phone number</label><input name="phone_number" inputmode="tel" autocomplete="tel" placeholder="263771234567" required></div><div class="va-field"><label>First message <span class="muted">(optional)</span></label><textarea name="message" rows="5" maxlength="4000" placeholder="Write a personal introduction or leave blank to open the chat."></textarea></div><p class="muted">Meta may require an approved template when the customer has not messaged you within the service window.</p><div class="va-actions"><button type="button" class="va-button ghost" data-new-chat-close>Cancel</button><button class="va-button">Open conversation</button></div></form></section></aside></div>`;
+
+	const openChat=async(name,preserveDraft=false)=>{
+		activeConversation=name;
+		document.querySelectorAll("[data-chat-open]").forEach(button=>button.classList.toggle("active",button.dataset.chatOpen===name));
+		const panel=document.querySelector("#conversation-thread");
+		const oldMessage=preserveDraft?document.querySelector("#wa-message")?.value:"";
+		const oldDue=preserveDraft?document.querySelector("#wa-due-at")?.value:"";
+		const row=await call("verityai_saas.api.conversations.detail",{workspace,conversation:name});
+		if(activeConversation!==name)return;
+		const whatsapp=row.platform==="WhatsApp", followups=row.follow_ups||[], handoff=row.handoff;
+		const messages=(row.history||[]).map(message=>`<article class="va-wa-message ${message.role==="user"?"incoming":"outgoing"}"><p>${esc(message.content||"")}</p><small>${message.role==="user"?"Customer":"Assistant / team"}</small></article>`).join("");
+		panel.innerHTML=`<header class="va-chat-thread-header"><span class="va-chat-avatar large">${esc((row.user_identifier||"?").slice(-2))}</span><div><strong>${esc(row.user_identifier||row.name)}</strong><small>${esc(row.platform)} · ${esc(row.status||"Open")}${handoff?` · ${esc(handoff.status)} handoff`:""}</small></div><details class="va-chat-menu"><summary aria-label="Conversation actions">•••</summary><div><button type="button" data-handoff-open>Open handoff</button><button type="button" data-handoff-assign>Assign</button><button type="button" data-handoff-resolve>Resolve</button></div></details></header><div class="va-wa-messages" id="wa-messages">${messages||emptyState("No messages yet","Send the first message to begin this conversation.")}</div>${whatsapp?`<footer class="va-wa-composer"><div class="va-wa-compose-row"><textarea id="wa-message" rows="1" maxlength="4000" placeholder="Type a message" aria-label="Message"></textarea><button type="button" class="va-ai-draft-button" id="draft-follow-up" title="Draft with AI">AI</button><button type="button" class="va-send-button" id="send-whatsapp-reply" title="Send message" aria-label="Send message">➤</button></div><div class="va-composer-tools"><span>Enter to send · Shift+Enter for a new line</span><details><summary>Schedule or view follow-ups</summary><div class="va-followup-popover"><label>Send this message later<input id="wa-due-at" type="datetime-local"></label><button type="button" class="va-button secondary" id="schedule-follow-up">Schedule</button>${followups.length?`<div class="va-followup-list">${followups.map(item=>`<div><span>${pill(item.status)} ${esc(item.due_at||"")}</span><p>${esc(item.message||"")}</p>${item.status==="Scheduled"?`<button type="button" class="va-button ghost" data-follow-up-cancel="${esc(item.name)}">Cancel</button>`:""}${item.error?`<small>${esc(item.error)}</small>`:""}</div>`).join("")}</div>`:"<p class=\"muted\">No follow-ups scheduled.</p>"}</div></details></div></footer>`:`<footer class="va-wa-composer unavailable"><p>This web conversation will continue when the visitor returns to the website widget.</p></footer>`}`;
+		if(oldMessage)document.querySelector("#wa-message").value=oldMessage;
+		if(oldDue)document.querySelector("#wa-due-at").value=oldDue;
+		const stream=document.querySelector("#wa-messages");if(!preserveDraft)stream.scrollTop=stream.scrollHeight;
+		if(whatsapp){
+			const message=document.querySelector("#wa-message");
+			const send=async()=>{if(!message.value.trim())return;const button=document.querySelector("#send-whatsapp-reply");button.disabled=true;try{await call("verityai_saas.api.conversations.send_reply",{workspace,conversation:name,message:message.value});message.value="";await openChat(name);}catch(err){alert(err.message,true);}finally{button.disabled=false;message.focus();}};
+			document.querySelector("#send-whatsapp-reply").onclick=send;
+			message.addEventListener("keydown",event=>{if(event.key==="Enter"&&!event.shiftKey){event.preventDefault();send();}});
+			document.querySelector("#draft-follow-up").onclick=async event=>{event.currentTarget.disabled=true;try{const result=await call("verityai_saas.api.conversations.draft_follow_up",{workspace,conversation:name,instruction:message.value});message.value=result.message;message.focus();}catch(err){alert(err.message,true);}finally{event.currentTarget.disabled=false;}};
+			document.querySelector("#schedule-follow-up").onclick=async()=>{const due=document.querySelector("#wa-due-at").value;if(!message.value.trim()){alert("Write or draft a message first.",true);return;}try{await call("verityai_saas.api.conversations.schedule_follow_up",{workspace,conversation:name,message:message.value,due_at:due});message.value="";await openChat(name);}catch(err){alert(err.message,true);}};
+			document.querySelectorAll("[data-follow-up-cancel]").forEach(button=>button.onclick=async()=>{try{await call("verityai_saas.api.conversations.cancel_follow_up",{workspace,follow_up:button.dataset.followUpCancel});await openChat(name,true);}catch(err){alert(err.message,true);}});
+		}
+		panel.querySelector("[data-handoff-open]").onclick=async()=>{const note=window.prompt("Why does this conversation need a person?","");if(note===null)return;await call("verityai_saas.api.conversations.update_handoff",{workspace,conversation:name,status:"Open",note});await openChat(name,true);};
+		panel.querySelector("[data-handoff-assign]").onclick=async()=>{const assigned=window.prompt(`Assign to:\n${assignees.join("\n")}`,handoff?.assigned_to||"");if(!assigned)return;await call("verityai_saas.api.conversations.update_handoff",{workspace,conversation:name,status:"Assigned",assigned_to:assigned});await openChat(name,true);};
+		panel.querySelector("[data-handoff-resolve]").onclick=async()=>{await call("verityai_saas.api.conversations.update_handoff",{workspace,conversation:name,status:"Resolved"});await openChat(name,true);};
+	};
+
+	document.querySelectorAll("[data-chat-open]").forEach(button=>button.onclick=()=>openChat(button.dataset.chatOpen));
+	document.querySelector("#conversation-filter").onsubmit=event=>{event.preventDefault();conversationFilters={...conversationFilters,...json(event.currentTarget),start:0};activeConversation=null;conversations();};
+	document.querySelector("#conversation-filter input").addEventListener("search",event=>{conversationFilters.search=event.currentTarget.value;activeConversation=null;conversations();});
+	document.querySelector("#conversation-refresh").onclick=()=>activeConversation?openChat(activeConversation,true):conversations();
+	document.querySelector("#conversations-prev").onclick=()=>{conversationFilters.start=Math.max(0,conversationFilters.start-conversationFilters.limit);activeConversation=null;conversations();};
+	document.querySelector("#conversations-next").onclick=()=>{conversationFilters.start+=conversationFilters.limit;activeConversation=null;conversations();};
+	const drawer=document.querySelector("#new-chat-drawer");
+	document.querySelector("#new-whatsapp-chat").onclick=()=>{drawer.hidden=false;document.body.classList.add("va-no-scroll");drawer.querySelector("input").focus();};
+	drawer.querySelectorAll("[data-new-chat-close]").forEach(button=>button.onclick=()=>{drawer.hidden=true;document.body.classList.remove("va-no-scroll");});
+	document.querySelector("#new-chat-form").onsubmit=async event=>{event.preventDefault();const button=event.currentTarget.querySelector("button:not([type=button])");button.disabled=true;try{const result=await call("verityai_saas.api.conversations.start_whatsapp_conversation",{workspace,...json(event.currentTarget)});activeConversation=result.conversation;drawer.hidden=true;document.body.classList.remove("va-no-scroll");await conversations();if(result.warning)alert(result.warning,true);}catch(err){alert(err.message,true);}finally{button.disabled=false;}};
+	if(activeConversation)await openChat(activeConversation);
+	conversationRefreshTimer=setInterval(()=>{if(activeConversation&&!document.querySelector("#wa-message:focus"))openChat(activeConversation,true).catch(()=>{});},5000);
   }
   async function crmLegacy() {
     const [leadData,customers,pipeline,appointments,activities] = await Promise.all([

@@ -55,6 +55,13 @@ def send_reply(workspace, conversation, message):
 
 @frappe.whitelist(methods=["POST"])
 @endpoint
+def start_whatsapp_conversation(workspace, phone_number, message=None):
+	require_workspace_permission(workspace, "manage_conversations")
+	return followups.start_conversation(workspace, phone_number, message)
+
+
+@frappe.whitelist(methods=["POST"])
+@endpoint
 def draft_follow_up(workspace, conversation, instruction=None):
 	require_workspace_permission(workspace, "manage_conversations")
 	return followups.draft(workspace, conversation, instruction)
