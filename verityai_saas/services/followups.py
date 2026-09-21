@@ -134,7 +134,15 @@ def send_reply(workspace, conversation, message, follow_up=None):
 		"follow_up": follow_up, "direction": "Outbound", "recipient": doc.user_identifier,
 		"phone_number_id": phone_id, "message": message, "status": "Sending",
 	}).insert(ignore_permissions=True)
-	result = _send_outbound(doc, config, phone_id, message)
+	try:
+		result = _send_outbound(doc, config, phone_id, message)
+	except Exception as exc:
+		error = mask_sensitive_text(str(exc) or "WhatsApp delivery failed.", max_length=500)
+		log.status, log.failed_on, log.error_message = "Failed", now_datetime(), error
+		log.save(ignore_permissions=True)
+		if follow_up:
+			frappe.db.set_value("VerityAI Conversation Follow Up", follow_up, {"status": "Failed", "error": error})
+		return {"conversation": doc.name, "sent": False, "status": "Failed", "error": error, "delivery_log": log.name}
 	log.delivery_method = result.get("delivery_method") or "Text"
 	log.template_name = result.get("template_name") or None
 	if not result.get("accepted"):

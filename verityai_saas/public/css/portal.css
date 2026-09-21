@@ -1754,12 +1754,16 @@ img, svg, video, canvas { max-width: 100%; }
 .va-wa-message.delivery-failed { border: 1px solid #e7a7a7; background: #fff0f0; }
 .va-delivery-error { display: block; margin-top: 5px; color: #a32929; font-size: 9px; line-height: 1.4; }
 .va-wa-composer { display: grid; gap: 6px; padding: 9px 11px 7px; border-top: 1px solid #dce3e7; background: #f3f5f6; }
+.va-wa-composer form { display: grid; gap: 6px; margin: 0; }
 .va-wa-compose-row { display: grid; grid-template-columns: minmax(0,1fr) 38px 42px; align-items: end; gap: 7px; }
 .va-wa-compose-row textarea { width: 100%; min-height: 42px; max-height: 120px; resize: vertical; padding: 11px 13px; border: 1px solid #dfe5e7; border-radius: 21px; background: #fff; color: var(--ink-900); font: inherit; font-size: 12px; }
 .va-ai-draft-button,.va-send-button { height: 40px; border: 0; border-radius: 50%; color: #fff; cursor: pointer; font-size: 11px; font-weight: 850; }
 .va-ai-draft-button { background: #5968d9; }
 .va-send-button { background: #168260; font-size: 16px; }
 .va-ai-draft-button:disabled,.va-send-button:disabled { opacity: .55; cursor: wait; }
+.va-send-status { min-height: 16px; margin: 0; color: var(--ink-500); font-size: 10px; }
+.va-send-status:empty { display: none; }
+.va-send-status.error { color: #b42318; font-weight: 750; }
 .va-composer-tools { min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 4px; color: var(--ink-500); font-size: 9px; }
 .va-composer-tools details { position: relative; }
 .va-composer-tools summary { cursor: pointer; font-weight: 750; }

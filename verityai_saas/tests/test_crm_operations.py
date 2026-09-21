@@ -237,6 +237,19 @@ class TestCRMOperations(FrappeTestCase):
 		self.assertEqual(frappe.parse_json(frappe.db.get_value("AI Chat Session", conversation.name, "chat_history")), before)
 		self.assertEqual(frappe.db.get_value("VerityAI WhatsApp Message", result["delivery_log"], "status"), "Failed")
 
+	def test_transport_exception_returns_retryable_failure_and_closes_sending_log(self):
+		conversation = self.make_conversation("263771234573", platform="WhatsApp")
+		frappe.db.set_value("AI Configuration", {"tenant": self.tenant}, "whatsapp_phone_id", "phone-exception")
+		before = frappe.parse_json(conversation.chat_history)
+		frappe.set_user(self.owner)
+		with patch("verityai_saas.services.followups.send_whatsapp_message_result", side_effect=RuntimeError("temporary provider failure")):
+			result = conversations_api.send_reply(self.workspace, conversation.name, "Please retry this message")["data"]
+		self.assertFalse(result["sent"])
+		self.assertEqual(result["status"], "Failed")
+		self.assertIn("temporary provider failure", result["error"])
+		self.assertEqual(frappe.db.get_value("VerityAI WhatsApp Message", result["delivery_log"], "status"), "Failed")
+		self.assertEqual(frappe.parse_json(frappe.db.get_value("AI Chat Session", conversation.name, "chat_history")), before)
+
 	def test_stale_conversation_uses_verified_template_and_preserves_edited_message(self):
 		conversation = self.make_conversation("263771234570", platform="WhatsApp")
 		conversation.last_customer_message_on = add_to_date(now_datetime(), days=-2)
@@ -303,7 +316,7 @@ class TestCRMOperations(FrappeTestCase):
 			javascript = source.read()
 		with open(frappe.get_app_path("verityai_saas", "public", "css", "portal.css"), encoding="utf-8") as source:
 			stylesheet = source.read()
-		for marker in ("mobile-chat-open", "va-chat-back", "send-whatsapp-reply", "retry_follow_up", "Sync messages", "Verify follow-up template", 'maxlength="1000"', "preserveScrollTop", "wasAtBottom", "chatRenderSequence"):
+		for marker in ("mobile-chat-open", "va-chat-back", "send-whatsapp-reply", "wa-reply-form", "wa-send-status", "conversationSendPending", "retry_follow_up", "Sync messages", "Verify follow-up template", 'maxlength="1000"', "preserveScrollTop", "wasAtBottom", "chatRenderSequence"):
 			self.assertIn(marker, javascript)
 		for marker in (".va-chat-app.mobile-chat-open", ".va-chat-layout.chat-open .va-chat-sidebar", "overflow-y: auto", "grid-template-rows: auto minmax(0,1fr) auto"):
 			self.assertIn(marker, stylesheet)
