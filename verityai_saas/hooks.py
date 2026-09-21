@@ -25,6 +25,7 @@ permission_query_conditions = {
 	"VerityAI Knowledge Ingestion": "verityai_saas.services.permissions.workspace_child_query_condition",
 	"VerityAI Conversation Handoff": "verityai_saas.services.permissions.workspace_child_query_condition",
 	"VerityAI Conversation Follow Up": "verityai_saas.services.permissions.workspace_child_query_condition",
+	"VerityAI WhatsApp Message": "verityai_saas.services.permissions.workspace_child_query_condition",
 	"VerityAI Onboarding Checklist": "verityai_saas.services.permissions.workspace_child_query_condition",
 	"VerityAI Notification Setting": "verityai_saas.services.permissions.workspace_child_query_condition",
 	"VerityAI Email Delivery Log": "verityai_saas.services.permissions.workspace_child_query_condition",
@@ -80,3 +81,4 @@ verity_ai_catalog_search_handler = ["verityai_saas.services.commerce.handle_ai_c
 verity_ai_lead_capture_handler = ["verityai_saas.services.commerce.handle_ai_lead_capture"]
 verity_ai_sales_crm_handler = ["verityai_saas.services.commerce.handle_ai_sales_crm"]
 verity_ai_whatsapp_inbound = ["verityai_saas.services.whatsapp.record_inbound_webhook"]
+verity_ai_whatsapp_status = ["verityai_saas.services.followups.record_delivery_status"]

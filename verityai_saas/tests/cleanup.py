@@ -4,6 +4,7 @@ import frappe
 SAAS_WORKSPACE_DOCTYPES = (
 	"VerityAI Sales Campaign",
 	"VerityAI Conversation Follow Up",
+	"VerityAI WhatsApp Message",
 	"VerityAI CRM Activity",
 	"VerityAI Appointment",
 	"VerityAI Sales Opportunity",

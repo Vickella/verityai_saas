@@ -115,12 +115,14 @@ class TestCRMOperations(FrappeTestCase):
 		conversation = self.make_conversation("263776552106", platform="WhatsApp")
 		frappe.db.set_value("AI Configuration", {"tenant": self.tenant}, "whatsapp_phone_id", "123456")
 		frappe.set_user(self.owner)
-		with patch("verityai_saas.services.followups.send_whatsapp_message", return_value=True) as sender:
+		with patch("verityai_saas.services.followups.send_whatsapp_message_result", return_value={"accepted": True, "message_id": "wamid.manual", "status": "accepted", "error": None}) as sender:
 			response = conversations_api.send_reply(self.workspace, conversation.name, "Are you ready to continue?")
 			self.assertTrue(response["data"]["sent"])
 			sender.assert_called_once()
 		history = frappe.parse_json(frappe.db.get_value("AI Chat Session", conversation.name, "chat_history"))
 		self.assertEqual(history[-1]["content"], "Are you ready to continue?")
+		self.assertEqual(history[-1]["delivery_status"], "Accepted")
+		self.assertEqual(frappe.db.get_value("VerityAI WhatsApp Message", {"meta_message_id": "wamid.manual"}, "status"), "Accepted")
 		due_at = add_to_date(now_datetime(), hours=1)
 		scheduled = conversations_api.schedule_follow_up(self.workspace, conversation.name, "I can help you complete the next step.", due_at)
 		follow_up = scheduled["data"]["follow_up"]
@@ -176,11 +178,35 @@ class TestCRMOperations(FrappeTestCase):
 			"conversation": conversation.name, "due_at": now_datetime(), "recipient": conversation.user_identifier,
 			"message": "Checking whether you would like to continue.", "status": "Scheduled",
 		}).insert(ignore_permissions=True)
-		with patch("verityai_saas.services.followups.send_whatsapp_message", return_value=True) as sender:
+		with patch("verityai_saas.services.followups.send_whatsapp_message_result", return_value={"accepted": True, "message_id": "wamid.followup", "status": "accepted", "error": None}) as sender:
 			followups.process_due_followups()
 			self.assertEqual(sender.call_args.args[0], "phone-account-1")
 			self.assertEqual(sender.call_args.kwargs["config"].name, setup.name)
 		self.assertEqual(frappe.db.get_value(follow_up.doctype, follow_up.name, "status"), "Sent")
+
+	def test_meta_delivery_receipts_update_message_and_conversation(self):
+		conversation = self.make_conversation("263771234568", platform="WhatsApp")
+		frappe.db.set_value("AI Configuration", {"tenant": self.tenant}, "whatsapp_phone_id", "phone-receipts")
+		frappe.set_user(self.owner)
+		with patch("verityai_saas.services.followups.send_whatsapp_message_result", return_value={"accepted": True, "message_id": "wamid.receipt", "status": "accepted", "error": None}):
+			self.assertTrue(conversations_api.send_reply(self.workspace, conversation.name, "Delivery tracked message")["data"]["sent"])
+		followups.record_delivery_status(self.tenant, phone_number_id="phone-receipts", message_id="wamid.receipt", recipient=conversation.user_identifier, status="delivered")
+		self.assertEqual(frappe.db.get_value("VerityAI WhatsApp Message", {"meta_message_id": "wamid.receipt"}, "status"), "Delivered")
+		detail = conversations_api.detail(self.workspace, conversation.name)["data"]
+		self.assertEqual(detail["history"][-1]["delivery_status"], "Delivered")
+		followups.record_delivery_status(self.tenant, phone_number_id="phone-receipts", message_id="wamid.receipt", recipient=conversation.user_identifier, status="read")
+		self.assertEqual(frappe.db.get_value("VerityAI WhatsApp Message", {"meta_message_id": "wamid.receipt"}, "status"), "Read")
+
+	def test_rejected_message_is_not_added_to_conversation(self):
+		conversation = self.make_conversation("263771234569", platform="WhatsApp")
+		frappe.db.set_value("AI Configuration", {"tenant": self.tenant}, "whatsapp_phone_id", "phone-rejected")
+		before = frappe.parse_json(conversation.chat_history)
+		frappe.set_user(self.owner)
+		with patch("verityai_saas.services.followups.send_whatsapp_message_result", return_value={"accepted": False, "message_id": None, "status": "failed", "error": "Meta rejected this recipient"}):
+			result = conversations_api.send_reply(self.workspace, conversation.name, "This must not appear")["data"]
+		self.assertFalse(result["sent"])
+		self.assertEqual(frappe.parse_json(frappe.db.get_value("AI Chat Session", conversation.name, "chat_history")), before)
+		self.assertEqual(frappe.db.get_value("VerityAI WhatsApp Message", result["delivery_log"], "status"), "Failed")
 
 	def test_conversation_ui_has_mobile_single_thread_and_desktop_composer_controls(self):
 		with open(frappe.get_app_path("verityai_saas", "public", "js", "portal.js"), encoding="utf-8") as source:

@@ -327,7 +327,11 @@ def get_conversation(workspace_name, conversation_name):
 			continue
 		content = str(item.get("content") or "").strip()
 		if content:
-			public_history.append({"role": item["role"], "content": content})
+			public_item = {"role": item["role"], "content": content}
+			if item["role"] == "assistant" and item.get("whatsapp_message_id"):
+				public_item["delivery_status"] = item.get("delivery_status") or "Accepted"
+				public_item["delivery_error"] = str(item.get("delivery_error") or "")[:500]
+			public_history.append(public_item)
 	lead = frappe.db.get_value("AI Lead", {"tenant": tenant, "chat_session": doc.name}, "name")
 	display_name = doc.user_identifier
 	if not display_name and doc.platform == "Web":

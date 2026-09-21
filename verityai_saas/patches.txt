@@ -25,3 +25,4 @@ verityai_saas.patches.v0_21.whatsapp_setup_guide_upload
 verityai_saas.patches.v0_22.production_product_fixes
 verityai_saas.patches.v0_27.sales_campaign_grounding
 verityai_saas.patches.v0_28.conversation_followups
+verityai_saas.patches.v0_29.whatsapp_delivery_tracking

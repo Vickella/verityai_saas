@@ -5,7 +5,8 @@ import frappe
 from frappe import _
 from frappe.utils import get_datetime, now_datetime
 
-from verity_ai.api.whatsapp import send_whatsapp_message
+from verity_ai.api.whatsapp import send_whatsapp_message_result
+from verity_ai.tenant_security import mask_sensitive_text
 from verity_ai.engine.openai_handler import (
 	assert_usage_within_limit,
 	clean_public_response,
@@ -73,14 +74,18 @@ def _phone_id(doc, config):
 	return phone_id
 
 
-def _append_reply(doc, message):
+def _append_reply(doc, message, message_id=None, delivery_status=None):
 	try:
 		history = json.loads(doc.chat_history or "[]")
 	except (TypeError, ValueError):
 		history = []
 	if not isinstance(history, list):
 		history = []
-	history.append({"role": "assistant", "content": message})
+	item = {"role": "assistant", "content": message}
+	if message_id:
+		item["whatsapp_message_id"] = message_id
+		item["delivery_status"] = delivery_status or "Accepted"
+	history.append(item)
 	doc.chat_history = frappe.as_json(history[-100:])
 	doc.save(ignore_permissions=True)
 
@@ -89,12 +94,27 @@ def send_reply(workspace, conversation, message, follow_up=None):
 	doc = _whatsapp_conversation(workspace, conversation)
 	message = _message(message)
 	config = _delivery_config(workspace, doc)
-	if not send_whatsapp_message(_phone_id(doc, config), doc.user_identifier, message, config=config):
-		frappe.throw(_("WhatsApp did not accept the message. Check the connection and the 24-hour messaging window."), frappe.ValidationError)
-	_append_reply(doc, message)
+	phone_id = _phone_id(doc, config)
+	log = frappe.get_doc({
+		"doctype": "VerityAI WhatsApp Message", "workspace": workspace, "conversation": conversation,
+		"follow_up": follow_up, "direction": "Outbound", "recipient": doc.user_identifier,
+		"phone_number_id": phone_id, "message": message, "status": "Sending",
+	}).insert(ignore_permissions=True)
+	result = send_whatsapp_message_result(phone_id, doc.user_identifier, message, config=config)
+	if not result.get("accepted"):
+		error = mask_sensitive_text(result.get("error") or "WhatsApp rejected the message.", max_length=500)
+		log.status, log.failed_on, log.error_message = "Failed", now_datetime(), error
+		log.save(ignore_permissions=True)
+		if follow_up:
+			frappe.db.set_value("VerityAI Conversation Follow Up", follow_up, {"status": "Failed", "error": error})
+		return {"conversation": conversation, "sent": False, "status": "Failed", "error": error, "delivery_log": log.name}
+	message_id = result["message_id"]
+	log.meta_message_id, log.status, log.accepted_on = message_id, "Accepted", now_datetime()
+	log.save(ignore_permissions=True)
+	_append_reply(doc, message, message_id=message_id, delivery_status="Accepted")
 	if follow_up and frappe.db.exists("VerityAI Conversation Follow Up", {"name": follow_up, "workspace": workspace, "conversation": conversation}):
 		frappe.db.set_value("VerityAI Conversation Follow Up", follow_up, {"status": "Sent", "sent_on": now_datetime(), "error": None})
-	return {"conversation": conversation, "sent": True}
+	return {"conversation": conversation, "sent": True, "status": "Accepted", "message_id": message_id, "delivery_log": log.name}
 
 
 def start_conversation(workspace, phone_number, message=None):
@@ -113,14 +133,9 @@ def start_conversation(workspace, phone_number, message=None):
 		session.save(ignore_permissions=True)
 	sent, warning = False, None
 	if str(message or "").strip():
-		try:
-			send_reply(workspace, session.name, message)
-			sent = True
-		except Exception as exc:
-			# Keep the thread available even when Meta requires an approved
-			# first-contact template; the operator can still receive a reply or
-			# retry from the composer after correcting the channel setup.
-			warning = " ".join(str(exc).split())[:300]
+		result = send_reply(workspace, session.name, message)
+		sent = result["sent"]
+		warning = result.get("error")
 	return {"conversation": session.name, "phone_number": phone, "sent": sent, "warning": warning}
 
 
@@ -151,7 +166,10 @@ def retry(workspace, follow_up):
 	doc = frappe.get_doc("VerityAI Conversation Follow Up", follow_up)
 	frappe.db.set_value(doc.doctype, doc.name, {"status": "Sending", "error": None})
 	try:
-		return send_reply(workspace, doc.conversation, doc.message, follow_up=doc.name)
+		result = send_reply(workspace, doc.conversation, doc.message, follow_up=doc.name)
+		if not result["sent"]:
+			frappe.db.set_value(doc.doctype, doc.name, {"status": "Failed", "error": result.get("error")})
+		return result
 	except Exception as exc:
 		frappe.db.set_value(doc.doctype, doc.name, {"status": "Failed", "error": str(exc)[:500]})
 		raise
@@ -160,6 +178,62 @@ def retry(workspace, follow_up):
 def list_for_conversation(workspace, conversation):
 	crm.require_conversation(workspace, conversation)
 	return frappe.get_all("VerityAI Conversation Follow Up", filters={"workspace": workspace, "conversation": conversation}, fields=["name", "due_at", "message", "status", "sent_on", "error"], order_by="due_at desc", limit=50)
+
+
+def record_delivery_status(tenant_name, phone_number_id=None, message_id=None, recipient=None, status=None, timestamp=None, error_code=None, error_title=None, error_message=None, **kwargs):
+	status_map = {"sent": "Sent", "delivered": "Delivered", "read": "Read", "failed": "Failed"}
+	new_status = status_map.get(str(status or "").lower())
+	if not message_id or not new_status:
+		return
+	workspace = frappe.db.get_value("VerityAI Workspace", {"engine_tenant": tenant_name}, "name")
+	log_name = frappe.db.get_value("VerityAI WhatsApp Message", {"meta_message_id": message_id, "workspace": workspace}, "name") if workspace else None
+	if not log_name and workspace:
+		conversation_name = frappe.db.get_value("AI Chat Session", {"tenant": tenant_name, "platform": "WhatsApp", "chat_history": ["like", f"%{message_id}%"]}, "name")
+		if conversation_name:
+			conversation = frappe.get_doc("AI Chat Session", conversation_name)
+			try:
+				history = json.loads(conversation.chat_history or "[]")
+			except (TypeError, ValueError):
+				history = []
+			item = next((row for row in reversed(history if isinstance(history, list) else []) if isinstance(row, dict) and row.get("whatsapp_message_id") == message_id), None)
+			if item:
+				log_name = frappe.get_doc({
+					"doctype": "VerityAI WhatsApp Message", "workspace": workspace, "conversation": conversation.name,
+					"direction": "Outbound", "meta_message_id": message_id, "recipient": conversation.user_identifier,
+					"phone_number_id": phone_number_id, "message": item.get("content"), "status": "Accepted", "accepted_on": now_datetime(),
+				}).insert(ignore_permissions=True).name
+	if not log_name:
+		return
+	log = frappe.get_doc("VerityAI WhatsApp Message", log_name)
+	if phone_number_id and str(log.phone_number_id) != str(phone_number_id):
+		return
+	ranks = {"Sending": 0, "Accepted": 1, "Sent": 2, "Delivered": 3, "Read": 4}
+	if new_status != "Failed" and ranks.get(new_status, 0) < ranks.get(log.status, 0):
+		return
+	now = now_datetime()
+	log.status = new_status
+	if new_status == "Sent": log.sent_on = now
+	elif new_status == "Delivered": log.delivered_on = now
+	elif new_status == "Read": log.read_on = now
+	elif new_status == "Failed":
+		log.failed_on, log.error_code = now, str(error_code or "")[:140]
+		log.error_message = mask_sensitive_text(error_message or error_title or "Meta reported delivery failure.", max_length=500)
+	log.save(ignore_permissions=True)
+	conversation = frappe.get_doc("AI Chat Session", log.conversation)
+	try:
+		history = json.loads(conversation.chat_history or "[]")
+	except (TypeError, ValueError):
+		history = []
+	for item in reversed(history if isinstance(history, list) else []):
+		if isinstance(item, dict) and item.get("whatsapp_message_id") == message_id:
+			item["delivery_status"] = new_status
+			if new_status == "Failed": item["delivery_error"] = log.error_message
+			break
+	conversation.chat_history = frappe.as_json(history)
+	conversation.save(ignore_permissions=True)
+	if log.follow_up:
+		values = {"status": "Failed", "error": log.error_message} if new_status == "Failed" else ({"status": "Sent", "error": None} if new_status in {"Sent", "Delivered", "Read"} else {})
+		if values: frappe.db.set_value("VerityAI Conversation Follow Up", log.follow_up, values)
 
 
 def draft(workspace, conversation, instruction=None):
@@ -195,7 +269,9 @@ def process_due_followups():
 		frappe.db.commit()
 		doc = frappe.get_doc("VerityAI Conversation Follow Up", name)
 		try:
-			send_reply(doc.workspace, doc.conversation, doc.message, follow_up=doc.name)
+			result = send_reply(doc.workspace, doc.conversation, doc.message, follow_up=doc.name)
+			if not result["sent"]:
+				frappe.db.set_value(doc.doctype, doc.name, {"status": "Failed", "error": result.get("error")})
 		except Exception as exc:
 			frappe.db.set_value(doc.doctype, doc.name, {"status": "Failed", "error": str(exc)[:500]})
 			frappe.log_error(title=f"Conversation follow-up failed: {doc.name}", message=frappe.get_traceback())

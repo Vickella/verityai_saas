@@ -1751,6 +1751,8 @@ img, svg, video, canvas { max-width: 100%; }
 .va-wa-message small { display: block; margin-top: 3px; color: #6f7d78; font-size: 8px; text-align: right; }
 .va-wa-message.incoming { align-self: flex-start; border-top-left-radius: 2px; background: #fff; }
 .va-wa-message.outgoing { align-self: flex-end; border-top-right-radius: 2px; background: #d9fdd3; }
+.va-wa-message.delivery-failed { border: 1px solid #e7a7a7; background: #fff0f0; }
+.va-delivery-error { display: block; margin-top: 5px; color: #a32929; font-size: 9px; line-height: 1.4; }
 .va-wa-composer { display: grid; gap: 6px; padding: 9px 11px 7px; border-top: 1px solid #dce3e7; background: #f3f5f6; }
 .va-wa-compose-row { display: grid; grid-template-columns: minmax(0,1fr) 38px 42px; align-items: end; gap: 7px; }
 .va-wa-compose-row textarea { width: 100%; min-height: 42px; max-height: 120px; resize: vertical; padding: 11px 13px; border: 1px solid #dfe5e7; border-radius: 21px; background: #fff; color: var(--ink-900); font: inherit; font-size: 12px; }

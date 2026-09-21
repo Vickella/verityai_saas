@@ -509,6 +509,19 @@ def ensure_doctypes():
 		field("created_by_user", "Created By", "Link", options="User", read_only=1),
 		field("sent_on", "Sent On", "Datetime", read_only=1), field("error", "Error", "Small Text", read_only=1),
 	], "VCFU-.########")
+	ensure_doctype("VerityAI WhatsApp Message", [
+		field("workspace", "Workspace", "Link", options="VerityAI Workspace", reqd=1, in_list_view=1),
+		field("conversation", "Conversation", "Link", options="AI Chat Session", reqd=1, in_list_view=1),
+		field("follow_up", "Follow Up", "Link", options="VerityAI Conversation Follow Up"),
+		field("direction", "Direction", "Select", options="Outbound\nInbound", default="Outbound", reqd=1),
+		field("meta_message_id", "Meta Message ID", unique=1, in_list_view=1),
+		field("recipient", "Recipient", reqd=1, in_list_view=1), field("phone_number_id", "Phone Number ID", reqd=1),
+		field("message", "Message", "Small Text", reqd=1),
+		field("status", "Delivery Status", "Select", options="Sending\nAccepted\nSent\nDelivered\nRead\nFailed", default="Sending", reqd=1, in_list_view=1),
+		field("accepted_on", "Accepted On", "Datetime"), field("sent_on", "Sent On", "Datetime"),
+		field("delivered_on", "Delivered On", "Datetime"), field("read_on", "Read On", "Datetime"), field("failed_on", "Failed On", "Datetime"),
+		field("error_code", "Error Code"), field("error_message", "Error Message", "Small Text"),
+	], "VWAM-.########")
 	ensure_doctype("VerityAI Billing Document", [
 		field("workspace", "Workspace", "Link", options="VerityAI Workspace", reqd=1, in_list_view=1), field("account", "Account", "Link", options="VerityAI Account", reqd=1),
 		field("subscription", "Subscription", "Link", options="VerityAI Subscription"), field("billing_event", "Billing Event", "Link", options="VerityAI Billing Event", reqd=1),
