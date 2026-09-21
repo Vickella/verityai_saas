@@ -237,6 +237,24 @@ class TestCRMOperations(FrappeTestCase):
 		self.assertEqual(frappe.parse_json(frappe.db.get_value("AI Chat Session", conversation.name, "chat_history")), before)
 		self.assertEqual(frappe.db.get_value("VerityAI WhatsApp Message", result["delivery_log"], "status"), "Failed")
 
+	def test_legacy_conversation_recovers_recent_customer_window_from_inbound_usage(self):
+		conversation = self.make_conversation("263771234574", platform="WhatsApp")
+		conversation.last_customer_message_on = None
+		conversation.save(ignore_permissions=True)
+		frappe.db.set_value("AI Configuration", {"tenant": self.tenant}, "whatsapp_phone_id", "phone-recovered-window")
+		frappe.get_doc({
+			"doctype": "AI Usage Log", "tenant": self.tenant, "chat_session": conversation.name,
+			"platform": "WhatsApp", "status": "Success", "operation": "assistant_response",
+			"source_feature": "whatsapp_ai", "total_tokens": 1,
+		}).insert(ignore_permissions=True)
+		frappe.set_user(self.owner)
+		with patch("verityai_saas.services.followups.send_whatsapp_message_result", return_value={"accepted": True, "message_id": "wamid.recovered", "status": "accepted", "error": None}) as sender, patch("verityai_saas.services.followups.send_whatsapp_template_result") as template_sender:
+			result = conversations_api.send_reply(self.workspace, conversation.name, "A custom follow-up inside the recovered window")["data"]
+		self.assertTrue(result["sent"])
+		sender.assert_called_once()
+		template_sender.assert_not_called()
+		self.assertIsNotNone(frappe.db.get_value("AI Chat Session", conversation.name, "last_customer_message_on"))
+
 	def test_transport_exception_returns_retryable_failure_and_closes_sending_log(self):
 		conversation = self.make_conversation("263771234573", platform="WhatsApp")
 		frappe.db.set_value("AI Configuration", {"tenant": self.tenant}, "whatsapp_phone_id", "phone-exception")

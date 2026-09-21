@@ -87,6 +87,26 @@ def _phone_id(doc, config):
 
 def _customer_window_open(doc):
 	last_customer_message = doc.get("last_customer_message_on")
+	if not last_customer_message and frappe.db.exists("DocType", "AI Usage Log"):
+		filters = {
+			"chat_session": doc.name,
+			"platform": "WhatsApp",
+			"status": "Success",
+		}
+		meta = frappe.get_meta("AI Usage Log")
+		if meta.has_field("operation"):
+			filters["operation"] = "assistant_response"
+		if meta.has_field("source_feature"):
+			filters["source_feature"] = ["in", ["whatsapp_ai", "whatsapp"]]
+		last_customer_message = frappe.db.get_value(
+			"AI Usage Log", filters, "creation", order_by="creation desc",
+		)
+		if last_customer_message and doc.meta.has_field("last_customer_message_on"):
+			doc.last_customer_message_on = last_customer_message
+			frappe.db.set_value(
+				"AI Chat Session", doc.name, "last_customer_message_on", last_customer_message,
+				update_modified=False,
+			)
 	if not last_customer_message:
 		return False
 	return max(time_diff_in_hours(now_datetime(), get_datetime(last_customer_message)), 0) < CUSTOMER_WINDOW_SAFETY_HOURS
