@@ -47,7 +47,7 @@ def workspace_summary(workspace_name, user=None):
 		"usage": usage,
 		"assistant": tenant,
 		"recent_alerts": engine.get_workspace_alerts(workspace.name),
-		"conversation_count": frappe.db.count("AI Chat Session", {"tenant": workspace.engine_tenant}) if workspace.engine_tenant else 0,
+		"conversation_count": frappe.db.count("AI Chat Session", engine.active_conversation_filters(workspace.engine_tenant)) if workspace.engine_tenant else 0,
 		"new_leads": frappe.db.count("AI Lead", {"tenant": workspace.engine_tenant, "status": "New"}) if workspace.engine_tenant else 0,
 		"generated_at": now_datetime(),
 	}

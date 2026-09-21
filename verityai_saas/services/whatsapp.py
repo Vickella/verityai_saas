@@ -193,7 +193,11 @@ def _record(setup, reference):
 
 
 def record_channel_activity(doc, method=None):
-	if doc.platform == "WhatsApp":
+	# A newly created manual outbound thread is not proof that Meta delivered an
+	# inbound webhook. Explicit webhook notifications (plain mappings) and saved
+	# sessions carrying an inbound timestamp are proof and may mark the route live.
+	confirmed_inbound = doc.get("last_customer_message_on") or not doc.get("doctype")
+	if doc.platform == "WhatsApp" and confirmed_inbound:
 		workspace = frappe.db.get_value("VerityAI Workspace", {"engine_tenant": doc.tenant}, "name")
 		setup = _get_setup(workspace) if workspace else None
 		if setup:
@@ -208,6 +212,46 @@ def record_inbound_webhook(tenant_name, phone_number_id=None, message_id=None, *
 	setup = frappe.get_doc("VerityAI WhatsApp Setup", name) if name else _get_setup(workspace)
 	if setup:
 		_record(setup, message_id)
+
+
+def merge_chat_sessions(primary, duplicates):
+	"""Preserve SaaS records while the engine unifies duplicate customer threads."""
+	duplicates = [name for name in (duplicates or []) if name and name != primary]
+	if not primary or not duplicates:
+		return
+	all_names = [primary] + duplicates
+	if frappe.db.exists("DocType", "VerityAI Conversation Handoff"):
+		handoffs = frappe.get_all(
+			"VerityAI Conversation Handoff", filters={"conversation": ["in", all_names]},
+			fields=["name", "conversation", "status", "assigned_to", "opened_on", "resolved_on", "resolved_by", "history_json", "modified"],
+			order_by="modified asc",
+		)
+		if handoffs:
+			target = next((row for row in handoffs if row.conversation == primary), handoffs[0])
+			history = []
+			for row in handoffs:
+				try:
+					items = frappe.parse_json(row.history_json or "[]")
+				except Exception:
+					items = []
+				if isinstance(items, list):
+					history.extend(items)
+			latest = handoffs[-1]
+			for row in handoffs:
+				if row.name != target.name:
+					frappe.delete_doc("VerityAI Conversation Handoff", row.name, ignore_permissions=True, force=True)
+			target_doc = frappe.get_doc("VerityAI Conversation Handoff", target.name)
+			target_doc.conversation = primary
+			target_doc.status = latest.status
+			target_doc.assigned_to = latest.assigned_to
+			target_doc.opened_on = target_doc.opened_on or latest.opened_on
+			target_doc.resolved_on = latest.resolved_on
+			target_doc.resolved_by = latest.resolved_by
+			target_doc.history_json = frappe.as_json(history[-200:])
+			target_doc.save(ignore_permissions=True)
+	for doctype in ("VerityAI Conversation Follow Up", "VerityAI WhatsApp Message"):
+		if frappe.db.exists("DocType", doctype):
+			frappe.db.set_value(doctype, {"conversation": ["in", duplicates]}, "conversation", primary, update_modified=False)
 
 
 def test_connection(workspace_name, account=None):

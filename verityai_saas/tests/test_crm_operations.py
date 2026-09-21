@@ -115,11 +115,13 @@ class TestCRMOperations(FrappeTestCase):
 	def test_whatsapp_reply_and_scheduled_follow_up(self):
 		conversation = self.make_conversation("263776552106", platform="WhatsApp")
 		frappe.db.set_value("AI Configuration", {"tenant": self.tenant}, "whatsapp_phone_id", "123456")
+		frappe.db.set_value("AI Chat Session", conversation.name, {"channel_account": "removed-account", "channel_phone_number_id": "stale-phone-id"})
 		frappe.set_user(self.owner)
 		with patch("verityai_saas.services.followups.send_whatsapp_message_result", return_value={"accepted": True, "message_id": "wamid.manual", "status": "accepted", "error": None}) as sender:
 			response = conversations_api.send_reply(self.workspace, conversation.name, "Are you ready to continue?")
 			self.assertTrue(response["data"]["sent"])
 			sender.assert_called_once()
+			self.assertEqual(sender.call_args.args[0], "123456")
 		history = frappe.parse_json(frappe.db.get_value("AI Chat Session", conversation.name, "chat_history"))
 		self.assertEqual(history[-1]["content"], "Are you ready to continue?")
 		self.assertEqual(history[-1]["delivery_status"], "Accepted")
@@ -137,12 +139,38 @@ class TestCRMOperations(FrappeTestCase):
 		created = conversations_api.start_whatsapp_conversation(self.workspace, "+263 77 655 2106")
 		self.assertTrue(created["success"])
 		conversation = frappe.get_doc("AI Chat Session", created["data"]["conversation"])
-		self.assertEqual(conversation.session_id, "wa_123456_263776552106")
+		self.assertEqual(conversation.session_id, "wa_263776552106")
 		self.assertEqual(conversation.user_identifier, "263776552106")
 		self.assertEqual(conversation.platform, "WhatsApp")
 		# Calling it again returns the same thread that the inbound webhook uses.
 		reopened = conversations_api.start_whatsapp_conversation(self.workspace, "263776552106")
 		self.assertEqual(reopened["data"]["conversation"], conversation.name)
+
+	def test_legacy_whatsapp_duplicates_merge_and_old_links_redirect(self):
+		phone = "263771112233"
+		frappe.db.set_value("AI Configuration", {"tenant": self.tenant}, "whatsapp_phone_id", "123456")
+		first = frappe.get_doc({
+			"doctype": "AI Chat Session", "tenant": self.tenant, "session_id": f"wa_old_one_{phone}",
+			"platform": "WhatsApp", "user_identifier": phone, "status": "Open",
+			"chat_history": frappe.as_json([{"role": "user", "content": "Can you help with a website?"}]),
+		}).insert(ignore_permissions=True)
+		second = frappe.get_doc({
+			"doctype": "AI Chat Session", "tenant": self.tenant, "session_id": f"wa_old_two_{phone}",
+			"platform": "WhatsApp", "user_identifier": f"+{phone}", "status": "Open",
+			"chat_history": frappe.as_json([{"role": "assistant", "content": "Yes, our team can help."}]),
+		}).insert(ignore_permissions=True)
+		frappe.set_user(self.owner)
+		result = conversations_api.start_whatsapp_conversation(self.workspace, phone)
+		self.assertTrue(result["success"], result)
+		primary_name = result["data"]["conversation"]
+		self.assertIn(primary_name, {first.name, second.name})
+		duplicate_name = second.name if primary_name == first.name else first.name
+		self.assertEqual(frappe.db.get_value("AI Chat Session", duplicate_name, "merged_into"), primary_name)
+		rows = conversations_api.list_conversations(self.workspace, platform="WhatsApp", search=phone)["data"]["rows"]
+		self.assertEqual([row["name"] for row in rows], [primary_name])
+		detail = conversations_api.detail(self.workspace, duplicate_name)["data"]
+		self.assertEqual(detail["name"], primary_name)
+		self.assertEqual([item["content"] for item in detail["history"]], ["Can you help with a website?", "Yes, our team can help."])
 
 	def test_conversation_list_has_safe_message_preview(self):
 		conversation = self.make_conversation("preview@example.com")

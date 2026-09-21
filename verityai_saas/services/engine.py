@@ -287,7 +287,7 @@ def get_workspace_usage(workspace_name, from_date=None, to_date=None):
 
 def get_workspace_conversations(workspace_name, filters=None):
 	tenant = get_workspace_engine_tenant(workspace_name)
-	query = {"tenant": tenant}
+	query = active_conversation_filters(tenant)
 	filters = filters or {}
 	for key in ("platform", "status"):
 		if filters.get(key):
@@ -299,7 +299,7 @@ def get_workspace_conversations(workspace_name, filters=None):
 	if search:
 		or_filters = {"session_id": ["like", f"%{search}%"], "user_identifier": ["like", f"%{search}%"]}
 	rows = frappe.get_all("AI Chat Session", filters=query, or_filters=or_filters, fields=["name", "session_id", "platform", "user_identifier", "status", "estimated_deal_value", "modified", "chat_history"], order_by="modified desc", limit_start=start, limit_page_length=limit)
-	web_names = frappe.get_all("AI Chat Session", filters={"tenant": tenant, "platform": "Web"}, pluck="name", order_by="creation asc")
+	web_names = frappe.get_all("AI Chat Session", filters=active_conversation_filters(tenant, {"platform": "Web"}), pluck="name", order_by="creation asc")
 	web_labels = {name: f"WEB v{index}" for index, name in enumerate(web_names, start=1)}
 	for row in rows:
 		try:
@@ -316,6 +316,11 @@ def get_conversation(workspace_name, conversation_name):
 	tenant = get_workspace_engine_tenant(workspace_name)
 	if not frappe.db.exists("AI Chat Session", {"name": conversation_name, "tenant": tenant}): frappe.throw(_("Conversation was not found."), frappe.DoesNotExistError)
 	doc = frappe.get_doc("AI Chat Session", conversation_name)
+	if doc.meta.has_field("merged_into") and doc.get("merged_into"):
+		merged_into = doc.get("merged_into")
+		if not frappe.db.exists("AI Chat Session", {"name": merged_into, "tenant": tenant}):
+			frappe.throw(_("Conversation was not found."), frappe.DoesNotExistError)
+		doc = frappe.get_doc("AI Chat Session", merged_into)
 	try: history = json.loads(doc.chat_history or "[]")
 	except (TypeError, ValueError): history = []
 	# Chat history also contains system instructions, tool calls and tool results.
@@ -335,9 +340,17 @@ def get_conversation(workspace_name, conversation_name):
 	lead = frappe.db.get_value("AI Lead", {"tenant": tenant, "chat_session": doc.name}, "name")
 	display_name = doc.user_identifier
 	if not display_name and doc.platform == "Web":
-		web_names = frappe.get_all("AI Chat Session", filters={"tenant": tenant, "platform": "Web"}, pluck="name", order_by="creation asc")
+		web_names = frappe.get_all("AI Chat Session", filters=active_conversation_filters(tenant, {"platform": "Web"}), pluck="name", order_by="creation asc")
 		display_name = f"WEB v{web_names.index(doc.name) + 1}" if doc.name in web_names else "WEB visitor"
 	return {"name": doc.name, "platform": doc.platform, "user_identifier": doc.user_identifier, "display_name": display_name or doc.session_id, "status": doc.status, "estimated_deal_value": doc.estimated_deal_value, "last_customer_message_on": doc.get("last_customer_message_on"), "history": public_history, "lead": lead}
+
+
+def active_conversation_filters(tenant, extra=None):
+	filters = {"tenant": tenant}
+	if frappe.get_meta("AI Chat Session").has_field("merged_into"):
+		filters["merged_into"] = ["is", "not set"]
+	filters.update(extra or {})
+	return filters
 
 
 def get_workspace_leads(workspace_name, filters=None):

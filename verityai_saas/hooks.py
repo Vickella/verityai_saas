@@ -82,3 +82,4 @@ verity_ai_lead_capture_handler = ["verityai_saas.services.commerce.handle_ai_lea
 verity_ai_sales_crm_handler = ["verityai_saas.services.commerce.handle_ai_sales_crm"]
 verity_ai_whatsapp_inbound = ["verityai_saas.services.whatsapp.record_inbound_webhook"]
 verity_ai_whatsapp_status = ["verityai_saas.services.followups.record_delivery_status"]
+verity_ai_merge_chat_sessions = ["verityai_saas.services.whatsapp.merge_chat_sessions"]

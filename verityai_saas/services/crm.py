@@ -25,7 +25,12 @@ def require_conversation(workspace_name, conversation_name):
 	tenant = _workspace_tenant(workspace_name)
 	if not frappe.db.exists("AI Chat Session", {"name": conversation_name, "tenant": tenant}):
 		frappe.throw("Conversation was not found.", frappe.DoesNotExistError)
-	return frappe.get_doc("AI Chat Session", conversation_name)
+	doc = frappe.get_doc("AI Chat Session", conversation_name)
+	if doc.meta.has_field("merged_into") and doc.get("merged_into"):
+		if not frappe.db.exists("AI Chat Session", {"name": doc.get("merged_into"), "tenant": tenant}):
+			frappe.throw("Conversation was not found.", frappe.DoesNotExistError)
+		doc = frappe.get_doc("AI Chat Session", doc.get("merged_into"))
+	return doc
 
 
 def workspace_assignees(workspace_name):
@@ -100,6 +105,7 @@ def update_handoff(workspace_name, conversation_name, status, assigned_to=None, 
 	if status not in HANDOFF_STATUSES:
 		frappe.throw("Unsupported handoff status.", frappe.ValidationError)
 	conversation = require_conversation(workspace_name, conversation_name)
+	conversation_name = conversation.name
 	assigned_to = validate_assignee(workspace_name, assigned_to)
 	if status == "Assigned" and not assigned_to:
 		frappe.throw("An assignee is required for an assigned handoff.", frappe.ValidationError)
@@ -129,7 +135,7 @@ def update_handoff(workspace_name, conversation_name, status, assigned_to=None, 
 
 
 def handoff_data(workspace_name, conversation_name):
-	require_conversation(workspace_name, conversation_name)
+	conversation_name = require_conversation(workspace_name, conversation_name).name
 	name = frappe.db.get_value("VerityAI Conversation Handoff", {"workspace": workspace_name, "conversation": conversation_name}, "name")
 	if not name:
 		return None

@@ -16,6 +16,7 @@ from verity_ai.engine.openai_handler import (
 	get_config,
 	log_usage,
 	get_or_create_session,
+	canonical_whatsapp_session_id,
 )
 
 from verityai_saas.services import crm, engine
@@ -36,6 +37,8 @@ def _phone_number(value):
 		phone = phone[2:]
 	if len(phone) < 8 or len(phone) > 15:
 		frappe.throw(_("Enter a valid international phone number, including country code."), frappe.ValidationError)
+	if phone.startswith("0"):
+		frappe.throw(_("Use the international country code without a leading zero, for example 263771234567."), frappe.ValidationError)
 	return phone
 
 
@@ -65,9 +68,9 @@ def _delivery_config(workspace, doc=None):
 	name = None
 	if account:
 		name = frappe.db.get_value("VerityAI WhatsApp Setup", {"name": account, "workspace": workspace, "active": 1}, "name")
-	elif doc.get("channel_phone_number_id"):
+	if not name and doc.get("channel_phone_number_id"):
 		name = frappe.db.get_value("VerityAI WhatsApp Setup", {"workspace": workspace, "active": 1, "whatsapp_phone_id": doc.get("channel_phone_number_id")}, "name")
-	if not name and not account:
+	if not name:
 		for candidate in frappe.get_all("VerityAI WhatsApp Setup", filters={"workspace": workspace, "active": 1}, fields=["name", "whatsapp_phone_id"], order_by="is_default desc, creation asc"):
 			if str(candidate.whatsapp_phone_id or "").strip():
 				name = candidate.name
@@ -76,7 +79,7 @@ def _delivery_config(workspace, doc=None):
 
 
 def _phone_id(doc, config):
-	phone_id = str(doc.get("channel_phone_number_id") or config.get("whatsapp_phone_id") or "").strip()
+	phone_id = str(config.get("whatsapp_phone_id") or doc.get("channel_phone_number_id") or "").strip()
 	if not phone_id:
 		frappe.throw(_("Connect a WhatsApp phone number before sending a follow-up."), frappe.ValidationError)
 	return phone_id
@@ -127,7 +130,7 @@ def send_reply(workspace, conversation, message, follow_up=None):
 	config = _delivery_config(workspace, doc)
 	phone_id = _phone_id(doc, config)
 	log = frappe.get_doc({
-		"doctype": "VerityAI WhatsApp Message", "workspace": workspace, "conversation": conversation,
+		"doctype": "VerityAI WhatsApp Message", "workspace": workspace, "conversation": doc.name,
 		"follow_up": follow_up, "direction": "Outbound", "recipient": doc.user_identifier,
 		"phone_number_id": phone_id, "message": message, "status": "Sending",
 	}).insert(ignore_permissions=True)
@@ -140,30 +143,30 @@ def send_reply(workspace, conversation, message, follow_up=None):
 		log.save(ignore_permissions=True)
 		if follow_up:
 			frappe.db.set_value("VerityAI Conversation Follow Up", follow_up, {"status": "Failed", "error": error})
-		return {"conversation": conversation, "sent": False, "status": "Failed", "error": error, "delivery_log": log.name}
+		return {"conversation": doc.name, "sent": False, "status": "Failed", "error": error, "delivery_log": log.name}
 	message_id = result["message_id"]
 	log.meta_message_id, log.status, log.accepted_on = message_id, "Accepted", now_datetime()
 	log.save(ignore_permissions=True)
 	_append_reply(doc, message, message_id=message_id, delivery_status="Accepted")
-	if follow_up and frappe.db.exists("VerityAI Conversation Follow Up", {"name": follow_up, "workspace": workspace, "conversation": conversation}):
+	if follow_up and frappe.db.exists("VerityAI Conversation Follow Up", {"name": follow_up, "workspace": workspace, "conversation": doc.name}):
 		frappe.db.set_value("VerityAI Conversation Follow Up", follow_up, {"status": "Sent", "sent_on": now_datetime(), "error": None})
-	return {"conversation": conversation, "sent": True, "status": "Accepted", "message_id": message_id, "delivery_method": log.delivery_method, "delivery_log": log.name}
+	return {"conversation": doc.name, "sent": True, "status": "Accepted", "message_id": message_id, "delivery_method": log.delivery_method, "delivery_log": log.name}
 
 
 def start_conversation(workspace, phone_number, message=None):
 	"""Create the same deterministic session key used by the inbound webhook."""
 	phone = _phone_number(phone_number)
 	tenant = engine.get_workspace_engine_tenant(workspace)
-	config = _delivery_config(workspace)
+	session = get_or_create_session(tenant, canonical_whatsapp_session_id(phone), "WhatsApp", phone)
+	config = _delivery_config(workspace, session)
 	phone_id = _phone_id(frappe._dict(), config)
-	session = get_or_create_session(
-		tenant, f"wa_{phone_id}_{phone}", "WhatsApp", phone,
-		channel_account=config.name if config.doctype == "VerityAI WhatsApp Setup" else None,
-		channel_phone_number_id=phone_id,
-	)
+	if not session.channel_account and config.doctype == "VerityAI WhatsApp Setup":
+		session.channel_account = config.name
+	if not session.channel_phone_number_id:
+		session.channel_phone_number_id = phone_id
 	if session.status == "Closed":
 		session.status = "Open"
-		session.save(ignore_permissions=True)
+	session.save(ignore_permissions=True)
 	sent, warning = False, None
 	if str(message or "").strip():
 		result = send_reply(workspace, session.name, message)
@@ -209,8 +212,8 @@ def retry(workspace, follow_up):
 
 
 def list_for_conversation(workspace, conversation):
-	crm.require_conversation(workspace, conversation)
-	return frappe.get_all("VerityAI Conversation Follow Up", filters={"workspace": workspace, "conversation": conversation}, fields=["name", "due_at", "message", "status", "sent_on", "error"], order_by="due_at desc", limit=50)
+	doc = crm.require_conversation(workspace, conversation)
+	return frappe.get_all("VerityAI Conversation Follow Up", filters={"workspace": workspace, "conversation": doc.name}, fields=["name", "due_at", "message", "status", "sent_on", "error"], order_by="due_at desc", limit=50)
 
 
 def _generic_follow_up(text):

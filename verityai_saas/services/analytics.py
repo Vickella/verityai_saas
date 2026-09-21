@@ -40,8 +40,9 @@ def workspace_analytics(workspace_name, from_date=None, to_date=None):
 	end_time = f"{end} 23:59:59"
 	usage_rows = frappe.db.sql("""select date(creation) as date, coalesce(sum(total_tokens),0) as tokens, coalesce(sum(estimated_cost),0) as cost, count(name) as requests from `tabAI Usage Log` where tenant=%s and status='Success' and creation between %s and %s group by date(creation) order by date(creation)""", (tenant, start, end_time), as_dict=True)
 	lead_rows = frappe.db.sql("""select date(creation) as date, count(name) as leads from `tabAI Lead` where tenant=%s and creation between %s and %s group by date(creation) order by date(creation)""", (tenant, start, end_time), as_dict=True)
-	conversation_rows = frappe.db.sql("""select date(creation) as date, count(name) as conversations from `tabAI Chat Session` where tenant=%s and creation between %s and %s group by date(creation) order by date(creation)""", (tenant, start, end_time), as_dict=True)
-	channel_rows = frappe.get_all("AI Chat Session", filters={"tenant": tenant, "creation": ["between", [start, end_time]]}, fields=["platform", "count(name) as total"], group_by="platform")
+	merged_clause = " and (merged_into is null or merged_into='')" if frappe.get_meta("AI Chat Session").has_field("merged_into") else ""
+	conversation_rows = frappe.db.sql(f"""select date(creation) as date, count(name) as conversations from `tabAI Chat Session` where tenant=%s and creation between %s and %s{merged_clause} group by date(creation) order by date(creation)""", (tenant, start, end_time), as_dict=True)
+	channel_rows = frappe.get_all("AI Chat Session", filters=engine.active_conversation_filters(tenant, {"creation": ["between", [start, end_time]]}), fields=["platform", "count(name) as total"], group_by="platform")
 	lead_status_rows = frappe.get_all("AI Lead", filters={"tenant": tenant, "creation": ["between", [start, end_time]]}, fields=["status", "count(name) as total"], group_by="status")
 	billing_rows = frappe.db.sql("""select date(creation) as date, coalesce(sum(case when event_type='Payment' and status='Completed' then amount else 0 end),0) as revenue, coalesce(sum(case when event_type='Refund' and status='Completed' then amount else 0 end),0) as refunds from `tabVerityAI Billing Event` where workspace=%s and creation between %s and %s group by date(creation) order by date(creation)""", (workspace_name, start, end_time), as_dict=True)
 	return {
@@ -74,7 +75,7 @@ def workspace_export(workspace_name, from_date=None, to_date=None):
 	start, end = data["from_date"], data["to_date"]
 	end_time = f"{end} 23:59:59"
 	leads = frappe.get_all("AI Lead", filters={"tenant": tenant, "creation": ["between", [start, end_time]]}, fields=["name", "lead_name", "email", "phone", "source_channel", "status", "creation"], order_by="creation asc", limit_page_length=10000)
-	conversations = frappe.get_all("AI Chat Session", filters={"tenant": tenant, "creation": ["between", [start, end_time]]}, fields=["name", "session_id", "platform", "user_identifier", "status", "estimated_deal_value", "creation", "modified"], order_by="creation asc", limit_page_length=10000)
+	conversations = frappe.get_all("AI Chat Session", filters=engine.active_conversation_filters(tenant, {"creation": ["between", [start, end_time]]}), fields=["name", "session_id", "platform", "user_identifier", "status", "estimated_deal_value", "creation", "modified"], order_by="creation asc", limit_page_length=10000)
 	usage = frappe.get_all("AI Usage Log", filters={"tenant": tenant, "creation": ["between", [start, end_time]]}, fields=["name", "chat_session", "platform", "input_tokens", "output_tokens", "total_tokens", "estimated_cost", "status", "creation"], order_by="creation asc", limit_page_length=10000)
 	billing = frappe.get_all("VerityAI Billing Event", filters={"workspace": workspace_name, "creation": ["between", [start, end_time]]}, fields=["name", "event_type", "amount", "currency", "status", "provider", "gateway_reference", "creation", "paid_on"], order_by="creation asc", limit_page_length=10000)
 	files = {
@@ -96,7 +97,7 @@ def operator_summary_csv():
 	for workspace in frappe.get_all("VerityAI Workspace", fields=["name", "business_name", "status", "engine_tenant"], order_by="name"):
 		subscription = frappe.db.get_value("VerityAI Subscription", {"workspace": workspace.name}, ["plan", "status"], as_dict=True, order_by="creation desc") or {}
 		wallet = frappe.db.get_value("VerityAI Usage Wallet", {"workspace": workspace.name}, ["tokens_used", "tokens_remaining", "status"], as_dict=True) or {}
-		rows.append([workspace.name, workspace.business_name, workspace.status, subscription.get("plan"), subscription.get("status"), wallet.get("tokens_used"), wallet.get("tokens_remaining"), wallet.get("status"), frappe.db.count("AI Lead", {"tenant": workspace.engine_tenant}), frappe.db.count("AI Chat Session", {"tenant": workspace.engine_tenant})])
+		rows.append([workspace.name, workspace.business_name, workspace.status, subscription.get("plan"), subscription.get("status"), wallet.get("tokens_used"), wallet.get("tokens_remaining"), wallet.get("status"), frappe.db.count("AI Lead", {"tenant": workspace.engine_tenant}), frappe.db.count("AI Chat Session", engine.active_conversation_filters(workspace.engine_tenant))])
 	return _csv_bytes(["workspace", "business_name", "workspace_status", "plan", "subscription_status", "tokens_used", "tokens_remaining", "wallet_status", "leads", "conversations"], rows)
 
 
