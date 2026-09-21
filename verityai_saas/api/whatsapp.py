@@ -64,3 +64,10 @@ def subscribe_waba(workspace, account=None):
 	else:
 		require_workspace_permission(workspace, "manage_whatsapp")
 	return whatsapp.subscribe_waba(workspace, account=account)
+
+
+@frappe.whitelist(methods=["POST"])
+@endpoint
+def verify_reengagement_template(workspace, account=None):
+	require_workspace_permission(workspace, "manage_whatsapp")
+	return whatsapp.verify_reengagement_template(workspace, account=account)

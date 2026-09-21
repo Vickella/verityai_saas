@@ -1,12 +1,13 @@
 import frappe
 from frappe.tests.utils import FrappeTestCase
 from frappe.utils import add_to_date, now_datetime
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from verityai_saas import setup_doctypes
 from verityai_saas.api import conversations as conversations_api
 from verityai_saas.api import leads as leads_api
-from verityai_saas.services import followups
+from verityai_saas.services import followups, whatsapp
 from verityai_saas.services.onboarding import create_workspace
 from verityai_saas.tests.cleanup import cleanup_all_test_fixtures, cleanup_test_workspace
 
@@ -40,7 +41,7 @@ class TestCRMOperations(FrappeTestCase):
 		return frappe.get_doc({"doctype": "AI Lead", "tenant": self.tenant, "lead_name": name, "email": email, "source_channel": "Web", "status": status}).insert(ignore_permissions=True)
 
 	def make_conversation(self, identifier, platform="Web"):
-		return frappe.get_doc({"doctype": "AI Chat Session", "tenant": self.tenant, "session_id": frappe.generate_hash(), "platform": platform, "user_identifier": identifier, "status": "Open", "chat_history": frappe.as_json([{"role": "system", "content": "private system prompt"}, {"role": "user", "content": "We need manufacturing stock visibility"}, {"role": "assistant", "content": "I can help capture that requirement."}, {"role": "assistant", "content": "  "}, {"role": "tool", "content": "private tool payload"}])}).insert(ignore_permissions=True)
+		return frappe.get_doc({"doctype": "AI Chat Session", "tenant": self.tenant, "session_id": frappe.generate_hash(), "platform": platform, "user_identifier": identifier, "last_customer_message_on": now_datetime() if platform == "WhatsApp" else None, "status": "Open", "chat_history": frappe.as_json([{"role": "system", "content": "private system prompt"}, {"role": "user", "content": "We need manufacturing stock visibility"}, {"role": "assistant", "content": "I can help capture that requirement."}, {"role": "assistant", "content": "  "}, {"role": "tool", "content": "private tool payload"}])}).insert(ignore_permissions=True)
 
 	def test_lead_search_pagination_assignment_notes_status_and_funnel(self):
 		first = self.make_lead("Alpha Buyer", "alpha@example.com")
@@ -208,12 +209,87 @@ class TestCRMOperations(FrappeTestCase):
 		self.assertEqual(frappe.parse_json(frappe.db.get_value("AI Chat Session", conversation.name, "chat_history")), before)
 		self.assertEqual(frappe.db.get_value("VerityAI WhatsApp Message", result["delivery_log"], "status"), "Failed")
 
+	def test_stale_conversation_uses_verified_template_and_preserves_edited_message(self):
+		conversation = self.make_conversation("263771234570", platform="WhatsApp")
+		conversation.last_customer_message_on = add_to_date(now_datetime(), days=-2)
+		conversation.save(ignore_permissions=True)
+		setup = frappe.get_doc("VerityAI WhatsApp Setup", frappe.db.get_value("VerityAI WhatsApp Setup", {"workspace": self.workspace}, "name"))
+		setup.whatsapp_phone_id = "phone-template"
+		setup.whatsapp_access_token = "test-token"
+		setup.reengagement_template_name = "sales_follow_up"
+		setup.reengagement_template_language = "en_US"
+		setup.reengagement_template_status = "Approved"
+		setup.save(ignore_permissions=True)
+		conversation.channel_account = setup.name
+		conversation.channel_phone_number_id = setup.whatsapp_phone_id
+		conversation.save(ignore_permissions=True)
+		frappe.set_user(self.owner)
+		message = "Would you like me to send the onboarding form for your manufacturing team?"
+		with patch("verityai_saas.services.followups.send_whatsapp_template_result", return_value={"accepted": True, "message_id": "wamid.template", "status": "accepted", "error": None, "delivery_method": "Template", "template_name": "sales_follow_up"}) as template_sender, patch("verityai_saas.services.followups.send_whatsapp_message_result") as text_sender:
+			result = conversations_api.send_reply(self.workspace, conversation.name, message)["data"]
+		self.assertTrue(result["sent"])
+		self.assertEqual(result["delivery_method"], "Template")
+		template_sender.assert_called_once()
+		self.assertEqual(template_sender.call_args.args, ("phone-template", conversation.user_identifier, message, "sales_follow_up", "en_US"))
+		self.assertEqual(template_sender.call_args.kwargs["config"].name, setup.name)
+		text_sender.assert_not_called()
+		self.assertEqual(frappe.db.get_value("VerityAI WhatsApp Message", result["delivery_log"], "message"), message)
+
+	def test_stale_conversation_never_attempts_invalid_free_form_delivery(self):
+		conversation = self.make_conversation("263771234571", platform="WhatsApp")
+		conversation.last_customer_message_on = add_to_date(now_datetime(), days=-2)
+		conversation.save(ignore_permissions=True)
+		setup = frappe.get_doc("VerityAI WhatsApp Setup", frappe.db.get_value("VerityAI WhatsApp Setup", {"workspace": self.workspace}, "name"))
+		setup.whatsapp_phone_id = "phone-no-template"
+		setup.reengagement_template_name = None
+		setup.reengagement_template_status = "Not Configured"
+		setup.save(ignore_permissions=True)
+		conversation.channel_account = setup.name
+		conversation.channel_phone_number_id = setup.whatsapp_phone_id
+		conversation.save(ignore_permissions=True)
+		frappe.set_user(self.owner)
+		with patch("verityai_saas.services.followups.send_whatsapp_message_result") as text_sender, patch("verityai_saas.services.followups.send_whatsapp_template_result") as template_sender:
+			result = conversations_api.send_reply(self.workspace, conversation.name, "Can we continue with your website setup?")["data"]
+		self.assertFalse(result["sent"])
+		self.assertIn("approved WhatsApp follow-up template", result["error"])
+		text_sender.assert_not_called()
+		template_sender.assert_not_called()
+
+	@patch("requests.get")
+	def test_follow_up_template_verification_requires_approved_single_body_variable(self, get):
+		setup = frappe.get_doc("VerityAI WhatsApp Setup", frappe.db.get_value("VerityAI WhatsApp Setup", {"workspace": self.workspace}, "name"))
+		setup.whatsapp_access_token = "test-token"
+		setup.meta_waba_id = "waba-one"
+		setup.reengagement_template_name = "sales_follow_up"
+		setup.reengagement_template_language = "en_US"
+		setup.save(ignore_permissions=True)
+		get.return_value.content = b"payload"
+		get.return_value.ok = True
+		get.return_value.json.return_value = {"data": [{"name": "sales_follow_up", "language": "en_US", "status": "APPROVED", "components": [{"type": "BODY", "text": "Following up on our conversation: {{1}}"}]}]}
+		result = whatsapp.verify_reengagement_template(self.workspace, setup.name)
+		self.assertTrue(result["approved"])
+		self.assertEqual(frappe.db.get_value(setup.doctype, setup.name, "reengagement_template_status"), "Approved")
+
 	def test_conversation_ui_has_mobile_single_thread_and_desktop_composer_controls(self):
 		with open(frappe.get_app_path("verityai_saas", "public", "js", "portal.js"), encoding="utf-8") as source:
 			javascript = source.read()
 		with open(frappe.get_app_path("verityai_saas", "public", "css", "portal.css"), encoding="utf-8") as source:
 			stylesheet = source.read()
-		for marker in ("mobile-chat-open", "va-chat-back", "send-whatsapp-reply", "retry_follow_up", "Sync messages"):
+		for marker in ("mobile-chat-open", "va-chat-back", "send-whatsapp-reply", "retry_follow_up", "Sync messages", "Verify follow-up template", 'maxlength="1000"', "preserveScrollTop", "wasAtBottom", "chatRenderSequence"):
 			self.assertIn(marker, javascript)
 		for marker in (".va-chat-app.mobile-chat-open", ".va-chat-layout.chat-open .va-chat-sidebar", "overflow-y: auto", "grid-template-rows: auto minmax(0,1fr) auto"):
 			self.assertIn(marker, stylesheet)
+
+	def test_generic_follow_up_copy_is_rejected_before_operator_review(self):
+		self.assertTrue(followups._generic_follow_up("Just checking in. Let me know how I can assist."))
+		self.assertFalse(followups._generic_follow_up("Would you like me to send the onboarding form for your logistics website now?"))
+
+	def test_ai_draft_repairs_generic_copy_with_conversation_context(self):
+		conversation = self.make_conversation("263771234572", platform="WhatsApp")
+		generic = SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content="Just checking in. Let me know how I can assist."))])
+		contextual = SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content="Would you like me to arrange the manufacturing stock-visibility demo this week?"))])
+		with patch("verityai_saas.services.followups.get_config", return_value={"model_name": "test-model"}), patch("verityai_saas.services.followups.assert_usage_within_limit"), patch("verityai_saas.services.followups.get_client", return_value=object()), patch("verityai_saas.services.followups.create_chat_completion", side_effect=[generic, contextual]) as completion, patch("verityai_saas.services.followups.extract_usage", return_value={}), patch("verityai_saas.services.followups.log_usage"):
+			result = followups.draft(self.workspace, conversation.name)
+		self.assertEqual(result["message"], "Would you like me to arrange the manufacturing stock-visibility demo this week?")
+		self.assertEqual(completion.call_count, 2)
+		self.assertIn("generic", completion.call_args.args[3][-1]["content"])

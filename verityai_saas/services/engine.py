@@ -337,7 +337,7 @@ def get_conversation(workspace_name, conversation_name):
 	if not display_name and doc.platform == "Web":
 		web_names = frappe.get_all("AI Chat Session", filters={"tenant": tenant, "platform": "Web"}, pluck="name", order_by="creation asc")
 		display_name = f"WEB v{web_names.index(doc.name) + 1}" if doc.name in web_names else "WEB visitor"
-	return {"name": doc.name, "platform": doc.platform, "user_identifier": doc.user_identifier, "display_name": display_name or doc.session_id, "status": doc.status, "estimated_deal_value": doc.estimated_deal_value, "history": public_history, "lead": lead}
+	return {"name": doc.name, "platform": doc.platform, "user_identifier": doc.user_identifier, "display_name": display_name or doc.session_id, "status": doc.status, "estimated_deal_value": doc.estimated_deal_value, "last_customer_message_on": doc.get("last_customer_message_on"), "history": public_history, "lead": lead}
 
 
 def get_workspace_leads(workspace_name, filters=None):

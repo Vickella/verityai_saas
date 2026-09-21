@@ -1,3 +1,5 @@
+import re
+
 import frappe
 from frappe.utils import cint, get_url, now_datetime, time_diff_in_hours
 
@@ -78,11 +80,21 @@ def configure(workspace_name, values, account=None, creating=False):
 		"active": cint(values.get("active", setup.active if not setup.is_new() else 1)),
 		"verify_meta_signature": cint(values.get("verify_meta_signature", setup.verify_meta_signature if not setup.is_new() else 1)),
 	})
+	if "reengagement_template_name" in values or "reengagement_template_language" in values:
+		old_template = (str(setup.reengagement_template_name or "").strip(), str(setup.reengagement_template_language or "en_US").strip())
+		new_template = (
+			str(values.get("reengagement_template_name") if "reengagement_template_name" in values else setup.reengagement_template_name or "").strip(),
+			str(values.get("reengagement_template_language") if "reengagement_template_language" in values else setup.reengagement_template_language or "en_US").strip() or "en_US",
+		)
+		setup.reengagement_template_name, setup.reengagement_template_language = new_template
+		if new_template != old_template:
+			setup.reengagement_template_status = "Not Checked" if new_template[0] else "Not Configured"
 	if "meta_waba_id" in values:
 		new_waba = str(values.get("meta_waba_id") or "").strip()
 		if new_waba != str(setup.meta_waba_id or "").strip():
 			setup.meta_waba_id = new_waba
 			setup.waba_subscription_status = "Not Checked" if new_waba else "Missing"
+			setup.reengagement_template_status = "Not Checked" if setup.reengagement_template_name else "Not Configured"
 			changed = True
 	for fieldname in SECRET_FIELDS:
 		if values.get(fieldname) not in (None, ""):
@@ -142,7 +154,7 @@ def _account_status(setup):
 
 
 def _safe_account(setup):
-	fields = ("name", "account_label", "active", "is_default", "mode", "business_whatsapp_number", "whatsapp_button_enabled", "lead_alert_enabled", "full_ai_enabled", "setup_status", "whatsapp_phone_id", "meta_waba_id", "waba_subscription_status", "last_subscription_check_on", "meta_phone_number_id_status", "access_token_status", "webhook_status", "signature_verification_status", "last_tested_on", "last_webhook_on", "last_webhook_event")
+	fields = ("name", "account_label", "active", "is_default", "mode", "business_whatsapp_number", "whatsapp_button_enabled", "lead_alert_enabled", "full_ai_enabled", "setup_status", "whatsapp_phone_id", "meta_waba_id", "waba_subscription_status", "last_subscription_check_on", "meta_phone_number_id_status", "access_token_status", "webhook_status", "signature_verification_status", "last_tested_on", "last_webhook_on", "last_webhook_event", "reengagement_template_name", "reengagement_template_language", "reengagement_template_status")
 	data = {fieldname: setup.get(fieldname) for fieldname in fields}
 	data["engine"] = _account_status(setup)
 	data["configuration_ready"] = bool(data["engine"]["phone_id_present"] and data["engine"]["access_token_present"] and data["engine"]["verify_token_present"] and (not data["engine"]["signature_verification_enabled"] or data["engine"]["app_secret_present"]))
@@ -259,6 +271,57 @@ def subscribe_waba(workspace_name, account=None):
 		setup.waba_subscription_status = "Subscribed"
 		setup.save(ignore_permissions=True)
 	return {"account": setup.name, "accepted": True, "subscribed": verification["subscribed"], "status": setup.waba_subscription_status, "applications": verification["applications"], "verification_warning": warning, "checked_at": setup.last_subscription_check_on}
+
+
+def verify_reengagement_template(workspace_name, account=None):
+	"""Confirm Meta approved a one-body-variable template for natural edited follow-ups."""
+	import requests
+
+	setup = _get_setup(workspace_name, account, required=True)
+	token = _password(setup, "whatsapp_access_token")
+	waba_id = str(setup.meta_waba_id or "").strip()
+	name = str(setup.reengagement_template_name or "").strip()
+	language = str(setup.reengagement_template_language or "en_US").strip()
+	if not setup.active or not token or not waba_id or not name:
+		frappe.throw("An active account, access token, WABA ID, and follow-up template name are required.", frappe.ValidationError)
+	try:
+		response = requests.get(
+			f"https://graph.facebook.com/{_graph_version()}/{waba_id}/message_templates",
+			headers={"Authorization": f"Bearer {token}"},
+			params={"name": name, "fields": "name,status,language,components", "limit": 100},
+			timeout=20,
+		)
+		payload = response.json() if response.content else {}
+	except Exception as exc:
+		frappe.throw(f"Meta template verification failed: {str(exc)[:200]}", frappe.ValidationError)
+	if not response.ok:
+		error = payload.get("error") if isinstance(payload, dict) else {}
+		detail = (error.get("message") if isinstance(error, dict) else None) or response.reason or "Unknown error"
+		frappe.throw(f"Meta rejected the template check: {detail[:200]}", frappe.ValidationError)
+	templates = payload.get("data") if isinstance(payload, dict) else []
+	match = next((row for row in templates or [] if row.get("name") == name and row.get("language") == language), None)
+	valid, reason = False, "The named language variant was not found."
+	if match:
+		status = str(match.get("status") or "").upper()
+		components = match.get("components") or []
+		body = next((row for row in components if str(row.get("type") or "").upper() == "BODY"), {})
+		body_variables = set(re.findall(r"\{\{(\d+)\}\}", str(body.get("text") or "")))
+		other_variables = set()
+		for component in components:
+			if component is not body:
+				other_variables.update(re.findall(r"\{\{(\d+)\}\}", frappe.as_json(component)))
+		valid = status == "APPROVED" and body_variables == {"1"} and not other_variables
+		if status != "APPROVED":
+			reason = f"Meta reports template status {status or 'UNKNOWN'}."
+		elif body_variables != {"1"}:
+			reason = "The BODY must contain exactly the {{1}} message variable."
+		elif other_variables:
+			reason = "Header and button variables are not supported for automatic follow-ups."
+		else:
+			reason = "Approved and ready for natural edited follow-ups."
+	setup.reengagement_template_status = "Approved" if valid else "Rejected"
+	setup.save(ignore_permissions=True)
+	return {"account": setup.name, "approved": valid, "status": setup.reengagement_template_status, "message": reason, "template": name, "language": language}
 
 
 def _graph_version():
