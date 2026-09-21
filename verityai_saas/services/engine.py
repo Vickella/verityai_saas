@@ -299,6 +299,8 @@ def get_workspace_conversations(workspace_name, filters=None):
 	if search:
 		or_filters = {"session_id": ["like", f"%{search}%"], "user_identifier": ["like", f"%{search}%"]}
 	rows = frappe.get_all("AI Chat Session", filters=query, or_filters=or_filters, fields=["name", "session_id", "platform", "user_identifier", "status", "estimated_deal_value", "modified", "chat_history"], order_by="modified desc", limit_start=start, limit_page_length=limit)
+	web_names = frappe.get_all("AI Chat Session", filters={"tenant": tenant, "platform": "Web"}, pluck="name", order_by="creation asc")
+	web_labels = {name: f"WEB v{index}" for index, name in enumerate(web_names, start=1)}
 	for row in rows:
 		try:
 			history = json.loads(row.pop("chat_history", None) or "[]")
@@ -307,6 +309,7 @@ def get_workspace_conversations(workspace_name, filters=None):
 		last = next((item for item in reversed(history) if isinstance(item, dict) and item.get("role") in {"user", "assistant"} and str(item.get("content") or "").strip()), None)
 		row["last_message"] = str((last or {}).get("content") or "").strip()[:140]
 		row["last_role"] = (last or {}).get("role")
+		row["display_name"] = row.user_identifier or web_labels.get(row.name) or row.session_id
 	return rows
 
 def get_conversation(workspace_name, conversation_name):
@@ -326,7 +329,11 @@ def get_conversation(workspace_name, conversation_name):
 		if content:
 			public_history.append({"role": item["role"], "content": content})
 	lead = frappe.db.get_value("AI Lead", {"tenant": tenant, "chat_session": doc.name}, "name")
-	return {"name": doc.name, "platform": doc.platform, "user_identifier": doc.user_identifier, "status": doc.status, "estimated_deal_value": doc.estimated_deal_value, "history": public_history, "lead": lead}
+	display_name = doc.user_identifier
+	if not display_name and doc.platform == "Web":
+		web_names = frappe.get_all("AI Chat Session", filters={"tenant": tenant, "platform": "Web"}, pluck="name", order_by="creation asc")
+		display_name = f"WEB v{web_names.index(doc.name) + 1}" if doc.name in web_names else "WEB visitor"
+	return {"name": doc.name, "platform": doc.platform, "user_identifier": doc.user_identifier, "display_name": display_name or doc.session_id, "status": doc.status, "estimated_deal_value": doc.estimated_deal_value, "history": public_history, "lead": lead}
 
 
 def get_workspace_leads(workspace_name, filters=None):

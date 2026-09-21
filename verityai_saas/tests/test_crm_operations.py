@@ -6,6 +6,7 @@ from unittest.mock import patch
 from verityai_saas import setup_doctypes
 from verityai_saas.api import conversations as conversations_api
 from verityai_saas.api import leads as leads_api
+from verityai_saas.services import followups
 from verityai_saas.services.onboarding import create_workspace
 from verityai_saas.tests.cleanup import cleanup_all_test_fixtures, cleanup_test_workspace
 
@@ -148,3 +149,45 @@ class TestCRMOperations(FrappeTestCase):
 		self.assertEqual(row["last_role"], "assistant")
 		self.assertNotIn("chat_history", row)
 		self.assertNotIn("private tool payload", frappe.as_json(row))
+
+	def test_web_visitors_receive_stable_numbered_labels(self):
+		first = self.make_conversation("")
+		second = self.make_conversation("")
+		frappe.set_user(self.owner)
+		rows = conversations_api.list_conversations(self.workspace, platform="Web")["data"]["rows"]
+		labels = {row["name"]: row["display_name"] for row in rows}
+		self.assertEqual(labels[first.name], "WEB v1")
+		self.assertEqual(labels[second.name], "WEB v2")
+		self.assertEqual(conversations_api.detail(self.workspace, second.name)["data"]["display_name"], "WEB v2")
+
+	def test_due_follow_up_uses_the_conversations_whatsapp_account(self):
+		conversation = self.make_conversation("263771234567", platform="WhatsApp")
+		setup_name = frappe.db.get_value("VerityAI WhatsApp Setup", {"workspace": self.workspace}, "name")
+		setup = frappe.get_doc("VerityAI WhatsApp Setup", setup_name)
+		setup.whatsapp_phone_id = "phone-account-1"
+		setup.whatsapp_access_token = "test-token"
+		setup.is_default = 1
+		setup.save(ignore_permissions=True)
+		conversation.channel_account = setup.name
+		conversation.channel_phone_number_id = setup.whatsapp_phone_id
+		conversation.save(ignore_permissions=True)
+		follow_up = frappe.get_doc({
+			"doctype": "VerityAI Conversation Follow Up", "workspace": self.workspace,
+			"conversation": conversation.name, "due_at": now_datetime(), "recipient": conversation.user_identifier,
+			"message": "Checking whether you would like to continue.", "status": "Scheduled",
+		}).insert(ignore_permissions=True)
+		with patch("verityai_saas.services.followups.send_whatsapp_message", return_value=True) as sender:
+			followups.process_due_followups()
+			self.assertEqual(sender.call_args.args[0], "phone-account-1")
+			self.assertEqual(sender.call_args.kwargs["config"].name, setup.name)
+		self.assertEqual(frappe.db.get_value(follow_up.doctype, follow_up.name, "status"), "Sent")
+
+	def test_conversation_ui_has_mobile_single_thread_and_desktop_composer_controls(self):
+		with open(frappe.get_app_path("verityai_saas", "public", "js", "portal.js"), encoding="utf-8") as source:
+			javascript = source.read()
+		with open(frappe.get_app_path("verityai_saas", "public", "css", "portal.css"), encoding="utf-8") as source:
+			stylesheet = source.read()
+		for marker in ("mobile-chat-open", "va-chat-back", "send-whatsapp-reply", "retry_follow_up", "Sync messages"):
+			self.assertIn(marker, javascript)
+		for marker in (".va-chat-app.mobile-chat-open", ".va-chat-layout.chat-open .va-chat-sidebar", "overflow-y: auto", "grid-template-rows: auto minmax(0,1fr) auto"):
+			self.assertIn(marker, stylesheet)

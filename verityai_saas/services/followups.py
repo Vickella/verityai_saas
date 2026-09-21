@@ -50,6 +50,22 @@ def _whatsapp_conversation(workspace, conversation):
 	return doc
 
 
+def _delivery_config(workspace, doc=None):
+	doc = doc or frappe._dict()
+	account = doc.get("channel_account")
+	name = None
+	if account:
+		name = frappe.db.get_value("VerityAI WhatsApp Setup", {"name": account, "workspace": workspace, "active": 1}, "name")
+	elif doc.get("channel_phone_number_id"):
+		name = frappe.db.get_value("VerityAI WhatsApp Setup", {"workspace": workspace, "active": 1, "whatsapp_phone_id": doc.get("channel_phone_number_id")}, "name")
+	if not name and not account:
+		for candidate in frappe.get_all("VerityAI WhatsApp Setup", filters={"workspace": workspace, "active": 1}, fields=["name", "whatsapp_phone_id"], order_by="is_default desc, creation asc"):
+			if str(candidate.whatsapp_phone_id or "").strip():
+				name = candidate.name
+				break
+	return frappe.get_doc("VerityAI WhatsApp Setup", name) if name else engine.get_engine_configuration(workspace)
+
+
 def _phone_id(doc, config):
 	phone_id = str(doc.get("channel_phone_number_id") or config.get("whatsapp_phone_id") or "").strip()
 	if not phone_id:
@@ -72,7 +88,7 @@ def _append_reply(doc, message):
 def send_reply(workspace, conversation, message, follow_up=None):
 	doc = _whatsapp_conversation(workspace, conversation)
 	message = _message(message)
-	config = engine.get_engine_configuration(workspace)
+	config = _delivery_config(workspace, doc)
 	if not send_whatsapp_message(_phone_id(doc, config), doc.user_identifier, message, config=config):
 		frappe.throw(_("WhatsApp did not accept the message. Check the connection and the 24-hour messaging window."), frappe.ValidationError)
 	_append_reply(doc, message)
@@ -85,10 +101,11 @@ def start_conversation(workspace, phone_number, message=None):
 	"""Create the same deterministic session key used by the inbound webhook."""
 	phone = _phone_number(phone_number)
 	tenant = engine.get_workspace_engine_tenant(workspace)
-	config = engine.get_engine_configuration(workspace)
+	config = _delivery_config(workspace)
 	phone_id = _phone_id(frappe._dict(), config)
 	session = get_or_create_session(
 		tenant, f"wa_{phone_id}_{phone}", "WhatsApp", phone,
+		channel_account=config.name if config.doctype == "VerityAI WhatsApp Setup" else None,
 		channel_phone_number_id=phone_id,
 	)
 	if session.status == "Closed":
@@ -126,6 +143,18 @@ def cancel(workspace, follow_up):
 		frappe.throw(_("Scheduled follow-up was not found."), frappe.DoesNotExistError)
 	frappe.db.set_value("VerityAI Conversation Follow Up", follow_up, "status", "Cancelled")
 	return {"cancelled": follow_up}
+
+
+def retry(workspace, follow_up):
+	if not frappe.db.exists("VerityAI Conversation Follow Up", {"name": follow_up, "workspace": workspace, "status": "Failed"}):
+		frappe.throw(_("Failed follow-up was not found."), frappe.DoesNotExistError)
+	doc = frappe.get_doc("VerityAI Conversation Follow Up", follow_up)
+	frappe.db.set_value(doc.doctype, doc.name, {"status": "Sending", "error": None})
+	try:
+		return send_reply(workspace, doc.conversation, doc.message, follow_up=doc.name)
+	except Exception as exc:
+		frappe.db.set_value(doc.doctype, doc.name, {"status": "Failed", "error": str(exc)[:500]})
+		raise
 
 
 def list_for_conversation(workspace, conversation):

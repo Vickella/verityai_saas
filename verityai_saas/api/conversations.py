@@ -81,6 +81,13 @@ def cancel_follow_up(workspace, follow_up):
 	return followups.cancel(workspace, follow_up)
 
 
+@frappe.whitelist(methods=["POST"])
+@endpoint
+def retry_follow_up(workspace, follow_up):
+	require_workspace_permission(workspace, "manage_conversations")
+	return followups.retry(workspace, follow_up)
+
+
 def _csv_safe(value):
 	value = str(value or "")
 	return chr(9) + value if value[:1] in {"=", "+", "-", "@"} else value
