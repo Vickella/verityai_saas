@@ -1029,16 +1029,15 @@ def handle_ai_quote_status(tenant_name, quotation_reference=None, customer=None,
 	workspace = _workspace_for_tenant(tenant_name)
 	if not workspace:
 		return None
-	if not quotation_reference or not (customer or client_email or client_whatsapp_number):
-		return {"handled": True, "success": False, "error": "Please provide the quotation reference and matching customer contact details."}
+	if not quotation_reference or not (client_email or client_whatsapp_number):
+		return {"handled": True, "success": False, "error": "Please provide the quotation reference and matching email address or phone number."}
 	if not frappe.db.exists("VerityAI Quotation", {"name": quotation_reference, "workspace": workspace}):
 		return {"handled": True, "success": False, "error": "I could not find a matching quotation."}
 	quote = get_quotation(workspace, quotation_reference)
 	customer_doc = frappe.db.get_value("VerityAI Customer", quote.customer, ["customer_name", "email", "phone"], as_dict=True)
 	email_matches = bool(client_email and customer_doc.email and client_email.strip().lower() == customer_doc.email.strip().lower())
 	phone_matches = bool(client_whatsapp_number and customer_doc.phone and "".join(filter(str.isdigit, client_whatsapp_number)) == "".join(filter(str.isdigit, customer_doc.phone)))
-	name_matches = bool(customer and customer.strip().lower() == customer_doc.customer_name.strip().lower())
-	if not (email_matches or phone_matches or name_matches):
+	if not (email_matches or phone_matches):
 		return {"handled": True, "success": False, "error": "The contact details did not match this quotation."}
 	pdf_url = public_quotation_url(workspace, quote.name) if quote.status in {"Approved", "Sent", "Accepted"} else None
 	return {"handled": True, "success": True, "request": quote.name, "quotation": quote.name, "customer": quote.customer_name, "approval_status": quote.status, "quotation_status": quote.status, "total": quote.total, "currency": quote.currency, "pdf_url": pdf_url}

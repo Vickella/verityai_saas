@@ -204,6 +204,16 @@ class TestTenantNativeCommerce(FrappeTestCase):
 		)
 		self.assertTrue(created["handled"])
 		self.assertEqual(created["estimated_total"], 200)
+		name_only_status = commerce.handle_ai_quote_status(
+			self.created["engine_tenant"], created["quotation"], customer="AI Buyer",
+		)
+		self.assertFalse(name_only_status["success"])
+		self.assertIn("email address or phone number", name_only_status["error"])
+		mismatched_status = commerce.handle_ai_quote_status(
+			self.created["engine_tenant"], created["quotation"], customer="AI Buyer",
+			client_email="attacker@example.com",
+		)
+		self.assertFalse(mismatched_status["success"])
 		status = commerce.handle_ai_quote_status(
 			self.created["engine_tenant"], created["quotation"], client_email="ai-buyer@example.com"
 		)
