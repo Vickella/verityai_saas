@@ -2,6 +2,7 @@ from html import escape
 from io import BytesIO
 import hashlib
 import hmac
+import json
 import re
 import time
 from urllib.parse import urlencode
@@ -622,20 +623,33 @@ def convert_lead(workspace, lead, values=None):
 	existing_opportunity = frappe.db.get_value("VerityAI Sales Opportunity", {"workspace": workspace, "lead": lead_name}, ["name", "customer", "stage"], as_dict=True)
 	if existing_opportunity:
 		return {"lead": lead_name, "customer": existing_opportunity.customer, "opportunity": existing_opportunity.name, "stage": existing_opportunity.stage, "already_converted": True}
+	try:
+		qualification = json.loads(lead_doc.dynamic_details or "{}")
+	except (TypeError, ValueError):
+		qualification = {}
+	if not isinstance(qualification, dict):
+		qualification = {}
+	qualification_notes = "\n".join(
+		f"{str(key).replace('_', ' ').strip().title()}: {value if isinstance(value, str) else json.dumps(value, default=str)}"
+		for key, value in qualification.items()
+		if value not in (None, "")
+	)
+	lead_notes = "\n\n".join(part for part in (str(lead_doc.requirements or "").strip(), qualification_notes) if part)
 	customer = None
 	if lead_doc.email:
 		customer = frappe.db.get_value("VerityAI Customer", {"workspace": workspace, "email": lead_doc.email}, "name")
 	if not customer:
 		customer = frappe.db.get_value("VerityAI Customer", {"workspace": workspace, "customer_name": lead_doc.lead_name}, "name")
 	if not customer:
-		customer = save_customer(workspace, {"customer_name": lead_doc.lead_name, "email": lead_doc.email, "phone": lead_doc.phone, "notes": lead_doc.requirements}).name
+		customer = save_customer(workspace, {"customer_name": lead_doc.lead_name, "email": lead_doc.email, "phone": lead_doc.phone, "notes": lead_notes[:2000]}).name
 	frappe.db.set_value("VerityAI Customer", customer, {"source_lead": lead_name, "converted_on": now_datetime()})
 	opportunity = save_opportunity(workspace, {
 		"opportunity_name": values.get("opportunity_name") or f"{lead_doc.lead_name} opportunity",
 		"lead": lead_name, "customer": customer, "stage": values.get("stage") or "Qualified",
 		"amount": values.get("amount"), "currency": values.get("currency"), "probability": values.get("probability", 30),
 		"expected_close_date": values.get("expected_close_date"), "source": values.get("source") or lead_doc.source_channel,
-		"assigned_to": values.get("assigned_to"), "next_follow_up_on": values.get("next_follow_up_on"), "notes": values.get("notes") or lead_doc.requirements,
+		"assigned_to": values.get("assigned_to"), "next_follow_up_on": values.get("next_follow_up_on"),
+		"notes": "\n\n".join(part for part in (str(values.get("notes") or "").strip(), lead_notes) if part)[:10000],
 	})
 	lead_doc.status = "Qualified"
 	lead_doc.save(ignore_permissions=True)

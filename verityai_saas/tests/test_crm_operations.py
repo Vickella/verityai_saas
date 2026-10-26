@@ -314,6 +314,17 @@ class TestCRMOperations(FrappeTestCase):
 		text_sender.assert_not_called()
 		template_sender.assert_not_called()
 
+	def test_long_scheduled_follow_up_requires_verified_template_up_front(self):
+		conversation = self.make_conversation("263771234573", platform="WhatsApp")
+		setup = frappe.get_doc("VerityAI WhatsApp Setup", frappe.db.get_value("VerityAI WhatsApp Setup", {"workspace": self.workspace}, "name"))
+		setup.reengagement_template_name = None
+		setup.reengagement_template_status = "Not Configured"
+		setup.save(ignore_permissions=True)
+		frappe.set_user(self.owner)
+		due_at = add_to_date(now_datetime(), days=2)
+		with self.assertRaisesRegex(frappe.ValidationError, "approved re-engagement template"):
+			followups.schedule(self.workspace, conversation.name, "Can we continue with the demo?", due_at)
+
 	@patch("requests.get")
 	def test_follow_up_template_verification_requires_approved_single_body_variable(self, get):
 		setup = frappe.get_doc("VerityAI WhatsApp Setup", frappe.db.get_value("VerityAI WhatsApp Setup", {"workspace": self.workspace}, "name"))

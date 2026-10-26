@@ -210,6 +210,21 @@ def schedule(workspace, conversation, message, due_at):
 	due_at = get_datetime(due_at)
 	if due_at <= now_datetime():
 		frappe.throw(_("Choose a follow-up time in the future."), frappe.ValidationError)
+	config = _delivery_config(workspace, doc)
+	template_ready = bool(
+		str(config.get("reengagement_template_name") or "").strip()
+		and config.get("reengagement_template_status") == "Approved"
+	)
+	last_customer_message = doc.get("last_customer_message_on")
+	template_required = (
+		not last_customer_message
+		or due_at >= add_to_date(get_datetime(last_customer_message), hours=CUSTOMER_WINDOW_SAFETY_HOURS)
+	)
+	if template_required and not template_ready:
+		frappe.throw(
+			_("This follow-up will be sent outside WhatsApp's customer-service window. Configure and verify an approved re-engagement template before scheduling it."),
+			frappe.ValidationError,
+		)
 	return frappe.get_doc({
 		"doctype": "VerityAI Conversation Follow Up", "workspace": workspace,
 		"conversation": doc.name, "due_at": due_at, "recipient": doc.user_identifier,
@@ -325,7 +340,7 @@ def draft(workspace, conversation, instruction=None):
 	if instruction:
 		messages.append({"role": "user", "content": f"Operator drafting note: {str(instruction).strip()[:500]}"})
 	client = get_client(config)
-	response = create_chat_completion(client, config, config.get("model_name") or "gpt-4o-mini", messages)
+	response = create_chat_completion(client, config, config.get("model_name") or "gpt-4o-mini", messages, platform="WhatsApp")
 	text = clean_public_response(response.choices[0].message.content or "", "WhatsApp").strip()[:500]
 	responses = [response]
 	if _generic_follow_up(text):
@@ -333,7 +348,7 @@ def draft(workspace, conversation, instruction=None):
 			{"role": "assistant", "content": text},
 			{"role": "user", "content": "That draft is generic and does not advance this specific conversation. Rewrite it using a concrete fact, commitment, question, product, service, or next step from the transcript. Return only the improved message."},
 		]
-		response = create_chat_completion(client, config, config.get("model_name") or "gpt-4o-mini", repair_messages)
+		response = create_chat_completion(client, config, config.get("model_name") or "gpt-4o-mini", repair_messages, platform="WhatsApp")
 		responses.append(response)
 		text = clean_public_response(response.choices[0].message.content or "", "WhatsApp").strip()[:500]
 	if not text:

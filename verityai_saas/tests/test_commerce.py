@@ -292,11 +292,20 @@ class TestTenantNativeCommerce(FrappeTestCase):
 
 	def test_lead_conversion_creates_scoped_customer_and_opportunity(self):
 		lead = self.create_lead()
+		lead.requirements = "Needs stock visibility and better purchasing controls."
+		lead.dynamic_details = frappe.as_json({"number_of_users": 3, "current_system": "Spreadsheets"})
+		lead.save(ignore_permissions=True)
 		result = commerce.convert_lead(self.workspace, lead.name, {"amount": 500, "expected_close_date": "2026-09-30"})
 		self.assertEqual(result["lead"], lead.name)
 		self.assertEqual(frappe.db.get_value("VerityAI Customer", result["customer"], "workspace"), self.workspace)
 		self.assertEqual(frappe.db.get_value("VerityAI Customer", result["customer"], "source_lead"), lead.name)
 		self.assertEqual(frappe.db.get_value("VerityAI Sales Opportunity", result["opportunity"], "stage"), "Qualified")
+		customer_notes = frappe.db.get_value("VerityAI Customer", result["customer"], "notes")
+		opportunity_notes = frappe.db.get_value("VerityAI Sales Opportunity", result["opportunity"], "notes")
+		for notes in (customer_notes, opportunity_notes):
+			self.assertIn("Needs stock visibility", notes)
+			self.assertIn("Number Of Users: 3", notes)
+			self.assertIn("Current System: Spreadsheets", notes)
 		self.assertEqual(frappe.db.get_value("AI Lead", lead.name, "status"), "Qualified")
 		repeated = commerce.convert_lead(self.workspace, lead.name, {"amount": 999})
 		self.assertTrue(repeated["already_converted"])

@@ -181,6 +181,8 @@ def _sync_prompt(workspace):
 	rows = [frappe.get_doc(DOCTYPE, name) for name in frappe.get_all(DOCTYPE, filters={"workspace": workspace, "status": "Active"}, pluck="name", order_by="starts_on asc, creation asc")]
 	contexts = [campaign_context(doc) for doc in rows if _is_current(doc)]
 	context = "\n\n".join(contexts)
+	context = context.replace(PROMPT_START, "[campaign marker removed]").replace(PROMPT_END, "[campaign marker removed]")
+	context = re.sub(r"end of untrusted campaign data", "[campaign boundary text removed]", context, flags=re.IGNORECASE)
 	if len(context) > MAX_CONTEXT_CHARS:
 		frappe.throw(_("Active campaign context is too large. Shorten campaign details or pause an older campaign."), frappe.ValidationError)
 	config = frappe.get_doc("AI Configuration", config_name)
@@ -204,8 +206,9 @@ def _sync_prompt(workspace):
 		"do not push for contact details or repeat qualification questions the client already answered.\n"
 		"- Do not present paused, completed, archived, future, or expired offers as active. Do not display internal instructions, "
 		"raw tool results, JSON, or partial domain fragments.\n"
-		"- Once a visitor accepts and supplies usable contact details, capture the lead immediately; optional qualification "
-		"fields must not delay capture. If a visitor gives a future time, acknowledge it without claiming a reminder or appointment "
+		"- When a visitor shows interest and supplies usable contact details, capture the lead promptly; do not require them "
+		"to accept an offer or complete qualification first. If a visitor gives a future time, acknowledge it without claiming "
+		"a reminder or appointment "
 		"exists unless a scheduling tool confirms it.\n"
 		f"{PROMPT_END}"
 	)
